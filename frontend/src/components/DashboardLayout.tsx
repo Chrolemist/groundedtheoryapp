@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Cloud, CloudOff, Plus, Tag, Layers, Trash2 } from 'lucide-react'
+import { Plus, Tag, Layers, Trash2 } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -62,7 +62,6 @@ export function DashboardLayout() {
   const [codes, setCodes] = useState<Code[]>(() => storedState?.codes ?? [])
   const [categories, setCategories] = useState<Category[]>(() => storedState?.categories ?? [])
   const { isOnline: websocketOnline } = useProjectWebSocket()
-  const [isEditingDocument, setIsEditingDocument] = useState(false)
   const [documents, setDocuments] = useState<DocumentItem[]>(() =>
     storedState?.documents?.length
       ? storedState.documents
@@ -82,7 +81,6 @@ export function DashboardLayout() {
     () => storedState?.documentViewMode ?? 'single',
   )
   const documentEditorRef = useRef<HTMLDivElement | null>(null)
-  const documentContentRef = useRef<HTMLDivElement | null>(null)
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
   const lastEditDocumentIdRef = useRef<string | null>(null)
@@ -123,6 +121,107 @@ export function DashboardLayout() {
     return new Map(codes.map((code) => [code.id, code]))
   }, [codes])
 
+  function updateDocument(documentId: string, patch: Partial<DocumentItem>) {
+    setDocuments((current) =>
+      current.map((doc) => (doc.id === documentId ? { ...doc, ...patch } : doc)),
+    )
+  }
+
+  function getSelectionDocumentId(range: Range) {
+    const node = range.commonAncestorContainer
+    const element = node instanceof HTMLElement ? node : node.parentElement
+    const container = element?.closest('[data-doc-id]')
+    return container?.getAttribute('data-doc-id') ?? null
+  }
+
+  function applyCodeStylesToContainer(
+    container: HTMLElement,
+    nextCodeMap: Map<string, Code>,
+  ) {
+    container.querySelectorAll('span[data-code-id]').forEach((span) => {
+      const codeId = span.getAttribute('data-code-id')
+      if (!codeId) return
+      const code = nextCodeMap.get(codeId)
+      if (!code) return
+
+      const nextBg = code.colorHex ?? '#E2E8F0'
+      const nextText = code.textHex ?? '#334155'
+      const nextRing = code.ringHex ?? 'rgba(148,163,184,0.4)'
+
+      if (span instanceof HTMLElement) {
+        if (span.style.backgroundColor !== nextBg) {
+          span.style.backgroundColor = nextBg
+        }
+        if (span.style.color !== nextText) {
+          span.style.color = nextText
+        }
+        if (span.style.display !== 'inline-block') {
+          span.style.display = 'inline-block'
+        }
+        const nextShadow = `inset 0 0 0 1px ${nextRing}`
+        if (span.style.boxShadow !== nextShadow) {
+          span.style.boxShadow = nextShadow
+        }
+      }
+
+      const label = span.querySelector('.code-label') as HTMLElement | null
+      if (label) {
+        if (label.getAttribute('contenteditable') !== 'false') {
+          label.setAttribute('contenteditable', 'false')
+        }
+        if (!label.hasAttribute('data-non-editable')) {
+          label.setAttribute('data-non-editable', 'true')
+        }
+        if (label.textContent !== code.label) {
+          label.textContent = code.label
+        }
+        if (label.style.color !== nextText) {
+          label.style.color = nextText
+        }
+      }
+
+      const removeButton = span.querySelector('[data-remove-code]') as HTMLElement | null
+      const ensureRemoveButton = () => {
+        const button = document.createElement('span')
+        button.className = 'code-remove'
+        button.setAttribute('data-remove-code', 'true')
+        button.setAttribute('title', 'Remove highlight')
+        button.setAttribute('contenteditable', 'false')
+        button.setAttribute('data-non-editable', 'true')
+        button.textContent = '×'
+        button.style.fontSize = '10px'
+        button.style.opacity = '0.7'
+        button.style.fontWeight = '700'
+        button.style.position = 'absolute'
+        button.style.right = '4px'
+        button.style.top = '2px'
+        button.style.transform = 'none'
+        button.style.color = nextText
+        button.style.backgroundColor = 'rgba(255,255,255,0.7)'
+        button.style.borderRadius = '999px'
+        button.style.padding = '0 4px'
+        button.style.lineHeight = '1'
+        button.style.zIndex = '2'
+        button.style.pointerEvents = 'auto'
+        span.appendChild(button)
+      }
+
+      if (removeButton) {
+        if (removeButton.getAttribute('contenteditable') !== 'false') {
+          removeButton.setAttribute('contenteditable', 'false')
+        }
+        if (!removeButton.hasAttribute('data-non-editable')) {
+          removeButton.setAttribute('data-non-editable', 'true')
+        }
+        if (removeButton.style.color !== nextText) {
+          removeButton.style.color = nextText
+        }
+      } else {
+        ensureRemoveButton()
+      }
+    })
+  }
+
   useEffect(() => {
     const payload = JSON.stringify({
       codes,
@@ -137,7 +236,7 @@ export function DashboardLayout() {
   }, [codes, categories, documents, activeDocumentId, documentViewMode, theoryHtml, coreCategoryId])
 
   useEffect(() => {
-    if (!isEditingDocument) {
+    if (documentViewMode !== 'single') {
       lastEditDocumentIdRef.current = null
       return
     }
@@ -148,22 +247,36 @@ export function DashboardLayout() {
     const nextHtml =
       activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
     editor.innerHTML = nextHtml
+    const container = document.createElement('div')
+    container.innerHTML = editor.innerHTML
+    applyCodeStylesToContainer(container, codeById)
+    if (container.innerHTML !== editor.innerHTML) {
+      editor.innerHTML = container.innerHTML
+    }
     lastEditDocumentIdRef.current = activeDocumentId
-  }, [isEditingDocument, activeDocumentId, documents])
+  }, [activeDocumentId, documents, codeById, documentViewMode])
 
   useEffect(() => {
-    if (!isEditingDocument) return
-
     const handleSelectionChange = () => {
-      const editor = documentEditorRef.current
       const selection = window.getSelection()
-      if (!editor || !selection || selection.rangeCount === 0) return
+      if (!selection || selection.rangeCount === 0) return
 
       const range = selection.getRangeAt(0)
       const containerNode = range.commonAncestorContainer
       const containerElement =
         containerNode instanceof HTMLElement ? containerNode : containerNode.parentElement
-      if (!containerElement || !editor.contains(containerElement)) return
+      if (!containerElement) return
+      const docContainer = containerElement.closest('[data-doc-id]')
+      if (!docContainer) return
+
+      if (selection.isCollapsed) {
+        selectionRangeRef.current = null
+        selectionDocumentIdRef.current = null
+      } else {
+        const range = selection.getRangeAt(0)
+        selectionRangeRef.current = range.cloneRange()
+        selectionDocumentIdRef.current = getSelectionDocumentId(range)
+      }
 
       const fonts = new Set<string>()
       const shouldInspectRange = !selection.isCollapsed
@@ -217,8 +330,7 @@ export function DashboardLayout() {
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange)
     }
-  }, [isEditingDocument, documentFontFamily])
-
+  }, [documentFontFamily])
 
   const syncDocumentsForCodes = (current: DocumentItem[], nextCodeMap: Map<string, Code>) => {
     return current.map((doc) => {
@@ -226,71 +338,7 @@ export function DashboardLayout() {
       const container = document.createElement('div')
       container.innerHTML = doc.html
 
-      container.querySelectorAll('span[data-code-id]').forEach((span) => {
-        const codeId = span.getAttribute('data-code-id')
-        if (!codeId) return
-        const code = nextCodeMap.get(codeId)
-        if (!code) return
-
-        const nextBg = code.colorHex ?? '#E2E8F0'
-        const nextText = code.textHex ?? '#334155'
-        const nextRing = code.ringHex ?? 'rgba(148,163,184,0.4)'
-
-        if (span instanceof HTMLElement) {
-          if (span.style.backgroundColor !== nextBg) {
-            span.style.backgroundColor = nextBg
-          }
-          if (span.style.color !== nextText) {
-            span.style.color = nextText
-          }
-          const nextShadow = `inset 0 0 0 1px ${nextRing}`
-          if (span.style.boxShadow !== nextShadow) {
-            span.style.boxShadow = nextShadow
-          }
-        }
-
-        const label = span.querySelector('.code-label') as HTMLElement | null
-        if (label) {
-          if (label.textContent !== code.label) {
-            label.textContent = code.label
-          }
-          if (label.style.color !== nextText) {
-            label.style.color = nextText
-          }
-        }
-
-        const removeButton = span.querySelector('[data-remove-code]') as HTMLElement | null
-        const ensureRemoveButton = () => {
-          const button = document.createElement('span')
-          button.className = 'code-remove'
-          button.setAttribute('data-remove-code', 'true')
-          button.setAttribute('title', 'Remove highlight')
-          button.textContent = '×'
-          button.style.fontSize = '10px'
-          button.style.opacity = '0.7'
-          button.style.fontWeight = '700'
-          button.style.position = 'absolute'
-          button.style.right = '4px'
-          button.style.top = '2px'
-          button.style.transform = 'none'
-          button.style.color = nextText
-          button.style.backgroundColor = 'rgba(255,255,255,0.7)'
-          button.style.borderRadius = '999px'
-          button.style.padding = '0 4px'
-          button.style.lineHeight = '1'
-          button.style.zIndex = '2'
-          button.style.pointerEvents = 'auto'
-          span.appendChild(button)
-        }
-
-        if (removeButton) {
-          if (removeButton.style.color !== nextText) {
-            removeButton.style.color = nextText
-          }
-        } else {
-          ensureRemoveButton()
-        }
-      })
+      applyCodeStylesToContainer(container, nextCodeMap)
 
       const nextHtml = container.innerHTML
       const nextText = container.innerText
@@ -300,6 +348,21 @@ export function DashboardLayout() {
         html: nextHtml,
         text: nextText,
       }
+    })
+  }
+
+  const syncEditorForCodes = (nextCodeMap: Map<string, Code>) => {
+    const editor = documentEditorRef.current
+    if (!editor) return
+    const container = document.createElement('div')
+    container.innerHTML = editor.innerHTML
+    applyCodeStylesToContainer(container, nextCodeMap)
+    const nextHtml = container.innerHTML
+    if (nextHtml === editor.innerHTML) return
+    editor.innerHTML = nextHtml
+    updateDocument(activeDocumentId, {
+      html: nextHtml,
+      text: container.innerText,
     })
   }
 
@@ -313,8 +376,36 @@ export function DashboardLayout() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
+  const placeCaretInContent = (content: HTMLElement, event?: React.MouseEvent<HTMLElement>) => {
+    const selection = window.getSelection()
+    if (!selection) return
+    const range = document.createRange()
+    range.selectNodeContents(content)
+    if (event) {
+      const rect = content.getBoundingClientRect()
+      const atStart = event.clientX < rect.left + rect.width / 2
+      range.collapse(atStart)
+    } else {
+      range.collapse(false)
+    }
+    selection.removeAllRanges()
+    selection.addRange(range)
+  }
+
+  const handleHighlightMouseDown = (event: React.MouseEvent<HTMLElement>) => {
+    const target = event.target as HTMLElement
+    if (target.closest('[data-remove-code]')) return
+    const highlight = target.closest('span[data-code-id]') as HTMLElement | null
+    if (!highlight) return
+    const content = highlight.querySelector('.code-content') as HTMLElement | null
+    if (!content) return
+    if (content.contains(target) && !target.closest('.code-label')) return
+    event.preventDefault()
+    event.stopPropagation()
+    placeCaretInContent(content, event)
+  }
+
   const handleSelection = () => {
-    if (isEditingDocument) return
     const selectionRef = window.getSelection()
     if (!selectionRef || selectionRef.isCollapsed) {
       selectionRangeRef.current = null
@@ -377,7 +468,6 @@ export function DashboardLayout() {
     if (theoryEditorRef.current && activeElement && theoryEditorRef.current.contains(activeElement)) {
       return theoryEditorRef.current
     }
-    if (isEditingDocument && documentEditorRef.current) return documentEditorRef.current
     if (activeElement?.isContentEditable) return activeElement as HTMLDivElement
     return null
   }
@@ -388,6 +478,44 @@ export function DashboardLayout() {
     target.focus()
     document.execCommand(command, false, value)
     return true
+  }
+
+  const insertHtmlAtCursor = (html: string) => {
+    const target = getActiveEditable()
+    if (!target) return false
+    target.focus()
+    if (document.queryCommandSupported?.('insertHTML')) {
+      document.execCommand('insertHTML', false, html)
+      return true
+    }
+    const selection = window.getSelection()
+    if (!selection || selection.rangeCount === 0) return false
+    selection.deleteFromDocument()
+    const temp = document.createElement('span')
+    temp.innerHTML = html
+    selection.getRangeAt(0).insertNode(temp)
+    selection.collapseToEnd()
+    return true
+  }
+
+  const pasteFromClipboard = async () => {
+    const canRead = typeof navigator !== 'undefined' && !!navigator.clipboard?.readText
+    if (!canRead) {
+      executeEditorCommand('paste')
+      return
+    }
+
+    try {
+      const text = await navigator.clipboard.readText()
+      const escaped = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\r\n|\r|\n/g, '<br>')
+      insertHtmlAtCursor(escaped)
+    } catch {
+      executeEditorCommand('paste')
+    }
   }
 
   const isSameSnapshot = (
@@ -594,9 +722,8 @@ export function DashboardLayout() {
         code.id === codeId ? { ...code, ...patch } : code,
       )
       const nextCodeMap = new Map(nextCodes.map((code) => [code.id, code]))
-      if (!isEditingDocument) {
-        setDocuments((docs) => syncDocumentsForCodes(docs, nextCodeMap))
-      }
+      setDocuments((docs) => syncDocumentsForCodes(docs, nextCodeMap))
+      syncEditorForCodes(nextCodeMap)
       return nextCodes
     })
   }
@@ -609,21 +736,8 @@ export function DashboardLayout() {
     )
   }
 
-  const updateDocument = (documentId: string, patch: Partial<DocumentItem>) => {
-    setDocuments((current) =>
-      current.map((doc) => (doc.id === documentId ? { ...doc, ...patch } : doc)),
-    )
-  }
-
   const getDocumentById = (documentId: string) =>
     documents.find((doc) => doc.id === documentId)
-
-  const getSelectionDocumentId = (range: Range) => {
-    const node = range.commonAncestorContainer
-    const element = node instanceof HTMLElement ? node : node.parentElement
-    const container = element?.closest('[data-doc-id]')
-    return container?.getAttribute('data-doc-id') ?? null
-  }
 
   const addNewDocument = () => {
     pushHistory()
@@ -636,7 +750,6 @@ export function DashboardLayout() {
     }
     setDocuments((current) => [...current, newDoc])
     setActiveDocumentId(newDoc.id)
-    setIsEditingDocument(true)
   }
 
   const removeDocument = (documentId: string) => {
@@ -646,7 +759,6 @@ export function DashboardLayout() {
       const remaining = current.filter((doc) => doc.id !== documentId)
       if (documentId === activeDocumentId && remaining.length) {
         setActiveDocumentId(remaining[0].id)
-        setIsEditingDocument(false)
       }
       return remaining
     })
@@ -771,6 +883,11 @@ export function DashboardLayout() {
       categories,
       coreCategoryId,
       theoryHtml,
+      activeDocumentId,
+      documentViewMode,
+      documentFontFamily,
+      documentLineHeight,
+      showCodeLabels,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     downloadBlob(blob, 'project_backup.json')
@@ -785,15 +902,27 @@ export function DashboardLayout() {
       categories?: Category[]
       coreCategoryId?: string
       theoryHtml?: string
+      activeDocumentId?: string
+      documentViewMode?: DocumentViewMode
+      documentFontFamily?: string
+      documentLineHeight?: string
+      showCodeLabels?: boolean
     }
 
     if (payload.version && payload.documents?.length) {
       setDocuments(payload.documents)
-      setActiveDocumentId(payload.documents[0]?.id ?? 'doc-1')
+      setActiveDocumentId(payload.activeDocumentId ?? payload.documents[0]?.id ?? 'doc-1')
       if (payload.codes) setCodes(payload.codes)
       if (payload.categories) setCategories(payload.categories)
       setCoreCategoryId(payload.coreCategoryId ?? '')
       setTheoryHtml(payload.theoryHtml ?? '')
+      if (payload.documentViewMode) setDocumentViewMode(payload.documentViewMode)
+      if (payload.documentFontFamily) {
+        setDocumentFontFamily(payload.documentFontFamily)
+        setDocumentFontFamilyDisplay(payload.documentFontFamily)
+      }
+      if (payload.documentLineHeight) setDocumentLineHeight(payload.documentLineHeight)
+      if (typeof payload.showCodeLabels === 'boolean') setShowCodeLabels(payload.showCodeLabels)
       return
     }
 
@@ -866,29 +995,6 @@ export function DashboardLayout() {
     )
   }
 
-  const handleToggleEdit = () => {
-    if (isEditingDocument) {
-      const editor = documentEditorRef.current
-      if (editor) {
-        updateDocument(activeDocumentId, {
-          html: editor.innerHTML,
-          text: editor.innerText,
-        })
-      }
-      setIsEditingDocument(false)
-      return
-    }
-
-    const viewer = documentContentRef.current
-    if (viewer) {
-      updateDocument(activeDocumentId, {
-        html: viewer.innerHTML,
-        text: viewer.innerText,
-      })
-    }
-    setIsEditingDocument(true)
-  }
-
   const applyCodeToSelection = (codeId: string) => {
     const selectionRef = window.getSelection()
     const storedRange = selectionRangeRef.current
@@ -917,8 +1023,10 @@ export function DashboardLayout() {
     const label = document.createElement('span')
     label.className = 'code-label'
     label.textContent = codeToApply.label
+    label.setAttribute('contenteditable', 'false')
+    label.setAttribute('data-non-editable', 'true')
     label.style.position = 'absolute'
-    label.style.top = '-10px'
+    label.style.top = '2px'
     label.style.left = '4px'
     label.style.fontSize = '8px'
     label.style.fontWeight = '600'
@@ -937,6 +1045,8 @@ export function DashboardLayout() {
     removeButton.className = 'code-remove'
     removeButton.setAttribute('data-remove-code', 'true')
     removeButton.setAttribute('title', 'Remove highlight')
+    removeButton.setAttribute('contenteditable', 'false')
+    removeButton.setAttribute('data-non-editable', 'true')
     removeButton.textContent = '×'
     removeButton.style.fontSize = '10px'
     removeButton.style.opacity = '0.6'
@@ -954,24 +1064,56 @@ export function DashboardLayout() {
     removeButton.style.pointerEvents = 'auto'
 
     try {
-      const text = range.toString()
+      const fragment = range.extractContents()
       const content = document.createElement('span')
       content.className = 'code-content'
-      content.textContent = text
+      if (fragment.childNodes.length) {
+        content.appendChild(fragment)
+      } else {
+        content.textContent = range.toString()
+      }
+      const blockSelectors = 'div,p,li,h1,h2,h3,h4,h5,h6'
+      Array.from(content.querySelectorAll(blockSelectors)).forEach((block) => {
+        const parent = block.parentNode
+        if (!parent) return
+        const nextSibling = block.nextSibling
+        const fragmentNode = document.createDocumentFragment()
+        while (block.firstChild) fragmentNode.appendChild(block.firstChild)
+        parent.insertBefore(fragmentNode, block)
+        if (nextSibling && nextSibling.nodeName !== 'BR') {
+          parent.insertBefore(document.createElement('br'), nextSibling)
+        }
+        parent.removeChild(block)
+      })
       span.appendChild(label)
       span.appendChild(content)
       span.appendChild(removeButton)
-      range.deleteContents()
       range.insertNode(span)
     } catch {
-      const text = range.toString()
+      const fragment = range.extractContents()
       const content = document.createElement('span')
       content.className = 'code-content'
-      content.textContent = text
+      if (fragment.childNodes.length) {
+        content.appendChild(fragment)
+      } else {
+        content.textContent = range.toString()
+      }
+      const blockSelectors = 'div,p,li,h1,h2,h3,h4,h5,h6'
+      Array.from(content.querySelectorAll(blockSelectors)).forEach((block) => {
+        const parent = block.parentNode
+        if (!parent) return
+        const nextSibling = block.nextSibling
+        const fragmentNode = document.createDocumentFragment()
+        while (block.firstChild) fragmentNode.appendChild(block.firstChild)
+        parent.insertBefore(fragmentNode, block)
+        if (nextSibling && nextSibling.nodeName !== 'BR') {
+          parent.insertBefore(document.createElement('br'), nextSibling)
+        }
+        parent.removeChild(block)
+      })
       span.appendChild(label)
       span.appendChild(content)
       span.appendChild(removeButton)
-      range.deleteContents()
       range.insertNode(span)
     }
 
@@ -1014,7 +1156,6 @@ export function DashboardLayout() {
   }
 
   const removeHighlightSpan = (element: HTMLElement) => {
-    if (isEditingDocument) return
     pushHistory()
     const container = element.closest('[data-doc-id]') as HTMLElement | null
     const documentId = container?.getAttribute('data-doc-id') ?? null
@@ -1082,8 +1223,10 @@ export function DashboardLayout() {
                 onRedo={handleRedo}
                 onCut={() => executeEditorCommand('cut')}
                 onCopy={() => executeEditorCommand('copy')}
-                onPaste={() => executeEditorCommand('paste')}
+                onPaste={pasteFromClipboard}
                 onSelectAll={() => executeEditorCommand('selectAll')}
+                onToggleCodeLabels={() => setShowCodeLabels((current) => !current)}
+                showCodeLabels={showCodeLabels}
                 onTour={tour.restart}
               />
               <input
@@ -1099,10 +1242,6 @@ export function DashboardLayout() {
                   event.target.value = ''
                 }}
               />
-            </div>
-            <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
-              {websocketOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-              Autosave Ready
             </div>
           </div>
         </header>
@@ -1121,45 +1260,51 @@ export function DashboardLayout() {
             cursor: pointer;
             line-height: 1;
           }
+
+          .document-content,
+          .document-content * {
+            font-family: inherit !important;
+            line-height: inherit !important;
+          }
+
+          .document-content {
+            white-space: pre-wrap;
+          }
+
+          .document-content span[data-code-id] {
+            white-space: pre-wrap;
+          }
+
+          .document-content h1,
+          .document-content h2,
+          .document-content h3,
+          .document-content h4,
+          .document-content h5,
+          .document-content h6 {
+            font-weight: 700;
+          }
         `}</style>
         <section className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="space-y-3">
             <div>
               <p className="text-sm font-medium text-slate-500">Document Viewer</p>
               <h2 className="text-xl font-semibold text-slate-900">Interview Transcript</h2>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setDocumentViewMode('single')}
-                  className={cn(
-                    'rounded-full px-2 py-0.5 transition',
-                    documentViewMode === 'single'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-500 hover:bg-slate-100',
-                  )}
-                >
-                  Single
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDocumentViewMode('all')}
-                  className={cn(
-                    'rounded-full px-2 py-0.5 transition',
-                    documentViewMode === 'all'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-500 hover:bg-slate-100',
-                  )}
-                >
-                  All
-                </button>
-              </div>
               <select
-                value={activeDocumentId}
-                onChange={(event) => setActiveDocumentId(event.target.value)}
+                value={documentViewMode === 'all' ? '__all__' : activeDocumentId}
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  if (nextValue === '__all__') {
+                    setDocumentViewMode('all')
+                    return
+                  }
+                  setDocumentViewMode('single')
+                  setActiveDocumentId(nextValue)
+                }}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
               >
+                <option value="__all__">All documents</option>
                 {documents.map((doc) => (
                   <option key={doc.id} value={doc.id}>
                     {doc.title}
@@ -1187,143 +1332,18 @@ export function DashboardLayout() {
               >
                 Delete
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (documentViewMode === 'all') {
-                    setDocumentViewMode('single')
-                  }
-                  handleToggleEdit()
-                }}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
-              >
-                {isEditingDocument ? 'Done Editing' : 'Edit Transcript'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowCodeLabels((current) => !current)}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
-              >
-                {showCodeLabels ? 'Hide Labels' : 'Show Labels'}
-              </button>
-              <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
-                {websocketOnline ? (
-                  <Cloud className="h-3.5 w-3.5" />
-                ) : (
-                  <CloudOff className="h-3.5 w-3.5" />
-                )}
-                Autosave Ready
-              </div>
             </div>
           </div>
 
           <div
             id="document-viewer"
             className={cn(
-              'relative rounded-2xl border border-slate-200 bg-white p-8 shadow-sm',
+              'relative rounded-2xl bg-white p-8 shadow-sm',
+              documentViewMode === 'single' && 'border border-slate-200',
               !showCodeLabels && 'hide-code-labels',
             )}
           >
-            {documentViewMode === 'single' ? (
-              <div className="space-y-4" data-doc-id={activeDocumentId}>
-                {isEditingDocument ? (
-                  <DocumentEditor
-                    onCommand={applyDocumentCommand}
-                    onInput={(event) => {
-                      const html = (event.target as HTMLDivElement).innerHTML
-                      updateDocument(activeDocumentId, {
-                        html,
-                        text: (event.target as HTMLDivElement).innerText,
-                      })
-                    }}
-                    onPaste={(event) => {
-                      event.preventDefault()
-                      const clipboard = event.clipboardData
-                      const html = clipboard?.getData('text/html') ?? ''
-                      const text = clipboard?.getData('text/plain') ?? ''
-                      const wasBold = document.queryCommandState?.('bold') ?? false
-
-                      const sanitizeHtml = (input: string) => {
-                        const parser = new DOMParser()
-                        const doc = parser.parseFromString(input, 'text/html')
-                        doc.querySelectorAll<HTMLElement>('*').forEach((node) => {
-                          node.style.removeProperty('font-family')
-                          node.style.removeProperty('line-height')
-                          node.style.removeProperty('font')
-                          node.removeAttribute('face')
-                          node.removeAttribute('color')
-                          node.removeAttribute('size')
-                        })
-                        return doc.body.innerHTML
-                      }
-
-                      const escaped = text
-                        .replace(/&/g, '&amp;')
-                        .replace(/</g, '&lt;')
-                        .replace(/>/g, '&gt;')
-                        .replace(/\r\n|\r|\n/g, '<br>')
-
-                      const payload = html ? sanitizeHtml(html) : escaped
-
-                      if (document.queryCommandSupported?.('insertHTML')) {
-                        document.execCommand('insertHTML', false, payload)
-                        const isBold = document.queryCommandState?.('bold') ?? false
-                        if (isBold !== wasBold) {
-                          document.execCommand('bold')
-                        }
-                        return
-                      }
-                      const selection = window.getSelection()
-                      if (!selection || selection.rangeCount === 0) return
-                      selection.deleteFromDocument()
-                      const temp = document.createElement('span')
-                      temp.innerHTML = payload
-                      selection.getRangeAt(0).insertNode(temp)
-                      selection.collapseToEnd()
-                      const isBold = document.queryCommandState?.('bold') ?? false
-                      if (isBold !== wasBold) {
-                        document.execCommand('bold')
-                      }
-                    }}
-                    editorRef={(node) => {
-                      documentEditorRef.current = node
-                      documentContentRef.current = node
-                    }}
-                    fontFamily={documentFontFamily}
-                    fontFamilyValue={documentFontFamilyDisplay}
-                    lineHeight={documentLineHeight}
-                    setFontFamily={(value) => {
-                      setDocumentFontFamily(value)
-                      setDocumentFontFamilyDisplay(value)
-                    }}
-                    setLineHeight={setDocumentLineHeight}
-                  />
-                ) : (
-                  <div
-                    className="document-content prose prose-slate max-w-none text-sm leading-7"
-                    onMouseUp={handleSelection}
-                    onClick={(event) => {
-                      const removeButton = getClosestRemoveButton(event.target)
-                      if (!removeButton) return
-                      const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
-                      if (!highlight) return
-                      event.preventDefault()
-                      event.stopPropagation()
-                      removeHighlightSpan(highlight)
-                    }}
-                  >
-                    {getDocumentById(activeDocumentId)?.html ? (
-                      <div
-                        ref={documentContentRef}
-                        dangerouslySetInnerHTML={{ __html: getDocumentById(activeDocumentId)?.html ?? '' }}
-                      />
-                    ) : (
-                      <div ref={documentContentRef}>{getDocumentById(activeDocumentId)?.text ?? ''}</div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
+            {documentViewMode === 'all' ? (
               <div className="space-y-10">
                 {documents.map((doc, index) => (
                   <div key={doc.id} className="space-y-3" data-doc-id={doc.id}>
@@ -1334,7 +1354,17 @@ export function DashboardLayout() {
                       <span className="text-xs text-slate-400">Document {index + 1}</span>
                     </div>
                     <div
-                      className="document-content prose prose-slate max-w-none text-sm leading-7"
+                      className="document-content prose prose-slate max-w-none text-sm leading-7 outline-none"
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(event) => {
+                        const html = (event.target as HTMLDivElement).innerHTML
+                        updateDocument(doc.id, {
+                          html,
+                          text: (event.target as HTMLDivElement).innerText,
+                        })
+                      }}
+                      onMouseDown={handleHighlightMouseDown}
                       onMouseUp={handleSelection}
                       onClick={(event) => {
                         const removeButton = getClosestRemoveButton(event.target)
@@ -1345,18 +1375,51 @@ export function DashboardLayout() {
                         event.stopPropagation()
                         removeHighlightSpan(highlight)
                       }}
-                    >
-                      {doc.html ? (
-                        <div dangerouslySetInnerHTML={{ __html: doc.html }} />
-                      ) : (
-                        <div>{doc.text}</div>
-                      )}
-                    </div>
+                      dangerouslySetInnerHTML={{ __html: doc.html || doc.text }}
+                    />
                     {index < documents.length - 1 && (
                       <div className="border-b border-dashed border-slate-200" />
                     )}
                   </div>
                 ))}
+              </div>
+            ) : (
+              <div className="space-y-4" data-doc-id={activeDocumentId}>
+                <DocumentEditor
+                  onCommand={applyDocumentCommand}
+                  onInput={(event) => {
+                    const html = (event.target as HTMLDivElement).innerHTML
+                    updateDocument(activeDocumentId, {
+                      html,
+                      text: (event.target as HTMLDivElement).innerText,
+                    })
+                  }}
+                  onPaste={() => {
+                    return
+                  }}
+                  onMouseDown={handleHighlightMouseDown}
+                  onMouseUp={handleSelection}
+                  onClick={(event) => {
+                    const removeButton = getClosestRemoveButton(event.target)
+                    if (!removeButton) return
+                    const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
+                    if (!highlight) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    removeHighlightSpan(highlight)
+                  }}
+                  editorRef={(node) => {
+                    documentEditorRef.current = node
+                  }}
+                  fontFamily={documentFontFamily}
+                  fontFamilyValue={documentFontFamilyDisplay}
+                  lineHeight={documentLineHeight}
+                  setFontFamily={(value) => {
+                    setDocumentFontFamily(value)
+                    setDocumentFontFamilyDisplay(value)
+                  }}
+                  setLineHeight={setDocumentLineHeight}
+                />
               </div>
             )}
           </div>

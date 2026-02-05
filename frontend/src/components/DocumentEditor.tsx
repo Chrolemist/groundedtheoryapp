@@ -4,6 +4,9 @@ type DocumentEditorProps = {
   onCommand: (command: string, value?: string) => void
   onInput: (event: FormEvent<HTMLDivElement>) => void
   onPaste: (event: React.ClipboardEvent<HTMLDivElement>) => void
+  onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void
+  onMouseUp?: (event: React.MouseEvent<HTMLDivElement>) => void
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   editorRef: (node: HTMLDivElement | null) => void
   fontFamily: string
   fontFamilyValue: string
@@ -16,6 +19,9 @@ export function DocumentEditor({
   onCommand,
   onInput,
   onPaste,
+  onMouseDown,
+  onMouseUp,
+  onClick,
   editorRef,
   fontFamily,
   fontFamilyValue,
@@ -92,12 +98,15 @@ export function DocumentEditor({
       </div>
       <div
         ref={editorRef}
-        className="document-content min-h-[220px] whitespace-pre-wrap px-3 py-3 text-sm leading-7 text-slate-800 outline-none"
+        className="document-content min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
         style={{ fontFamily, lineHeight }}
         contentEditable
         suppressContentEditableWarning
         onInput={onInput}
         onPaste={onPaste}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onClick={onClick}
       />
     </div>
   )
