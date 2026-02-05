@@ -20,7 +20,7 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
       {
         target: 'body',
         placement: 'center',
-        content: 'Valkommen! Den har touren visar open, axial och selective coding.',
+        content: 'Valkommen! Rundturen visar open, axial och selective coding.',
       },
       {
         target: '#document-viewer',

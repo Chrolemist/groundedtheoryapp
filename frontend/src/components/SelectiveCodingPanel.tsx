@@ -67,7 +67,7 @@ export function SelectiveCodingPanel({
         </p>
       </div>
       <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
-        <div id="memos-section">
+        <div>
           <label
             htmlFor="core-category"
             className="text-xs font-semibold uppercase tracking-wide text-slate-400"
@@ -172,7 +172,7 @@ export function SelectiveCodingPanel({
             </div>
           </div>
         </div>
-        <div>
+        <div id="memos-section">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             Categories & Codes Overview
           </p>
