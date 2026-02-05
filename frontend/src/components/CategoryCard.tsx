@@ -39,6 +39,8 @@ export function CategoryCard({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <input
+          id={`category-name-${category.id}`}
+          name={`category-name-${category.id}`}
           value={category.name}
           onChange={(event) => onUpdate(category.id, { name: event.target.value })}
           className="min-w-[160px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900"
@@ -83,10 +85,15 @@ export function CategoryCard({
       {isExpanded ? (
         <div className="mt-4 grid gap-3">
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label
+              htmlFor={`category-precondition-${category.id}`}
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
               Förutsättning (Precondition)
             </label>
             <textarea
+              id={`category-precondition-${category.id}`}
+              name={`category-precondition-${category.id}`}
               value={category.precondition}
               onChange={(event) => onUpdate(category.id, { precondition: event.target.value })}
               onBlur={(event) => onUpdate(category.id, { precondition: event.target.value })}
@@ -96,10 +103,15 @@ export function CategoryCard({
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label
+              htmlFor={`category-action-${category.id}`}
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
               Handling (Action)
             </label>
             <textarea
+              id={`category-action-${category.id}`}
+              name={`category-action-${category.id}`}
               value={category.action}
               onChange={(event) => onUpdate(category.id, { action: event.target.value })}
               onBlur={(event) => onUpdate(category.id, { action: event.target.value })}
@@ -109,10 +121,15 @@ export function CategoryCard({
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label
+              htmlFor={`category-consequence-${category.id}`}
+              className="text-xs font-semibold uppercase tracking-wide text-slate-500"
+            >
               Konsekvens (Consequence)
             </label>
             <textarea
+              id={`category-consequence-${category.id}`}
+              name={`category-consequence-${category.id}`}
               value={category.consequence}
               onChange={(event) => onUpdate(category.id, { consequence: event.target.value })}
               onBlur={(event) => onUpdate(category.id, { consequence: event.target.value })}

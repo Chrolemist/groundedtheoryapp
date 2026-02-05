@@ -1980,7 +1980,10 @@ export function DashboardLayout() {
                   </div>
                   <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <label
+                        htmlFor="core-category"
+                        className="text-xs font-semibold uppercase tracking-wide text-slate-400"
+                      >
                         Core Category
                       </label>
                       <select
@@ -1999,9 +2002,9 @@ export function DashboardLayout() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                         Categories & Codes Overview
-                      </label>
+                      </p>
                       <div className="mt-2 grid gap-3 md:grid-cols-2">
                         {categories.length ? (
                           categories.map((category) => (
@@ -2053,7 +2056,11 @@ export function DashboardLayout() {
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      <label
+                        id="theory-narrative-label"
+                        htmlFor="theory-narrative"
+                        className="text-xs font-semibold uppercase tracking-wide text-slate-400"
+                      >
                         Theory Narrative
                       </label>
                       <div className="mt-2 rounded-lg border border-slate-200 bg-white">
@@ -2108,6 +2115,10 @@ export function DashboardLayout() {
                           )}
                           <div
                             ref={theoryEditorRef}
+                            id="theory-narrative"
+                            role="textbox"
+                            aria-multiline="true"
+                            aria-labelledby="theory-narrative-label"
                             className="min-h-[140px] px-3 py-3 text-sm text-slate-700 outline-none"
                             contentEditable
                             suppressContentEditableWarning
