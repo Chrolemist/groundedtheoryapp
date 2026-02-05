@@ -4,6 +4,7 @@ from io import BytesIO
 import os
 from pathlib import Path
 import json
+import logging
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -14,6 +15,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class DocumentItem(BaseModel):
@@ -254,9 +259,16 @@ def normalize_project_state(payload: Dict) -> ProjectState:
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
+    logger.info("New WebSocket connection request")
     global in_memory_project
     global in_memory_project_raw
-    user = await manager.connect(websocket)
+    try:
+        user = await manager.connect(websocket)
+        logger.info(f"WebSocket accepted. User: {user['id']} ({user['name']})")
+    except Exception as e:
+        logger.error(f"WebSocket connection failed: {e}")
+        return
+
     await websocket.send_json(
         {
             "type": "hello",
@@ -270,6 +282,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         while True:
             raw = await websocket.receive_text()
+            # logger.debug(f"Received message: {raw[:100]}...")  # Optional: Log incoming messages
             try:
                 data = json.loads(raw)
             except Exception:
@@ -309,6 +322,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     }
                 )
     except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected: {manager.connection_users.get(websocket)}")
         user_id = manager.connection_users.get(websocket)
         manager.disconnect(websocket)
         await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
