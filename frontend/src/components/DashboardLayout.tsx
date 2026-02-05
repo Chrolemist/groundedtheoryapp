@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
 import { cn } from '../lib/cn'
-import { type Category, type Code } from '../data/mockData'
+import { type Category, type Code } from '../types'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
 import { useProjectWebSocket } from '../hooks/useProjectWebSocket.ts'
@@ -29,6 +29,19 @@ type DocumentItem = {
   title: string
   text: string
   html: string
+}
+
+type PresenceUser = {
+  id: string
+  name: string
+  color: string
+}
+
+type CursorPresence = {
+  x: number
+  y: number
+  documentId?: string
+  updatedAt: number
 }
 
 const tabConfig: Array<{ key: TabKey; label: string; icon: typeof Tag }> = [
@@ -61,7 +74,70 @@ export function DashboardLayout() {
   const [activeTab, setActiveTab] = useState<TabKey>('open')
   const [codes, setCodes] = useState<Code[]>(() => storedState?.codes ?? [])
   const [categories, setCategories] = useState<Category[]>(() => storedState?.categories ?? [])
-  const { isOnline: websocketOnline } = useProjectWebSocket()
+  const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
+  const [localUser, setLocalUser] = useState<PresenceUser | null>(null)
+  const [remoteCursors, setRemoteCursors] = useState<Record<string, CursorPresence>>({})
+  const localUserRef = useRef<PresenceUser | null>(null)
+  const isApplyingRemoteRef = useRef(false)
+  const { isOnline: websocketOnline, sendJson } = useProjectWebSocket({
+    onMessage: (payload) => {
+      if (!payload || typeof payload !== 'object') return
+      const data = payload as Record<string, unknown>
+      const type = data.type as string | undefined
+
+      if (type === 'hello') {
+        const user = data.user as PresenceUser | undefined
+        if (user) {
+          setLocalUser(user)
+          localUserRef.current = user
+        }
+        const users = data.users as PresenceUser[] | undefined
+        if (users) setPresenceUsers(users)
+        const projectRaw = (data.project_raw ?? data.project) as Record<string, unknown> | undefined
+        if (projectRaw) {
+          applyRemoteProject(projectRaw)
+        }
+        return
+      }
+
+      if (type === 'presence:update') {
+        const users = data.users as PresenceUser[] | undefined
+        if (users) setPresenceUsers(users)
+        return
+      }
+
+      if (type === 'cursor:update') {
+        const userId = data.userId as string | undefined
+        const cursor = data.cursor as CursorPresence | undefined
+        if (!userId || !cursor) return
+        setRemoteCursors((current) => ({
+          ...current,
+          [userId]: cursor,
+        }))
+        return
+      }
+
+      if (type === 'cursor:clear') {
+        const userId = data.userId as string | undefined
+        if (!userId) return
+        setRemoteCursors((current) => {
+          const next = { ...current }
+          delete next[userId]
+          return next
+        })
+        return
+      }
+
+      if (type === 'project:update') {
+        const senderId = data.sender_id as string | undefined
+        if (senderId && senderId === localUserRef.current?.id) return
+        const projectRaw = (data.project_raw ?? data.project) as Record<string, unknown> | undefined
+        if (projectRaw) {
+          applyRemoteProject(projectRaw)
+        }
+      }
+    },
+  })
   const [documents, setDocuments] = useState<DocumentItem[]>(() =>
     storedState?.documents?.length
       ? storedState.documents
@@ -117,9 +193,122 @@ export function DashboardLayout() {
     }>
   }>({ past: [], future: [] })
 
+  const handleRenameUser = () => {
+    const currentName = localUser?.name ?? ''
+    const nextName = window.prompt('Your name', currentName)?.trim()
+    if (!nextName) return
+    sendJson({ type: 'presence:rename', name: nextName })
+  }
+
   const codeById = useMemo(() => {
     return new Map(codes.map((code) => [code.id, code]))
   }, [codes])
+
+  const presenceById = useMemo(() => {
+    return new Map(presenceUsers.map((user) => [user.id, user]))
+  }, [presenceUsers])
+
+  function applyRemoteProject(project: Record<string, unknown>) {
+    isApplyingRemoteRef.current = true
+
+    const incomingDocuments = Array.isArray(project.documents)
+      ? (project.documents as Array<Record<string, unknown>>).map((doc) => ({
+          id: String(doc.id ?? ''),
+          title: String(doc.title ?? ''),
+          html: String(doc.html ?? ''),
+          text: String(doc.text ?? doc.content ?? ''),
+        }))
+      : []
+
+    const incomingCodes = Array.isArray(project.codes)
+      ? (project.codes as Array<Record<string, unknown>>).map((code) => {
+          const colorHex = String(code.colorHex ?? code.color ?? '#E2E8F0')
+          const textHex = String(code.textHex ?? getReadableTextColor(colorHex))
+          return {
+            id: String(code.id ?? ''),
+            label: String(code.label ?? code.name ?? 'Untitled'),
+            description: String(code.description ?? ''),
+            colorClass: String(code.colorClass ?? 'bg-slate-100 text-slate-700 ring-slate-200'),
+            colorHex,
+            textHex,
+            ringHex: String(code.ringHex ?? `${textHex}33`),
+          }
+        })
+      : []
+
+    const incomingCategories = Array.isArray(project.categories)
+      ? (project.categories as Array<Record<string, unknown>>).map((category) => ({
+          id: String(category.id ?? ''),
+          name: String(category.name ?? ''),
+          codeIds: Array.isArray(category.codeIds)
+            ? (category.codeIds as string[])
+            : Array.isArray(category.contained_code_ids)
+              ? (category.contained_code_ids as string[])
+              : [],
+          precondition: String(category.precondition ?? ''),
+          action: String(category.action ?? ''),
+          consequence: String(category.consequence ?? ''),
+        }))
+      : []
+
+    setDocuments(incomingDocuments.length ? incomingDocuments : documents)
+    if (incomingCodes.length) setCodes(incomingCodes)
+    if (incomingCategories.length) setCategories(incomingCategories)
+
+    if (typeof project.coreCategoryId === 'string') {
+      setCoreCategoryId(project.coreCategoryId)
+    } else if (typeof project.core_category_id === 'string') {
+      setCoreCategoryId(project.core_category_id)
+    }
+
+    if (typeof project.theoryHtml === 'string') {
+      setTheoryHtml(project.theoryHtml)
+    } else if (typeof project.theory_description === 'string') {
+      setTheoryHtml(project.theory_description)
+    }
+
+    setTimeout(() => {
+      isApplyingRemoteRef.current = false
+    }, 0)
+  }
+
+  useEffect(() => {
+    localUserRef.current = localUser
+  }, [localUser])
+
+  useEffect(() => {
+    if (isApplyingRemoteRef.current) return
+    if (!sendJson) return
+    sendJson({
+      type: 'project:update',
+      project_raw: {
+        documents,
+        codes,
+        categories,
+        coreCategoryId,
+        theoryHtml,
+      },
+    })
+  }, [documents, codes, categories, coreCategoryId, theoryHtml, sendJson])
+
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      const now = Date.now()
+      setRemoteCursors((current) => {
+        const next: Record<string, CursorPresence> = {}
+        Object.entries(current).forEach(([userId, cursor]) => {
+          if (now - cursor.updatedAt < 8000) {
+            next[userId] = cursor
+          }
+        })
+        return next
+      })
+    }, 3000)
+
+    return () => {
+      window.clearInterval(interval)
+    }
+  }, [])
 
   function updateDocument(documentId: string, patch: Partial<DocumentItem>) {
     setDocuments((current) =>
@@ -259,15 +448,24 @@ export function DashboardLayout() {
   useEffect(() => {
     const handleSelectionChange = () => {
       const selection = window.getSelection()
-      if (!selection || selection.rangeCount === 0) return
+      if (!selection || selection.rangeCount === 0) {
+        sendJson?.({ type: 'cursor:clear' })
+        return
+      }
 
       const range = selection.getRangeAt(0)
       const containerNode = range.commonAncestorContainer
       const containerElement =
         containerNode instanceof HTMLElement ? containerNode : containerNode.parentElement
-      if (!containerElement) return
-      const docContainer = containerElement.closest('[data-doc-id]')
-      if (!docContainer) return
+      if (!containerElement) {
+        sendJson?.({ type: 'cursor:clear' })
+        return
+      }
+      const docContainer = containerElement.closest('[data-doc-id]') as HTMLElement | null
+      if (!docContainer) {
+        sendJson?.({ type: 'cursor:clear' })
+        return
+      }
 
       if (selection.isCollapsed) {
         selectionRangeRef.current = null
@@ -276,6 +474,17 @@ export function DashboardLayout() {
         const range = selection.getRangeAt(0)
         selectionRangeRef.current = range.cloneRange()
         selectionDocumentIdRef.current = getSelectionDocumentId(range)
+      }
+
+      const rect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+      if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+        const cursorPayload: CursorPresence = {
+          x: rect.left,
+          y: rect.top,
+          documentId: docContainer.getAttribute('data-doc-id') ?? undefined,
+          updatedAt: Date.now(),
+        }
+        sendJson?.({ type: 'cursor:update', cursor: cursorPayload })
       }
 
       const fonts = new Set<string>()
@@ -330,7 +539,16 @@ export function DashboardLayout() {
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange)
     }
-  }, [documentFontFamily])
+  }, [documentFontFamily, sendJson])
+
+  useEffect(() => {
+    const editor = theoryEditorRef.current
+    if (!editor) return
+    if (document.activeElement === editor) return
+    if (editor.innerHTML !== theoryHtml) {
+      editor.innerHTML = theoryHtml
+    }
+  }, [theoryHtml])
 
   const syncDocumentsForCodes = (current: DocumentItem[], nextCodeMap: Map<string, Code>) => {
     return current.map((doc) => {
@@ -874,6 +1092,9 @@ export function DashboardLayout() {
         id: category.id,
         name: category.name,
         contained_code_ids: category.codeIds,
+        precondition: category.precondition ?? '',
+        action: category.action ?? '',
+        consequence: category.consequence ?? '',
       })),
       core_category_id: coreCategoryId || null,
       theory_description: theoryHtml.replace(/<[^>]*>/g, '').trim(),
@@ -935,7 +1156,15 @@ export function DashboardLayout() {
       setDocuments(payload.documents)
       setActiveDocumentId(payload.activeDocumentId ?? payload.documents[0]?.id ?? 'doc-1')
       if (payload.codes) setCodes(payload.codes)
-      if (payload.categories) setCategories(payload.categories)
+      if (payload.categories)
+        setCategories(
+          payload.categories.map((category) => ({
+            ...category,
+            precondition: category.precondition ?? '',
+            action: category.action ?? '',
+            consequence: category.consequence ?? '',
+          })),
+        )
       setCoreCategoryId(payload.coreCategoryId ?? '')
       setTheoryHtml(payload.theoryHtml ?? '')
       if (payload.documentViewMode) setDocumentViewMode(payload.documentViewMode)
@@ -951,7 +1180,14 @@ export function DashboardLayout() {
     const legacy = JSON.parse(text) as {
       documents?: Array<{ id: string; title: string; content: string }>
       codes?: Array<{ id: string; name: string; color: string }>
-      categories?: Array<{ id: string; name: string; contained_code_ids: string[] }>
+      categories?: Array<{
+        id: string
+        name: string
+        contained_code_ids: string[]
+        precondition?: string
+        action?: string
+        consequence?: string
+      }>
       core_category_id?: string | null
       theory_description?: string
     }
@@ -986,6 +1222,9 @@ export function DashboardLayout() {
           id: category.id,
           name: category.name,
           codeIds: category.contained_code_ids ?? [],
+          precondition: category.precondition ?? '',
+          action: category.action ?? '',
+          consequence: category.consequence ?? '',
         })),
       )
     }
@@ -1206,6 +1445,9 @@ export function DashboardLayout() {
         id,
         name: 'New Category',
         codeIds: [],
+        precondition: '',
+        action: '',
+        consequence: '',
       },
     ])
   }
@@ -1215,7 +1457,7 @@ export function DashboardLayout() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="min-h-screen bg-slate-50 text-slate-900">
-        <OnboardingTour run={tour.run} onFinish={tour.stop} />
+        <OnboardingTour run={tour.run} runId={tour.runId} onFinish={tour.stop} />
         <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
           <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-4">
@@ -1245,6 +1487,7 @@ export function DashboardLayout() {
                 onDeleteDocument={() => removeDocument(activeDocumentId)}
                 canDeleteDocument={documents.length > 1}
                 deleteDocumentLabel={getDocumentById(activeDocumentId)?.title ?? 'Untitled document'}
+                onRenameUser={handleRenameUser}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onCut={() => executeEditorCommand('cut')}
@@ -1255,6 +1498,26 @@ export function DashboardLayout() {
                 showCodeLabels={showCodeLabels}
                 onTour={tour.restart}
               />
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                {presenceUsers.map((user) => (
+                  <span
+                    key={user.id}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1"
+                  >
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{ backgroundColor: user.color }}
+                    />
+                    <span className="font-semibold text-slate-600">
+                      {user.name}
+                      {localUser?.id === user.id ? ' (you)' : ''}
+                    </span>
+                  </span>
+                ))}
+                {!presenceUsers.length && (
+                  <span className="text-xs text-slate-400">No collaborators yet</span>
+                )}
+              </div>
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1622,6 +1885,60 @@ export function DashboardLayout() {
                     </div>
                     <div>
                       <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Categories & Codes Overview
+                      </label>
+                      <div className="mt-2 grid gap-3 md:grid-cols-2">
+                        {categories.length ? (
+                          categories.map((category) => (
+                            <div
+                              key={category.id}
+                              className="rounded-lg border border-slate-200 bg-white p-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <p className="text-sm font-semibold text-slate-800">
+                                  {category.name}
+                                </p>
+                                {coreCategoryId === category.id ? (
+                                  <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                                    Core
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {category.codeIds.length ? (
+                                  category.codeIds
+                                    .map((codeId) => codeById.get(codeId))
+                                    .filter((code): code is Code => Boolean(code))
+                                    .map((code) => (
+                                      <span
+                                        key={code.id}
+                                        className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                                        style={{
+                                          backgroundColor: code.colorHex ?? '#E2E8F0',
+                                          color: code.textHex ?? '#0F172A',
+                                          boxShadow: `inset 0 0 0 1px ${
+                                            code.ringHex ?? 'rgba(148,163,184,0.4)'
+                                          }`,
+                                        }}
+                                      >
+                                        {code.label}
+                                      </span>
+                                    ))
+                                ) : (
+                                  <span className="text-xs text-slate-400">No codes yet</span>
+                                )}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400">
+                            Add categories and codes to see the overview here.
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                         Theory Narrative
                       </label>
                       <div className="mt-2 rounded-lg border border-slate-200 bg-white">
@@ -1678,7 +1995,6 @@ export function DashboardLayout() {
                             onInput={(event) =>
                               setTheoryHtml((event.target as HTMLDivElement).innerHTML)
                             }
-                            dangerouslySetInnerHTML={{ __html: theoryHtml }}
                           />
                         </div>
                       </div>
@@ -1690,6 +2006,32 @@ export function DashboardLayout() {
           </div>
         </aside>
         </main>
+
+        <div className="pointer-events-none fixed inset-0 z-50">
+          {Object.entries(remoteCursors).map(([userId, cursor]) => {
+            if (localUser?.id === userId) return null
+            const user = presenceById.get(userId)
+            if (!user) return null
+            return (
+              <div
+                key={userId}
+                className="absolute"
+                style={{ left: cursor.x, top: cursor.y }}
+              >
+                <div
+                  className="h-5 w-0.5"
+                  style={{ backgroundColor: user.color }}
+                />
+                <div
+                  className="-mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                  style={{ backgroundColor: user.color }}
+                >
+                  {user.name}
+                </div>
+              </div>
+            )
+          })}
+        </div>
 
         <DragOverlay>
           {activeCode ? (

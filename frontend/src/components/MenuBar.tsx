@@ -13,6 +13,7 @@ type MenuBarProps = {
   onDeleteDocument: () => void
   canDeleteDocument: boolean
   deleteDocumentLabel: string
+  onRenameUser: () => void
   onUndo: () => void
   onRedo: () => void
   onCut: () => void
@@ -58,6 +59,7 @@ export function MenuBar({
   onDeleteDocument,
   canDeleteDocument,
   deleteDocumentLabel,
+  onRenameUser,
   onUndo,
   onRedo,
   onCut,
@@ -95,6 +97,7 @@ export function MenuBar({
       <div className="relative">
         <button
           type="button"
+          id="file-menu"
           onClick={() => toggleMenu('file')}
           className={cn(
             'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
@@ -223,6 +226,14 @@ export function MenuBar({
               shortcut="Ctrl+A"
               onClick={() => {
                 onSelectAll()
+                closeMenu()
+              }}
+            />
+            <div className="my-2 border-t border-slate-100" />
+            <MenuItem
+              label="Change my name"
+              onClick={() => {
+                onRenameUser()
                 closeMenu()
               }}
             />

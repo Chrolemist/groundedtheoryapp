@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import { Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { type Category, type Code } from '../data/mockData'
+import { type Category, type Code } from '../types'
 import { CodeChip } from './CodeChip'
 
 export function CategoryCard({
@@ -21,6 +22,8 @@ export function CategoryCard({
   const { isOver, setNodeRef } = useDroppable({
     id: category.id,
   })
+
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const assignedCodes = category.codeIds
     .map((codeId) => codes.find((code) => code.id === codeId))
@@ -46,6 +49,14 @@ export function CategoryCard({
           </span>
           <button
             type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Edit Logic
+            {isExpanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+          </button>
+          <button
+            type="button"
             onClick={() => onRemove(category.id)}
             className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50"
             title="Delete category"
@@ -69,6 +80,49 @@ export function CategoryCard({
           <span className="text-xs text-slate-400">Drop codes here</span>
         )}
       </div>
+      {isExpanded ? (
+        <div className="mt-4 grid gap-3">
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Förutsättning (Precondition)
+            </label>
+            <textarea
+              value={category.precondition}
+              onChange={(event) => onUpdate(category.id, { precondition: event.target.value })}
+              onBlur={(event) => onUpdate(category.id, { precondition: event.target.value })}
+              placeholder="Vad orsakar detta?"
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 bg-sky-50 px-3 py-2 text-sm text-slate-700"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Handling (Action)
+            </label>
+            <textarea
+              value={category.action}
+              onChange={(event) => onUpdate(category.id, { action: event.target.value })}
+              onBlur={(event) => onUpdate(category.id, { action: event.target.value })}
+              placeholder="Vad görs för att hantera det?"
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 bg-amber-50 px-3 py-2 text-sm text-slate-700"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Konsekvens (Consequence)
+            </label>
+            <textarea
+              value={category.consequence}
+              onChange={(event) => onUpdate(category.id, { consequence: event.target.value })}
+              onBlur={(event) => onUpdate(category.id, { consequence: event.target.value })}
+              placeholder="Vad blir resultatet?"
+              rows={2}
+              className="w-full rounded-lg border border-slate-200 bg-emerald-50 px-3 py-2 text-sm text-slate-700"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -9,9 +9,11 @@ const getStoredSeen = () => {
 
 export function useOnboardingTour() {
   const [run, setRun] = useState(() => !getStoredSeen())
+  const [runId, setRunId] = useState(0)
 
   const restart = () => {
     localStorage.removeItem(STORAGE_KEY)
+    setRunId((current) => current + 1)
     setRun(true)
   }
 
@@ -19,5 +21,5 @@ export function useOnboardingTour() {
     setRun(false)
   }
 
-  return { run, restart, stop }
+  return { run, runId, restart, stop }
 }

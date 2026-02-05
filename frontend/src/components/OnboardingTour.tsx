@@ -10,45 +10,47 @@ const getStoredSeen = () => {
 
 type OnboardingTourProps = {
   run: boolean
+  runId: number
   onFinish: () => void
 }
 
-export function OnboardingTour({ run, onFinish }: OnboardingTourProps) {
+export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
   const steps = useMemo<Step[]>(
     () => [
       {
         target: 'body',
         placement: 'center',
-        content: "Welcome to Grounded AI! Let's learn the workflow.",
+        content: "Welcome to Grounded Theory! Let's learn the workflow.",
       },
       {
         target: '#document-viewer',
         placement: 'right',
         content:
-          'Step A: Open Coding. Highlight text here to create concepts/codes.',
+          'Step A: Open Coding. Highlight text here and apply codes to create concepts.',
       },
       {
         target: '#axial-tab',
         placement: 'left',
         content:
-          'Step B & C: Categorization & Axial Coding. Drag your codes into Categories to find patterns and relationships.',
+          'Step B & C: Categorization & Axial Coding. Drag codes into categories and edit Precondition/Action/Consequence logic.',
       },
       {
         target: '#theory-tab',
         placement: 'left',
         content:
-          'Step D: Selective Coding. Choose your core category and describe your final theory here.',
+          'Step D: Selective Coding. Choose your core category and use the category/code overview to craft your theory.',
       },
       {
-        target: '#export-actions',
+        target: '#file-menu',
         placement: 'bottom',
-        content: 'Download your work as Word/Excel when done.',
+        content: 'Use the File menu to save/load and export Word or Excel.',
       },
     ],
     [],
   )
 
   const [seen, setSeen] = useState(getStoredSeen)
+  const shouldRun = run && (!seen || runId > 0)
 
   const handleCallback = (data: CallBackProps) => {
     const finished = data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED
@@ -61,8 +63,9 @@ export function OnboardingTour({ run, onFinish }: OnboardingTourProps) {
 
   return (
     <Joyride
+      key={runId}
       steps={steps}
-      run={run && !seen}
+      run={shouldRun}
       continuous
       scrollToFirstStep
       showProgress

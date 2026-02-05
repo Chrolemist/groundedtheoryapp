@@ -1,18 +1,4 @@
-export type Code = {
-  id: string
-  label: string
-  description: string
-  colorClass: string
-  colorHex?: string
-  textHex?: string
-  ringHex?: string
-}
-
-export type Category = {
-  id: string
-  name: string
-  codeIds: string[]
-}
+import type { Category, Code } from '../types'
 
 export type DocumentSegment = {
   text: string
@@ -72,11 +58,17 @@ export const mockCategories: Category[] = [
     id: 'category-journey',
     name: 'Sensemaking Journey',
     codeIds: ['code-meaning-making', 'code-identity'],
+    precondition: '',
+    action: '',
+    consequence: '',
   },
   {
     id: 'category-conditions',
     name: 'Conditions & Context',
     codeIds: ['code-barrier', 'code-support'],
+    precondition: '',
+    action: '',
+    consequence: '',
   },
 ]
 

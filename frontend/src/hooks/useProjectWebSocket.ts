@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 const getWebSocketUrl = () => {
   if (typeof window === 'undefined') return ''
@@ -13,6 +13,7 @@ type UseProjectWebSocketOptions = {
 export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
+  const socketRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
     messageHandlerRef.current = options.onMessage
@@ -23,6 +24,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     if (!url) return undefined
 
     const socket = new WebSocket(url)
+    socketRef.current = socket
 
     socket.onopen = () => setIsOnline(true)
     socket.onclose = () => setIsOnline(false)
@@ -42,5 +44,15 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     }
   }, [])
 
-  return { isOnline }
+  const sendJson = useCallback((payload: unknown) => {
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return false
+    try {
+      socketRef.current.send(JSON.stringify(payload))
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
+  return { isOnline, sendJson }
 }

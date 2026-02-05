@@ -3,7 +3,7 @@ import { Tag, Trash2 } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { cn } from '../lib/cn'
-import { type Code } from '../data/mockData'
+import { type Code } from '../types'
 
 export function CodeChip({
   code,
