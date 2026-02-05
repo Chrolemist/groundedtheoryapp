@@ -9,6 +9,10 @@ type MenuBarProps = {
   onSaveProject: () => void
   onExportExcel: () => void
   onExportWord: () => void
+  onAddDocument: () => void
+  onDeleteDocument: () => void
+  canDeleteDocument: boolean
+  deleteDocumentLabel: string
   onUndo: () => void
   onRedo: () => void
   onCut: () => void
@@ -50,6 +54,10 @@ export function MenuBar({
   onSaveProject,
   onExportExcel,
   onExportWord,
+  onAddDocument,
+  onDeleteDocument,
+  canDeleteDocument,
+  deleteDocumentLabel,
   onUndo,
   onRedo,
   onCut,
@@ -111,6 +119,29 @@ export function MenuBar({
                 onSaveProject()
                 closeMenu()
               }}
+            />
+            <div className="my-2 border-t border-slate-100" />
+            <MenuItem
+              label="New document"
+              onClick={() => {
+                onAddDocument()
+                closeMenu()
+              }}
+            />
+            <MenuItem
+              label="Delete document"
+              onClick={() => {
+                if (!canDeleteDocument) return
+                if (
+                  !window.confirm(
+                    `Delete "${deleteDocumentLabel}"? This cannot be undone.`,
+                  )
+                )
+                  return
+                onDeleteDocument()
+                closeMenu()
+              }}
+              destructive
             />
             <div className="my-2 border-t border-slate-100" />
             <MenuItem

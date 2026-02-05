@@ -801,17 +801,38 @@ export function DashboardLayout() {
       }
 
       let cursor = 0
+      const parts: string[] = []
+      const shouldIgnore = (element: HTMLElement | null) => {
+        if (!element) return false
+        return Boolean(
+          element.closest('.code-label') ||
+            element.closest('.code-remove') ||
+            element.closest('[data-non-editable="true"]'),
+        )
+      }
+
+      const getCodeContentText = (element: HTMLElement) => {
+        const content = element.querySelector('.code-content') as HTMLElement | null
+        return content?.textContent ?? ''
+      }
+
       const walk = (node: Node) => {
         if (node.nodeType === Node.TEXT_NODE) {
-          cursor += node.textContent?.length ?? 0
+          const parent = node.parentElement
+          if (shouldIgnore(parent)) return
+          const text = node.textContent ?? ''
+          parts.push(text)
+          cursor += text.length
           return
         }
         if (node.nodeType !== Node.ELEMENT_NODE) return
 
         const element = node as HTMLElement
+        if (shouldIgnore(element)) return
+
         const codeId = element.getAttribute('data-code-id')
         if (codeId) {
-          const text = element.textContent ?? ''
+          const text = getCodeContentText(element)
           const start = cursor
           const end = cursor + text.length
           highlights.push({
@@ -821,6 +842,7 @@ export function DashboardLayout() {
             end_index: end,
             code_id: codeId,
           })
+          parts.push(text)
           cursor = end
           return
         }
@@ -832,7 +854,7 @@ export function DashboardLayout() {
 
       return {
         ...doc,
-        content: root.textContent ?? doc.text,
+        content: parts.join(''),
       }
     })
 
@@ -1219,6 +1241,10 @@ export function DashboardLayout() {
                 onSaveProject={handleSaveProject}
                 onExportExcel={() => void exportReport('excel')}
                 onExportWord={() => void exportReport('word')}
+                onAddDocument={addNewDocument}
+                onDeleteDocument={() => removeDocument(activeDocumentId)}
+                canDeleteDocument={documents.length > 1}
+                deleteDocumentLabel={getDocumentById(activeDocumentId)?.title ?? 'Untitled document'}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onCut={() => executeEditorCommand('cut')}
@@ -1317,21 +1343,6 @@ export function DashboardLayout() {
                 className="min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
                 placeholder="Document title"
               />
-              <button
-                type="button"
-                onClick={addNewDocument}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
-              >
-                + New
-              </button>
-              <button
-                type="button"
-                onClick={() => removeDocument(activeDocumentId)}
-                disabled={documents.length <= 1}
-                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Delete
-              </button>
             </div>
           </div>
 

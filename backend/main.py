@@ -166,27 +166,27 @@ async def export_word() -> Response:
 
     document.add_heading("Categories (Axial Coding)", level=2)
     for category in in_memory_project.categories:
-        document.add_paragraph(category.name, style="List Bullet")
+        document.add_paragraph(category.name)
         for code_id in category.contained_code_ids:
             code = get_code_by_id(code_id)
             if code:
-                document.add_paragraph(code.name, style="List Bullet 2")
+                document.add_paragraph(f"- {code.name}")
 
     document.add_heading("Evidence (Open Coding)", level=2)
     for code in in_memory_project.codes:
-        document.add_paragraph(code.name, style="List Bullet")
+        document.add_paragraph(code.name)
         related_highlights = [
             highlight for highlight in in_memory_project.highlights if highlight.code_id == code.id
         ]
         if not related_highlights:
-            document.add_paragraph("No quotes yet.", style="List Bullet 2")
+            document.add_paragraph("No quotes yet.")
             continue
         for highlight in related_highlights:
             document_item = get_document_by_id(highlight.document_id)
             if not document_item:
                 continue
             quote = document_item.content[highlight.start_index : highlight.end_index]
-            document.add_paragraph(f'"{quote}"', style="List Bullet 2")
+            document.add_paragraph(f'"{quote}"')
 
     output = BytesIO()
     document.save(output)
