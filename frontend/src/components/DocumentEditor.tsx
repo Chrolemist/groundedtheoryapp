@@ -101,6 +101,7 @@ export function DocumentEditor({
         className="document-content min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
         style={{ fontFamily, lineHeight }}
         contentEditable
+        spellCheck={false}
         suppressContentEditableWarning
         onInput={onInput}
         onPaste={onPaste}

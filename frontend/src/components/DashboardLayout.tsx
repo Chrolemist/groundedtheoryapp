@@ -1720,6 +1720,7 @@ export function DashboardLayout() {
                           fontFamily: documentFontFamily,
                           lineHeight: documentLineHeight,
                         }}
+                        spellCheck={false}
                         ref={(node) => {
                           if (!node) return
                           const html = doc.html || doc.text
