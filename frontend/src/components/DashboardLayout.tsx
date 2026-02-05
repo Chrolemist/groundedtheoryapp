@@ -60,6 +60,7 @@ export function DashboardLayout() {
         activeDocumentId?: string
         documentViewMode?: DocumentViewMode
         theoryHtml?: string
+        coreCategoryId?: string
       }
     } catch {
       return null
@@ -93,12 +94,21 @@ export function DashboardLayout() {
   const documentContentRef = useRef<HTMLDivElement | null>(null)
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
+  const lastEditDocumentIdRef = useRef<string | null>(null)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const theoryEditorRef = useRef<HTMLDivElement | null>(null)
   const [theoryHtml, setTheoryHtml] = useState(() => storedState?.theoryHtml ?? '')
+  const [coreCategoryId, setCoreCategoryId] = useState(() => storedState?.coreCategoryId ?? '')
+  const [showCodeLabels, setShowCodeLabels] = useState(true)
+  const [documentLineHeight, setDocumentLineHeight] = useState('1.75')
+  const [documentFontFamily, setDocumentFontFamily] = useState('Inter, ui-sans-serif, system-ui')
   const tour = useOnboardingTour()
+
+  const codeById = useMemo(() => {
+    return new Map(codes.map((code) => [code.id, code]))
+  }, [codes])
 
   useEffect(() => {
     const payload = JSON.stringify({
@@ -108,13 +118,108 @@ export function DashboardLayout() {
       activeDocumentId,
       documentViewMode,
       theoryHtml,
+      coreCategoryId,
     })
     localStorage.setItem(storageKey, payload)
-  }, [codes, categories, documents, activeDocumentId, documentViewMode, theoryHtml])
+  }, [codes, categories, documents, activeDocumentId, documentViewMode, theoryHtml, coreCategoryId])
 
-  const codeById = useMemo(() => {
-    return new Map(codes.map((code) => [code.id, code]))
-  }, [codes])
+  useEffect(() => {
+    if (!isEditingDocument) {
+      lastEditDocumentIdRef.current = null
+      return
+    }
+    const editor = documentEditorRef.current
+    if (!editor) return
+    if (lastEditDocumentIdRef.current === activeDocumentId) return
+    const activeDoc = documents.find((doc) => doc.id === activeDocumentId)
+    const nextHtml =
+      activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
+    editor.innerHTML = nextHtml
+    lastEditDocumentIdRef.current = activeDocumentId
+  }, [isEditingDocument, activeDocumentId, documents])
+
+  const syncDocumentsForCodes = (current: DocumentItem[], nextCodeMap: Map<string, Code>) => {
+    return current.map((doc) => {
+      if (!doc.html) return doc
+      const container = document.createElement('div')
+      container.innerHTML = doc.html
+
+      container.querySelectorAll('span[data-code-id]').forEach((span) => {
+        const codeId = span.getAttribute('data-code-id')
+        if (!codeId) return
+        const code = nextCodeMap.get(codeId)
+        if (!code) return
+
+        const nextBg = code.colorHex ?? '#E2E8F0'
+        const nextText = code.textHex ?? '#334155'
+        const nextRing = code.ringHex ?? 'rgba(148,163,184,0.4)'
+
+        if (span instanceof HTMLElement) {
+          if (span.style.backgroundColor !== nextBg) {
+            span.style.backgroundColor = nextBg
+          }
+          if (span.style.color !== nextText) {
+            span.style.color = nextText
+          }
+          const nextShadow = `inset 0 0 0 1px ${nextRing}`
+          if (span.style.boxShadow !== nextShadow) {
+            span.style.boxShadow = nextShadow
+          }
+        }
+
+        const label = span.querySelector('.code-label') as HTMLElement | null
+        if (label) {
+          if (label.textContent !== code.label) {
+            label.textContent = code.label
+          }
+          if (label.style.color !== nextText) {
+            label.style.color = nextText
+          }
+        }
+
+        const removeButton = span.querySelector('[data-remove-code]') as HTMLElement | null
+        const ensureRemoveButton = () => {
+          const button = document.createElement('span')
+          button.className = 'code-remove'
+          button.setAttribute('data-remove-code', 'true')
+          button.setAttribute('title', 'Remove highlight')
+          button.textContent = '×'
+          button.style.fontSize = '10px'
+          button.style.opacity = '0.7'
+          button.style.fontWeight = '700'
+          button.style.position = 'absolute'
+          button.style.right = '4px'
+          button.style.top = '2px'
+          button.style.transform = 'none'
+          button.style.color = nextText
+          button.style.backgroundColor = 'rgba(255,255,255,0.7)'
+          button.style.borderRadius = '999px'
+          button.style.padding = '0 4px'
+          button.style.lineHeight = '1'
+          button.style.zIndex = '2'
+          button.style.pointerEvents = 'auto'
+          span.appendChild(button)
+        }
+
+        if (removeButton) {
+          if (removeButton.style.color !== nextText) {
+            removeButton.style.color = nextText
+          }
+        } else {
+          ensureRemoveButton()
+        }
+      })
+
+      const nextHtml = container.innerHTML
+      const nextText = container.innerText
+      if (nextHtml === doc.html && nextText === doc.text) return doc
+      return {
+        ...doc,
+        html: nextHtml,
+        text: nextText,
+      }
+    })
+  }
 
   const assignedCodeIds = useMemo(() => {
     return new Set(categories.flatMap((category) => category.codeIds))
@@ -143,6 +248,11 @@ export function DashboardLayout() {
     }
     selectionRangeRef.current = range.cloneRange()
     selectionDocumentIdRef.current = getSelectionDocumentId(range)
+  }
+
+  const getClosestRemoveButton = (target: EventTarget | null) => {
+    const element = target instanceof Element ? target : target instanceof Node ? target.parentElement : null
+    return element?.closest('[data-remove-code]') as HTMLElement | null
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -222,9 +332,16 @@ export function DashboardLayout() {
   }
 
   const updateCode = (codeId: string, patch: Partial<Code>) => {
-    setCodes((current) =>
-      current.map((code) => (code.id === codeId ? { ...code, ...patch } : code)),
-    )
+    setCodes((current) => {
+      const nextCodes = current.map((code) =>
+        code.id === codeId ? { ...code, ...patch } : code,
+      )
+      const nextCodeMap = new Map(nextCodes.map((code) => [code.id, code]))
+      if (!isEditingDocument) {
+        setDocuments((docs) => syncDocumentsForCodes(docs, nextCodeMap))
+      }
+      return nextCodes
+    })
   }
 
   const updateCategory = (categoryId: string, patch: Partial<Category>) => {
@@ -289,6 +406,205 @@ export function DashboardLayout() {
     )
   }
 
+  const buildProjectState = () => {
+    const highlights: Array<{
+      id: string
+      document_id: string
+      start_index: number
+      end_index: number
+      code_id: string
+    }> = []
+
+    const parsedDocuments = documents.map((doc) => {
+      if (!doc.html) {
+        return { ...doc, content: doc.text }
+      }
+
+      const parser = new DOMParser()
+      const wrapper = parser.parseFromString(`<div>${doc.html}</div>`, 'text/html')
+      const root = wrapper.body.firstElementChild
+      if (!root) {
+        return { ...doc, content: doc.text }
+      }
+
+      let cursor = 0
+      const walk = (node: Node) => {
+        if (node.nodeType === Node.TEXT_NODE) {
+          cursor += node.textContent?.length ?? 0
+          return
+        }
+        if (node.nodeType !== Node.ELEMENT_NODE) return
+
+        const element = node as HTMLElement
+        const codeId = element.getAttribute('data-code-id')
+        if (codeId) {
+          const text = element.textContent ?? ''
+          const start = cursor
+          const end = cursor + text.length
+          highlights.push({
+            id: `hl-${doc.id}-${start}-${end}-${codeId}`,
+            document_id: doc.id,
+            start_index: start,
+            end_index: end,
+            code_id: codeId,
+          })
+          cursor = end
+          return
+        }
+
+        Array.from(node.childNodes).forEach(walk)
+      }
+
+      Array.from(root.childNodes).forEach(walk)
+
+      return {
+        ...doc,
+        content: root.textContent ?? doc.text,
+      }
+    })
+
+    return {
+      documents: parsedDocuments.map((doc) => ({
+        id: doc.id,
+        title: doc.title,
+        content: doc.content ?? doc.text,
+      })),
+      codes: codes.map((code) => ({
+        id: code.id,
+        name: code.label,
+        color: code.colorHex ?? '#E2E8F0',
+      })),
+      highlights,
+      categories: categories.map((category) => ({
+        id: category.id,
+        name: category.name,
+        contained_code_ids: category.codeIds,
+      })),
+      core_category_id: coreCategoryId || null,
+      theory_description: theoryHtml.replace(/<[^>]*>/g, '').trim(),
+    }
+  }
+
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const getApiBase = () => {
+    if (typeof window === 'undefined') return ''
+    if (window.location.port === '5173') return 'http://localhost:8000'
+    return window.location.origin
+  }
+
+  const handleSaveProject = () => {
+    const payload = {
+      version: 1,
+      documents,
+      codes,
+      categories,
+      coreCategoryId,
+      theoryHtml,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
+    downloadBlob(blob, 'project_backup.json')
+  }
+
+  const handleLoadProject = async (file: File) => {
+    const text = await file.text()
+    const payload = JSON.parse(text) as {
+      version?: number
+      documents?: DocumentItem[]
+      codes?: Code[]
+      categories?: Category[]
+      coreCategoryId?: string
+      theoryHtml?: string
+    }
+
+    if (payload.version && payload.documents?.length) {
+      setDocuments(payload.documents)
+      setActiveDocumentId(payload.documents[0]?.id ?? 'doc-1')
+      if (payload.codes) setCodes(payload.codes)
+      if (payload.categories) setCategories(payload.categories)
+      setCoreCategoryId(payload.coreCategoryId ?? '')
+      setTheoryHtml(payload.theoryHtml ?? '')
+      return
+    }
+
+    const legacy = JSON.parse(text) as {
+      documents?: Array<{ id: string; title: string; content: string }>
+      codes?: Array<{ id: string; name: string; color: string }>
+      categories?: Array<{ id: string; name: string; contained_code_ids: string[] }>
+      core_category_id?: string | null
+      theory_description?: string
+    }
+
+    if (legacy.documents?.length) {
+      setDocuments(
+        legacy.documents.map((doc) => ({
+          id: doc.id,
+          title: doc.title,
+          text: doc.content,
+          html: '',
+        })),
+      )
+      setActiveDocumentId(legacy.documents[0].id)
+    }
+    if (legacy.codes) {
+      setCodes(
+        legacy.codes.map((code) => ({
+          id: code.id,
+          label: code.name,
+          description: 'Imported code',
+          colorClass: 'bg-slate-100 text-slate-700 ring-slate-200',
+          colorHex: code.color,
+          textHex: getReadableTextColor(code.color),
+          ringHex: `${getReadableTextColor(code.color)}33`,
+        })),
+      )
+    }
+    if (legacy.categories) {
+      setCategories(
+        legacy.categories.map((category) => ({
+          id: category.id,
+          name: category.name,
+          codeIds: category.contained_code_ids ?? [],
+        })),
+      )
+    }
+    setCoreCategoryId(legacy.core_category_id ?? '')
+    if (legacy.theory_description) {
+      setTheoryHtml(legacy.theory_description)
+    }
+  }
+
+  const exportReport = async (format: 'word' | 'excel') => {
+    const payload = buildProjectState()
+    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+    const formData = new FormData()
+    formData.append('file', blob, 'project.json')
+
+    const apiBase = getApiBase()
+
+    await fetch(`${apiBase}/project/load`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    const response = await fetch(`${apiBase}/export/${format}`)
+    if (!response.ok) return
+    const fileBlob = await response.blob()
+    downloadBlob(
+      fileBlob,
+      format === 'word' ? 'grounded_theory_report.docx' : 'grounded_theory_report.xlsx',
+    )
+  }
+
   const handleToggleEdit = () => {
     if (isEditingDocument) {
       const editor = documentEditorRef.current
@@ -327,16 +643,71 @@ export function DashboardLayout() {
     span.style.backgroundColor = codeToApply.colorHex ?? '#E2E8F0'
     span.style.color = codeToApply.textHex ?? '#334155'
     span.style.borderRadius = '6px'
-    span.style.padding = '0 4px'
+    span.style.padding = '0 18px 0 4px'
     span.style.boxShadow = `inset 0 0 0 1px ${
       codeToApply.ringHex ?? 'rgba(148,163,184,0.4)'
     }`
+    span.style.position = 'relative'
+    span.style.display = 'inline-block'
+    span.style.paddingTop = '16px'
+
+    const label = document.createElement('span')
+    label.className = 'code-label'
+    label.textContent = codeToApply.label
+    label.style.position = 'absolute'
+    label.style.top = '-10px'
+    label.style.left = '4px'
+    label.style.fontSize = '8px'
+    label.style.fontWeight = '600'
+    label.style.letterSpacing = '0.08em'
+    label.style.textTransform = 'uppercase'
+    label.style.color = codeToApply.textHex ?? '#475569'
+    label.style.backgroundColor = 'transparent'
+    label.style.padding = '0'
+    label.style.borderRadius = '999px'
+    label.style.boxShadow = 'none'
+    label.style.display = 'inline-flex'
+    label.style.alignItems = 'center'
+    label.style.gap = '4px'
+
+    const removeButton = document.createElement('span')
+    removeButton.className = 'code-remove'
+    removeButton.setAttribute('data-remove-code', 'true')
+    removeButton.setAttribute('title', 'Remove highlight')
+    removeButton.textContent = '×'
+    removeButton.style.fontSize = '10px'
+    removeButton.style.opacity = '0.6'
+    removeButton.style.fontWeight = '700'
+    removeButton.style.position = 'absolute'
+    removeButton.style.right = '4px'
+    removeButton.style.top = '2px'
+    removeButton.style.transform = 'none'
+    removeButton.style.color = codeToApply.textHex ?? '#0F172A'
+    removeButton.style.backgroundColor = 'rgba(255,255,255,0.7)'
+    removeButton.style.borderRadius = '999px'
+    removeButton.style.padding = '0 4px'
+    removeButton.style.lineHeight = '1'
+    removeButton.style.zIndex = '2'
+    removeButton.style.pointerEvents = 'auto'
 
     try {
-      range.surroundContents(span)
+      const text = range.toString()
+      const content = document.createElement('span')
+      content.className = 'code-content'
+      content.textContent = text
+      span.appendChild(label)
+      span.appendChild(content)
+      span.appendChild(removeButton)
+      range.deleteContents()
+      range.insertNode(span)
     } catch {
       const text = range.toString()
-      span.textContent = text
+      const content = document.createElement('span')
+      content.className = 'code-content'
+      content.textContent = text
+      span.appendChild(label)
+      span.appendChild(content)
+      span.appendChild(removeButton)
       range.deleteContents()
       range.insertNode(span)
     }
@@ -382,14 +753,16 @@ export function DashboardLayout() {
     if (isEditingDocument) return
     const container = element.closest('[data-doc-id]') as HTMLElement | null
     const documentId = container?.getAttribute('data-doc-id') ?? null
-    const textNode = document.createTextNode(element.textContent ?? '')
+    const content = element.querySelector('.code-content') as HTMLElement | null
+    const fallbackText = element.lastChild?.textContent ?? element.textContent ?? ''
+    const textNode = document.createTextNode(content?.textContent ?? fallbackText)
     element.replaceWith(textNode)
 
-    const content = container?.querySelector('.document-content') as HTMLDivElement | null
-    if (documentId && content) {
+    const documentContent = container?.querySelector('.document-content') as HTMLDivElement | null
+    if (documentId && documentContent) {
       updateDocument(documentId, {
-        html: content.innerHTML,
-        text: content.innerText,
+        html: documentContent.innerHTML,
+        text: documentContent.innerText,
       })
     }
   }
@@ -444,7 +817,19 @@ export function DashboardLayout() {
                 >
                   Help / Restart Tour
                 </button>
-                <input ref={fileInputRef} type="file" className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="application/json"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    if (file) {
+                      void handleLoadProject(file)
+                    }
+                    event.target.value = ''
+                  }}
+                />
                 <button
                   className="inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
                   onClick={() => fileInputRef.current?.click()}
@@ -453,7 +838,10 @@ export function DashboardLayout() {
                   Load Project
                 </button>
                 <div id="export-actions" className="relative flex items-center gap-3">
-                  <button className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300">
+                  <button
+                    className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300"
+                    onClick={handleSaveProject}
+                  >
                     <Save className="h-4 w-4" />
                     Save Project
                   </button>
@@ -473,10 +861,16 @@ export function DashboardLayout() {
                         exit={{ opacity: 0, y: 8 }}
                         className="absolute right-0 top-full mt-2 w-44 rounded-xl border border-slate-200 bg-white p-2 text-sm shadow-lg"
                       >
-                        <button className="w-full rounded-lg px-3 py-2 text-left text-slate-600 transition hover:bg-slate-50">
+                        <button
+                          className="w-full rounded-lg px-3 py-2 text-left text-slate-600 transition hover:bg-slate-50"
+                          onClick={() => void exportReport('excel')}
+                        >
                           Export as Excel
                         </button>
-                        <button className="w-full rounded-lg px-3 py-2 text-left text-slate-600 transition hover:bg-slate-50">
+                        <button
+                          className="w-full rounded-lg px-3 py-2 text-left text-slate-600 transition hover:bg-slate-50"
+                          onClick={() => void exportReport('word')}
+                        >
                           Export as Word
                         </button>
                       </motion.div>
@@ -489,6 +883,20 @@ export function DashboardLayout() {
         </header>
 
         <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
+        <style>{`
+          .hide-code-labels .code-label {
+            display: none !important;
+          }
+
+          .hide-code-labels span[data-code-id] {
+            padding-top: 0 !important;
+          }
+
+          .code-remove {
+            cursor: pointer;
+            line-height: 1;
+          }
+        `}</style>
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -556,11 +964,22 @@ export function DashboardLayout() {
               </button>
               <button
                 type="button"
-                onClick={handleToggleEdit}
-                disabled={documentViewMode === 'all'}
+                onClick={() => {
+                  if (documentViewMode === 'all') {
+                    setDocumentViewMode('single')
+                  }
+                  handleToggleEdit()
+                }}
                 className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
               >
                 {isEditingDocument ? 'Done Editing' : 'Edit Transcript'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCodeLabels((current) => !current)}
+                className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+              >
+                {showCodeLabels ? 'Hide Labels' : 'Show Labels'}
               </button>
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-500 shadow-sm">
                 {websocketOnline ? (
@@ -575,7 +994,10 @@ export function DashboardLayout() {
 
           <div
             id="document-viewer"
-            className="relative rounded-2xl border border-slate-200 bg-white p-8 shadow-sm"
+            className={cn(
+              'relative rounded-2xl border border-slate-200 bg-white p-8 shadow-sm',
+              !showCodeLabels && 'hide-code-labels',
+            )}
           >
             {documentViewMode === 'single' ? (
               <div className="space-y-4" data-doc-id={activeDocumentId}>
@@ -606,6 +1028,42 @@ export function DashboardLayout() {
                         <option value="4">Large</option>
                         <option value="5">XL</option>
                       </select>
+                      <select
+                        value={documentFontFamily}
+                        onChange={(event) => setDocumentFontFamily(event.target.value)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                      >
+                        <option value="Inter, ui-sans-serif, system-ui">Inter</option>
+                        <option value="Arial, Helvetica, sans-serif">Arial</option>
+                        <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica Neue</option>
+                        <option value="'Segoe UI', Tahoma, Geneva, Verdana, sans-serif">Segoe UI</option>
+                        <option value="Roboto, 'Helvetica Neue', Arial, sans-serif">Roboto</option>
+                        <option value="'Open Sans', Arial, sans-serif">Open Sans</option>
+                        <option value="Lato, Arial, sans-serif">Lato</option>
+                        <option value="'Montserrat', Arial, sans-serif">Montserrat</option>
+                        <option value="'Noto Sans', Arial, sans-serif">Noto Sans</option>
+                        <option value="'Source Sans Pro', Arial, sans-serif">Source Sans Pro</option>
+                        <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                        <option value="Georgia, serif">Georgia</option>
+                        <option value="Garamond, 'Times New Roman', serif">Garamond</option>
+                        <option value="'Palatino Linotype', 'Book Antiqua', Palatino, serif">Palatino</option>
+                        <option value="'Book Antiqua', 'Palatino Linotype', serif">Book Antiqua</option>
+                        <option value="'Courier New', Courier, monospace">Courier New</option>
+                        <option value="'Lucida Console', Monaco, monospace">Lucida Console</option>
+                        <option value="'Consolas', 'Courier New', monospace">Consolas</option>
+                        <option value="'Tahoma', Geneva, sans-serif">Tahoma</option>
+                        <option value="'Verdana', Geneva, sans-serif">Verdana</option>
+                      </select>
+                      <select
+                        value={documentLineHeight}
+                        onChange={(event) => setDocumentLineHeight(event.target.value)}
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+                      >
+                        <option value="1.4">Tight</option>
+                        <option value="1.6">Normal</option>
+                        <option value="1.75">Relaxed</option>
+                        <option value="2">Loose</option>
+                      </select>
                     </div>
                     <div
                       ref={(node) => {
@@ -613,6 +1071,7 @@ export function DashboardLayout() {
                         documentContentRef.current = node
                       }}
                       className="document-content min-h-[220px] whitespace-pre-wrap px-3 py-3 text-sm leading-7 text-slate-800 outline-none"
+                      style={{ fontFamily: documentFontFamily, lineHeight: documentLineHeight }}
                       contentEditable
                       suppressContentEditableWarning
                       onInput={(event) => {
@@ -622,12 +1081,6 @@ export function DashboardLayout() {
                           text: (event.target as HTMLDivElement).innerText,
                         })
                       }}
-                      dangerouslySetInnerHTML={{
-                        __html:
-                          getDocumentById(activeDocumentId)?.html ||
-                          getDocumentById(activeDocumentId)?.text.replace(/\n/g, '<br />') ||
-                          '',
-                      }}
                     />
                   </div>
                 ) : (
@@ -635,13 +1088,13 @@ export function DashboardLayout() {
                     className="document-content prose prose-slate max-w-none text-sm leading-7"
                     onMouseUp={handleSelection}
                     onClick={(event) => {
-                      const target = event.target as HTMLElement | null
-                      if (!target) return
-                      if (target.matches('span[data-code-id]')) {
-                        event.preventDefault()
-                        event.stopPropagation()
-                        removeHighlightSpan(target)
-                      }
+                      const removeButton = getClosestRemoveButton(event.target)
+                      if (!removeButton) return
+                      const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
+                      if (!highlight) return
+                      event.preventDefault()
+                      event.stopPropagation()
+                      removeHighlightSpan(highlight)
                     }}
                   >
                     {getDocumentById(activeDocumentId)?.html ? (
@@ -669,13 +1122,13 @@ export function DashboardLayout() {
                       className="document-content prose prose-slate max-w-none text-sm leading-7"
                       onMouseUp={handleSelection}
                       onClick={(event) => {
-                        const target = event.target as HTMLElement | null
-                        if (!target) return
-                        if (target.matches('span[data-code-id]')) {
-                          event.preventDefault()
-                          event.stopPropagation()
-                          removeHighlightSpan(target)
-                        }
+                        const removeButton = getClosestRemoveButton(event.target)
+                        if (!removeButton) return
+                        const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
+                        if (!highlight) return
+                        event.preventDefault()
+                        event.stopPropagation()
+                        removeHighlightSpan(highlight)
                       }}
                     >
                       {doc.html ? (
@@ -865,10 +1318,16 @@ export function DashboardLayout() {
                       <label className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                         Core Category
                       </label>
-                      <select className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
-                        <option>Select the core category</option>
+                      <select
+                        value={coreCategoryId}
+                        onChange={(event) => setCoreCategoryId(event.target.value)}
+                        className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
+                      >
+                        <option value="">Select the core category</option>
                         {categories.map((category) => (
-                          <option key={category.id}>{category.name}</option>
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
                         ))}
                       </select>
                     </div>
