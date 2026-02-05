@@ -95,12 +95,14 @@ class ConnectionManager:
             "Panda",
         ]
         base = f"{adjectives[len(self.users) % len(adjectives)]} {animals[len(self.users) % len(animals)]}"
-        if base not in {user["name"] for user in self.users.values()}:
-            return base
-        suffix = 2
-        while f"{base} {suffix}" in {user["name"] for user in self.users.values()}:
-            suffix += 1
-        return f"{base} {suffix}"
+        existing = {user["name"] for user in self.users.values()}
+        if base in existing:
+            suffix = 2
+            while f"{base} {suffix}" in existing:
+                suffix += 1
+            return f"{base} {suffix}"
+        # Add a short suffix to reduce collisions across instances
+        return f"{base} {uuid4().hex[:4]}"
 
     def _generate_user_color(self) -> str:
         palette = [

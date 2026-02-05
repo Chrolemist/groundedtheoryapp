@@ -14,6 +14,9 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
   const socketRef = useRef<WebSocket | null>(null)
+  const reconnectTimerRef = useRef<number | null>(null)
+  const pingTimerRef = useRef<number | null>(null)
+  const retryCountRef = useRef(0)
 
   useEffect(() => {
     messageHandlerRef.current = options.onMessage
@@ -22,25 +25,90 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   useEffect(() => {
     const url = getWebSocketUrl()
     if (!url) return undefined
+    let isDisposed = false
 
-    const socket = new WebSocket(url)
-    socketRef.current = socket
-
-    socket.onopen = () => setIsOnline(true)
-    socket.onclose = () => setIsOnline(false)
-    socket.onerror = () => setIsOnline(false)
-    socket.onmessage = (event) => {
-      if (!messageHandlerRef.current) return
-      try {
-        const payload = JSON.parse(event.data)
-        messageHandlerRef.current(payload)
-      } catch {
-        messageHandlerRef.current(event.data)
+    const clearPing = () => {
+      if (pingTimerRef.current) {
+        window.clearInterval(pingTimerRef.current)
+        pingTimerRef.current = null
       }
     }
 
+    const scheduleReconnect = () => {
+      if (isDisposed) return
+      if (reconnectTimerRef.current) return
+      const retry = retryCountRef.current
+      const delay = Math.min(10000, 500 * Math.pow(2, retry))
+      reconnectTimerRef.current = window.setTimeout(() => {
+        reconnectTimerRef.current = null
+        connect()
+      }, delay)
+    }
+
+    const connect = () => {
+      if (isDisposed) return
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) return
+
+      const socket = new WebSocket(url)
+      socketRef.current = socket
+
+      socket.onopen = () => {
+        retryCountRef.current = 0
+        setIsOnline(true)
+        clearPing()
+        pingTimerRef.current = window.setInterval(() => {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.send(JSON.stringify({ type: 'ping', ts: Date.now() }))
+          }
+        }, 25000)
+      }
+
+      socket.onclose = () => {
+        setIsOnline(false)
+        clearPing()
+        retryCountRef.current += 1
+        scheduleReconnect()
+      }
+
+      socket.onerror = () => {
+        setIsOnline(false)
+        clearPing()
+        retryCountRef.current += 1
+        scheduleReconnect()
+      }
+
+      socket.onmessage = (event) => {
+        if (!messageHandlerRef.current) return
+        try {
+          const payload = JSON.parse(event.data)
+          messageHandlerRef.current(payload)
+        } catch {
+          messageHandlerRef.current(event.data)
+        }
+      }
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+          connect()
+        }
+      }
+    }
+
+    connect()
+    document.addEventListener('visibilitychange', handleVisibility)
+
     return () => {
-      socket.close()
+      isDisposed = true
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearPing()
+      if (reconnectTimerRef.current) {
+        window.clearTimeout(reconnectTimerRef.current)
+        reconnectTimerRef.current = null
+      }
+      socketRef.current?.close()
+      socketRef.current = null
     }
   }, [])
 
