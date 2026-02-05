@@ -16,3 +16,11 @@ export type Category = {
   action: string
   consequence: string
 }
+
+export type Memo = {
+  id: string
+  title: string
+  body: string
+  createdAt: string
+  updatedAt: string
+}

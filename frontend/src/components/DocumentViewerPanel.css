@@ -1,0 +1,35 @@
+.hide-code-labels .code-label {
+  display: none !important;
+}
+
+.hide-code-labels span[data-code-id] {
+  padding-top: 0 !important;
+}
+
+.code-remove {
+  cursor: pointer;
+  line-height: 1;
+}
+
+.document-content,
+.document-content * {
+  font-family: inherit !important;
+  line-height: inherit !important;
+}
+
+.document-content {
+  white-space: pre-wrap;
+}
+
+.document-content span[data-code-id] {
+  white-space: pre-wrap;
+}
+
+.document-content h1,
+.document-content h2,
+.document-content h3,
+.document-content h4,
+.document-content h5,
+.document-content h6 {
+  font-weight: 700;
+}

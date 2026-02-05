@@ -20,30 +20,42 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
       {
         target: 'body',
         placement: 'center',
-        content: "Welcome to Grounded Theory! Let's learn the workflow.",
+        content: 'Valkommen! Den har touren visar open, axial och selective coding.',
       },
       {
         target: '#document-viewer',
         placement: 'right',
         content:
-          'Step A: Open Coding. Highlight text here and apply codes to create concepts.',
+          'Open coding: markera text och applicera codes direkt i dokumentet.',
       },
       {
         target: '#axial-tab',
         placement: 'left',
         content:
-          'Step B & C: Categorization & Axial Coding. Drag codes into categories and edit Precondition/Action/Consequence logic.',
+          'Axial coding: dra codes in i kategorier och fyll i precondition, action och consequence.',
       },
       {
-        target: '#theory-tab',
+        target: '#core-category',
         placement: 'left',
         content:
-          'Step D: Selective Coding. Choose your core category and use the category/code overview to craft your theory.',
+          'Selective coding: valj eller skapa en core category som bar teorin.',
+      },
+      {
+        target: '#memos-section',
+        placement: 'left',
+        content:
+          'Memos: skriv hypoteser, tolkningar och beslut medan du jobbar.',
+      },
+      {
+        target: '#theory-narrative',
+        placement: 'left',
+        content:
+          'Theory narrative: formulera storyline och hur kategorierna hanger ihop.',
       },
       {
         target: '#file-menu',
         placement: 'bottom',
-        content: 'Use the File menu to save/load and export Word or Excel.',
+        content: 'File: spara/ladda projekt och exportera till Word eller Excel.',
       },
     ],
     [],
