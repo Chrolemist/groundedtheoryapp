@@ -47,6 +47,8 @@ export function DocumentEditor({
           Italic
         </button>
         <select
+          id="doc-font-size"
+          name="doc-font-size"
           onChange={(event) => onCommand('fontSize', event.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
           defaultValue="3"
@@ -57,6 +59,8 @@ export function DocumentEditor({
           <option value="5">XL</option>
         </select>
         <select
+          id="doc-font-family"
+          name="doc-font-family"
           value={fontFamilyValue}
           onChange={(event) => setFontFamily(event.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
@@ -86,6 +90,8 @@ export function DocumentEditor({
           <option value="'Verdana', Geneva, sans-serif">Verdana</option>
         </select>
         <select
+          id="doc-line-height"
+          name="doc-line-height"
           value={lineHeight}
           onChange={(event) => setLineHeight(event.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"

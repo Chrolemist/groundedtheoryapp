@@ -1584,6 +1584,8 @@ export function DashboardLayout() {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <select
+                id="document-view-mode"
+                name="document-view-mode"
                 value={documentViewMode === 'all' ? '__all__' : activeDocumentId}
                 onChange={(event) => {
                   const nextValue = event.target.value
@@ -1604,6 +1606,8 @@ export function DashboardLayout() {
                 ))}
               </select>
               <input
+                id="document-title"
+                name="document-title"
                 value={getDocumentById(activeDocumentId)?.title ?? ''}
                 onChange={(event) => updateDocument(activeDocumentId, { title: event.target.value })}
                 className="min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
@@ -1649,6 +1653,8 @@ export function DashboardLayout() {
                           Italic
                         </button>
                         <select
+                          id={`all-doc-font-size-${doc.id}`}
+                          name={`all-doc-font-size-${doc.id}`}
                           onChange={(event) =>
                             document.execCommand('fontSize', false, event.target.value)
                           }
@@ -1661,6 +1667,8 @@ export function DashboardLayout() {
                           <option value="5">XL</option>
                         </select>
                         <select
+                          id={`all-doc-font-family-${doc.id}`}
+                          name={`all-doc-font-family-${doc.id}`}
                           value={documentFontFamilyDisplay}
                           onChange={(event) => {
                             setDocumentFontFamily(event.target.value)
@@ -1704,6 +1712,8 @@ export function DashboardLayout() {
                           <option value="'Verdana', Geneva, sans-serif">Verdana</option>
                         </select>
                         <select
+                          id={`all-doc-line-height-${doc.id}`}
+                          name={`all-doc-line-height-${doc.id}`}
                           value={documentLineHeight}
                           onChange={(event) => setDocumentLineHeight(event.target.value)}
                           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
@@ -1867,12 +1877,16 @@ export function DashboardLayout() {
                           Apply
                         </button>
                         <input
+                          id={`code-label-${code.id}`}
+                          name={`code-label-${code.id}`}
                           value={code.label}
                           onChange={(event) => updateCode(code.id, { label: event.target.value })}
                           className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
                           placeholder="Code name"
                         />
                         <input
+                          id={`code-color-${code.id}`}
+                          name={`code-color-${code.id}`}
                           type="color"
                           value={code.colorHex ?? '#E2E8F0'}
                           onChange={(event) => {
@@ -1970,6 +1984,8 @@ export function DashboardLayout() {
                         Core Category
                       </label>
                       <select
+                        id="core-category"
+                        name="core-category"
                         value={coreCategoryId}
                         onChange={(event) => setCoreCategoryId(event.target.value)}
                         className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
@@ -2064,6 +2080,8 @@ export function DashboardLayout() {
                             Underline
                           </button>
                           <select
+                            id="theory-font-size"
+                            name="theory-font-size"
                             onChange={(event) => applyEditorCommand('fontSize', event.target.value)}
                             className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
                             defaultValue="3"
@@ -2074,6 +2092,8 @@ export function DashboardLayout() {
                             <option value="5">XL</option>
                           </select>
                           <input
+                            id="theory-text-color"
+                            name="theory-text-color"
                             type="color"
                             onChange={(event) => applyEditorCommand('foreColor', event.target.value)}
                             className="h-7 w-10 rounded border border-slate-200"
