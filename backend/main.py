@@ -9,6 +9,8 @@ from typing import Dict, List, Optional
 from uuid import uuid4
 
 import pandas as pd
+import firebase_admin
+from firebase_admin import credentials, firestore
 from docx import Document
 from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -153,6 +155,80 @@ manager = ConnectionManager()
 in_memory_project = ProjectState()
 in_memory_project_raw: Dict = {}
 
+firestore_client: Optional[firestore.Client] = None
+
+
+def get_firestore_client() -> Optional[firestore.Client]:
+    global firestore_client
+    if firestore_client is not None:
+        return firestore_client
+
+    project_id = os.getenv("FIREBASE_PROJECT_ID")
+    credentials_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
+    credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
+
+    try:
+        if not firebase_admin._apps:
+            if credentials_json:
+                creds_dict = json.loads(credentials_json)
+                firebase_admin.initialize_app(credentials.Certificate(creds_dict), {
+                    "projectId": project_id or creds_dict.get("project_id"),
+                })
+            elif credentials_path:
+                firebase_admin.initialize_app(credentials.Certificate(credentials_path), {
+                    "projectId": project_id,
+                })
+            else:
+                # Use Application Default Credentials (Cloud Run service account)
+                firebase_admin.initialize_app(credentials.ApplicationDefault(), {
+                    "projectId": project_id,
+                })
+
+        firestore_client = firestore.client()
+        return firestore_client
+    except Exception as exc:
+        logger.warning(f"Firestore not configured or failed to initialize: {exc}")
+        return None
+
+
+def get_firestore_doc_ref():
+    client = get_firestore_client()
+    if not client:
+        return None
+    collection = os.getenv("FIRESTORE_COLLECTION", "projects")
+    doc_id = os.getenv("FIRESTORE_DOC", "default")
+    return client.collection(collection).document(doc_id)
+
+
+def save_project_to_firestore(project_raw: Dict) -> None:
+    doc_ref = get_firestore_doc_ref()
+    if not doc_ref:
+        return
+    try:
+        doc_ref.set(
+            {
+                "project": project_raw,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+    except Exception as exc:
+        logger.warning(f"Failed to save project to Firestore: {exc}")
+
+
+def load_project_from_firestore() -> Optional[Dict]:
+    doc_ref = get_firestore_doc_ref()
+    if not doc_ref:
+        return None
+    try:
+        snapshot = doc_ref.get()
+        if not snapshot.exists:
+            return None
+        data = snapshot.to_dict() or {}
+        return data.get("project")
+    except Exception as exc:
+        logger.warning(f"Failed to load project from Firestore: {exc}")
+        return None
+
 allowed_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 
 app.add_middleware(
@@ -162,6 +238,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.on_event("startup")
+async def load_persisted_project() -> None:
+    global in_memory_project
+    global in_memory_project_raw
+    project_raw = load_project_from_firestore()
+    if project_raw:
+        in_memory_project_raw = project_raw
+        in_memory_project = normalize_project_state(project_raw)
+        logger.info("Loaded project from Firestore")
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
@@ -300,6 +387,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 project_raw = data.get("project_raw") or project_payload
                 in_memory_project_raw = project_raw
                 in_memory_project = normalize_project_state(project_raw)
+                save_project_to_firestore(in_memory_project_raw)
                 await manager.broadcast(
                     {
                         "type": "project:update",
@@ -324,6 +412,7 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
 
     global in_memory_project
     in_memory_project = project_state
+    save_project_to_firestore(project_state.model_dump())
     await manager.broadcast(in_memory_project.model_dump())
 
     return {"status": "ok"}

@@ -77,6 +77,7 @@ export function DashboardLayout() {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const [localUser, setLocalUser] = useState<PresenceUser | null>(null)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, CursorPresence>>({})
+  const [hasRemoteState, setHasRemoteState] = useState(false)
   const localUserRef = useRef<PresenceUser | null>(null)
   const isApplyingRemoteRef = useRef(false)
   const { isOnline: websocketOnline, sendJson } = useProjectWebSocket({
@@ -97,6 +98,7 @@ export function DashboardLayout() {
         if (projectRaw) {
           applyRemoteProject(projectRaw)
         }
+        setHasRemoteState(true)
         return
       }
 
@@ -278,6 +280,7 @@ export function DashboardLayout() {
 
   useEffect(() => {
     if (isApplyingRemoteRef.current) return
+    if (!hasRemoteState) return
     if (!sendJson) return
     sendJson({
       type: 'project:update',
@@ -289,7 +292,7 @@ export function DashboardLayout() {
         theoryHtml,
       },
     })
-  }, [documents, codes, categories, coreCategoryId, theoryHtml, sendJson])
+  }, [documents, codes, categories, coreCategoryId, theoryHtml, sendJson, hasRemoteState])
 
   useEffect(() => {
     const interval = window.setInterval(() => {
