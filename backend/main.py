@@ -164,23 +164,10 @@ app.add_middleware(
 )
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
-if FRONTEND_DIST.exists():
-    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="static")
 
-
-@app.middleware("http")
-async def spa_fallback(request: Request, call_next):
-    response = await call_next(request)
-    if response.status_code != 404:
-        return response
-    if request.method != "GET":
-        return response
-    if request.url.path.startswith(("/ws", "/project", "/export")):
-        return response
-    index_path = FRONTEND_DIST / "index.html"
-    if index_path.exists():
-        return FileResponse(index_path)
-    return response
+# Mount assets explicitly to avoid intercepting root requests (and WebSockets)
+if (FRONTEND_DIST / "assets").exists():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 
 def get_code_by_id(code_id: str) -> Optional[CodeItem]:
@@ -496,3 +483,19 @@ async def export_excel() -> Response:
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers=headers,
     )
+
+
+# Catch-all route for SPA - must be defined LAST
+@app.get("/{full_path:path}")
+async def serve_spa(full_path: str):
+    # If the file exists in dist (e.g. favicon.ico, manifest.json), serve it
+    possible_file = FRONTEND_DIST / full_path
+    if possible_file.is_file():
+        return FileResponse(possible_file)
+
+    # Otherwise serve index.html for client-side routing
+    index_path = FRONTEND_DIST / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    return Response("Frontend not found. Did you run 'npm run build'?", status_code=404)
