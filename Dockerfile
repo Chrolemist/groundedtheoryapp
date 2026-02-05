@@ -17,4 +17,4 @@ COPY --from=frontend-build /app/frontend/dist ./frontend/dist
 
 ENV PYTHONUNBUFFERED=1
 
-CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers"]
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips '*'"]
