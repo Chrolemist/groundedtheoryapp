@@ -70,39 +70,43 @@ class ConnectionManager:
         self.users: Dict[str, Dict[str, str]] = {}
 
     def _generate_user_name(self) -> str:
-        adjectives = [
-            "Curious",
-            "Brave",
-            "Bright",
-            "Quiet",
-            "Kind",
-            "Swift",
-            "Clever",
-            "Gentle",
-            "Bold",
-            "Sunny",
+        first_parts = [
+            "Busiga",
+            "Snälla",
+            "Tokiga",
+            "Glada",
+            "Luriga",
+            "Pigga",
+            "Coola",
+            "Snabba",
+            "Mjuka",
+            "Kloka",
+            "Sköna",
+            "Modiga",
         ]
-        animals = [
-            "Fox",
-            "Otter",
-            "Bear",
-            "Hawk",
-            "Dolphin",
-            "Rabbit",
-            "Wolf",
-            "Deer",
-            "Lynx",
-            "Panda",
+        second_parts = [
+            "Räven",
+            "Ugglan",
+            "Igelkotten",
+            "Bävern",
+            "Lamasen",
+            "Kängurun",
+            "Pandan",
+            "Humlan",
+            "Sälen",
+            "Älgen",
+            "Vesslan",
+            "Grodan",
         ]
-        base = f"{adjectives[len(self.users) % len(adjectives)]} {animals[len(self.users) % len(animals)]}"
+        index = len(self.users)
+        base = f"{first_parts[index % len(first_parts)]} {second_parts[index % len(second_parts)]}"
         existing = {user["name"] for user in self.users.values()}
-        if base in existing:
-            suffix = 2
-            while f"{base} {suffix}" in existing:
-                suffix += 1
-            return f"{base} {suffix}"
-        # Add a short suffix to reduce collisions across instances
-        return f"{base} {uuid4().hex[:4]}"
+        if base not in existing:
+            return base
+        suffix = 2
+        while f"{base} {suffix}" in existing:
+            suffix += 1
+        return f"{base} {suffix}"
 
     def _generate_user_color(self) -> str:
         palette = [
