@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import json
 import logging
+import hashlib
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -196,6 +197,7 @@ in_memory_project = ProjectState()
 in_memory_project_raw: Dict = {}
 
 firestore_client: Optional[firestore.Client] = None
+last_saved_project_hash: Optional[str] = None
 
 
 def get_firestore_client() -> Optional[firestore.Client]:
@@ -240,9 +242,21 @@ def get_firestore_doc_ref():
     return client.collection(collection).document(doc_id)
 
 
+def compute_project_hash(project_raw: Dict) -> Optional[str]:
+    try:
+        payload = json.dumps(project_raw, sort_keys=True, separators=(",", ":"))
+    except Exception:
+        return None
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
 def save_project_to_firestore(project_raw: Dict) -> None:
+    global last_saved_project_hash
     doc_ref = get_firestore_doc_ref()
     if not doc_ref:
+        return
+    current_hash = compute_project_hash(project_raw)
+    if current_hash and current_hash == last_saved_project_hash:
         return
     try:
         doc_ref.set(
@@ -251,6 +265,8 @@ def save_project_to_firestore(project_raw: Dict) -> None:
                 "updated_at": firestore.SERVER_TIMESTAMP,
             }
         )
+        if current_hash:
+            last_saved_project_hash = current_hash
     except Exception as exc:
         logger.warning(f"Failed to save project to Firestore: {exc}")
 
@@ -284,10 +300,12 @@ app.add_middleware(
 async def load_persisted_project() -> None:
     global in_memory_project
     global in_memory_project_raw
+    global last_saved_project_hash
     project_raw = load_project_from_firestore()
     if project_raw:
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
+        last_saved_project_hash = compute_project_hash(project_raw)
         logger.info("Loaded project from Firestore")
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -450,12 +468,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 async def get_project_state() -> Dict[str, Optional[Dict]]:
     global in_memory_project
     global in_memory_project_raw
+    global last_saved_project_hash
     project_raw = load_project_from_firestore()
     if project_raw:
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
+        last_saved_project_hash = compute_project_hash(project_raw)
     elif not in_memory_project_raw and in_memory_project.documents:
         in_memory_project_raw = in_memory_project.model_dump()
+        last_saved_project_hash = compute_project_hash(in_memory_project_raw)
 
     return {
         "project_raw": in_memory_project_raw or None,
@@ -467,6 +488,7 @@ async def get_project_state() -> Dict[str, Optional[Dict]]:
 async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
     global in_memory_project
     global in_memory_project_raw
+    global last_saved_project_hash
 
     project_raw = payload.get("project_raw") or payload.get("project") or payload
     if not isinstance(project_raw, dict):
@@ -475,6 +497,8 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
     in_memory_project_raw = project_raw
     in_memory_project = normalize_project_state(project_raw)
     save_project_to_firestore(in_memory_project_raw)
+    if not last_saved_project_hash:
+        last_saved_project_hash = compute_project_hash(in_memory_project_raw)
     await manager.broadcast(
         {
             "type": "project:update",
@@ -492,9 +516,11 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
 
     global in_memory_project
     global in_memory_project_raw
+    global last_saved_project_hash
     in_memory_project = project_state
     in_memory_project_raw = project_state.model_dump()
     save_project_to_firestore(project_state.model_dump())
+    last_saved_project_hash = compute_project_hash(in_memory_project_raw)
     await manager.broadcast(in_memory_project.model_dump())
 
     return {"status": "ok"}

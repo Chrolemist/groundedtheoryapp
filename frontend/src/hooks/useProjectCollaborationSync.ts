@@ -55,6 +55,7 @@ export function useProjectCollaborationSync({
 }: UseProjectCollaborationSyncArgs) {
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
+  const lastSyncedPayloadRef = useRef<string | null>(null)
   const idlePersistDelayMs = 1200
 
   useEffect(() => {
@@ -98,6 +99,11 @@ export function useProjectCollaborationSync({
       coreCategoryId,
       theoryHtml,
     }
+    const payload = JSON.stringify(projectRaw)
+    if (payload === lastSyncedPayloadRef.current) {
+      return
+    }
+    lastSyncedPayloadRef.current = payload
 
     if (hasRemoteState && sendJson) {
       sendJson({
