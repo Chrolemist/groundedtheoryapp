@@ -74,6 +74,9 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
 
   const handleCallback = (data: CallBackProps) => {
     if (data.type === EVENTS.TARGET_NOT_FOUND) {
+      if (data.index == null) {
+        return
+      }
       const nextIndex = data.index + 1
       if (nextIndex >= steps.length) {
         localStorage.setItem(STORAGE_KEY, 'true')
@@ -86,6 +89,9 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
     }
 
     if (data.type === EVENTS.STEP_AFTER) {
+      if (data.index == null) {
+        return
+      }
       const delta = data.action === ACTIONS.PREV ? -1 : 1
       setStepIndex(data.index + delta)
     }
