@@ -16,6 +16,8 @@ type UseYjsSyncArgs = {
   isApplyingRemoteRef: MutableRefObject<boolean>
 }
 
+type CategoryMapValue = Y.Text | Y.Array<string>
+
 const LOCAL_ORIGIN = 'local-yjs'
 const REMOTE_ORIGIN = 'remote-yjs'
 
@@ -57,11 +59,11 @@ export function useYjsSync({
 }: UseYjsSyncArgs) {
   const docRef = useRef<Y.Doc | null>(null)
   const docsMapRef = useRef<Y.Map<Y.Text> | null>(null)
-  const categoriesMapRef = useRef<Y.Map<Y.Map<unknown>> | null>(null)
+  const categoriesMapRef = useRef<Y.Map<Y.Map<CategoryMapValue>> | null>(null)
   const theoryTextRef = useRef<Y.Text | null>(null)
   const coreCategoryTextRef = useRef<Y.Text | null>(null)
   const observedDocsRef = useRef(new Map<string, Y.Text>())
-  const observedCategoriesRef = useRef(new Map<string, Y.Map<Y.AbstractType<unknown>>>())
+  const observedCategoriesRef = useRef(new Map<string, Y.Map<CategoryMapValue>>())
   const observedTheoryRef = useRef(false)
 
   const { sendJson } = useProjectWebSocket({
@@ -82,7 +84,7 @@ export function useYjsSync({
     const ydoc = new Y.Doc()
     docRef.current = ydoc
     docsMapRef.current = ydoc.getMap<Y.Text>('documents')
-    categoriesMapRef.current = ydoc.getMap<Y.Map<Y.AbstractType<unknown>>>('categories')
+    categoriesMapRef.current = ydoc.getMap<Y.Map<CategoryMapValue>>('categories')
     theoryTextRef.current = ydoc.getText('theoryHtml')
     coreCategoryTextRef.current = ydoc.getText('coreCategoryId')
 
@@ -166,7 +168,7 @@ export function useYjsSync({
     categories.forEach((category) => {
       const existing = categoriesMap.get(category.id)
       if (existing) return
-      const map = new Y.Map<unknown>()
+      const map = new Y.Map<CategoryMapValue>()
       const name = new Y.Text()
       name.insert(0, category.name)
       const precondition = new Y.Text()
@@ -196,7 +198,7 @@ export function useYjsSync({
       categories.forEach((category) => {
         let map = categoriesMap.get(category.id)
         if (!map) {
-          map = new Y.Map<unknown>()
+          map = new Y.Map<CategoryMapValue>()
           categoriesMap.set(category.id, map)
         }
         const name = map.get('name') as Y.Text | undefined
