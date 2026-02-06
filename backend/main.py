@@ -22,6 +22,8 @@ from pydantic import BaseModel, Field
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+BUILD_TAG = os.getenv("BUILD_TAG", "local-dev")
+logger.info("Build tag: %s", BUILD_TAG)
 
 
 class DocumentItem(BaseModel):

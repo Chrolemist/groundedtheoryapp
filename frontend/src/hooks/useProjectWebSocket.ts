@@ -52,6 +52,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       if (reconnectTimerRef.current) return
       const retry = retryCountRef.current
       const delay = Math.min(10000, 500 * Math.pow(2, retry))
+      console.info('[WebSocket] reconnect scheduled', { retry, delay })
       reconnectTimerRef.current = window.setTimeout(() => {
         reconnectTimerRef.current = null
         connect()
@@ -111,6 +112,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
+        console.info('[WebSocket] visibility change: visible')
         if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
           connect()
         }
@@ -122,6 +124,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
     return () => {
       isDisposed = true
+      console.info('[WebSocket] disposed')
       document.removeEventListener('visibilitychange', handleVisibility)
       clearPing()
       if (reconnectTimerRef.current) {
