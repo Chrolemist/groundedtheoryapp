@@ -53,16 +53,40 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
           'Selective coding: valj eller skapa en core category som bar teorin.',
       },
       {
+        target: '#theory-narrative',
+        placement: 'left',
+        content:
+          'Theory narrative: formulera storyline och hur kategorierna hanger ihop.',
+      },
+      {
         target: '#memos-tab',
         placement: 'left',
         content:
           'Integrative memos: samla helheten i en global memo-flik.',
       },
       {
-        target: '#theory-narrative',
-        placement: 'left',
+        target: '#theory-map-tab',
+        placement: 'bottom',
         content:
-          'Theory narrative: formulera storyline och hur kategorierna hanger ihop.',
+          'Theory Map: visuell karta over kategorier, codes och utdrag. Klicka utdrag for att hoppa till markeringen.',
+      },
+      {
+        target: '#theory-map-view',
+        placement: 'right',
+        content:
+          'Kartan har zoom och pan. Theory narrative visas ocksa har som egen nod.',
+      },
+      {
+        target: '#overview-tab',
+        placement: 'bottom',
+        content:
+          'Overview: samlar statistik och diagram pa ett stalle.',
+      },
+      {
+        target: '#analysis-overview',
+        placement: 'right',
+        content:
+          'Overview visar totals, memos per typ, starkaste kategorier och mest markerade codes.',
       },
       {
         target: '#file-menu',

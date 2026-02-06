@@ -218,6 +218,7 @@ export function DocumentViewerPanel({
             Document
           </button>
           <button
+            id="theory-map-tab"
             type="button"
             onClick={() => setActiveTab('tree')}
             className={cn(
@@ -230,6 +231,7 @@ export function DocumentViewerPanel({
             Theory Map
           </button>
           <button
+            id="overview-tab"
             type="button"
             onClick={() => setActiveTab('overview')}
             className={cn(

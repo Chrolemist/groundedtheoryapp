@@ -289,7 +289,10 @@ export function TreeMapView({
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <section
+      id="theory-map-view"
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-slate-900">Theory Map</p>
