@@ -26,6 +26,7 @@ type TreeNode = {
   label: string
   kind: 'root' | 'core' | 'category' | 'code' | 'excerpt' | 'memo' | 'theory'
   meta?: string
+  memoNotes?: Array<{ title: string; body: string }>
   logic?: {
     precondition: string
     action: string
@@ -262,26 +263,18 @@ export function TreeMapView({
         if (!code) return
         const excerpts = codeExcerpts.get(code.id) ?? []
         if (isFiltered && excerpts.length === 0) return
+        const codeMemos = showMemos
+          ? memos.filter((memo) => memo.type === 'code' && memo.refId === code.id)
+          : []
         const codeNode: TreeNode = {
           id: `code-${code.id}`,
           label: code.label,
           kind: 'code',
+          memoNotes: codeMemos.map((memo) => ({
+            title: memo.title || 'Code Note',
+            body: memo.body,
+          })),
           children: [],
-        }
-
-        if (showMemos) {
-          const codeMemos = memos.filter(
-            (memo) => memo.type === 'code' && memo.refId === code.id,
-          )
-          codeMemos.forEach((memo) => {
-            codeNode.children.push({
-              id: `memo-${memo.id}`,
-              label: memo.title || 'Code Note',
-              meta: memo.body,
-              kind: 'memo',
-              children: [],
-            })
-          })
         }
 
         excerpts.forEach((excerpt, index) => {
@@ -698,6 +691,16 @@ export function TreeMapView({
                     <p className="mt-1 text-[11px] text-slate-600">
                       {formatExcerpt(node.meta)}
                     </p>
+                  ) : null}
+                  {node.kind === 'code' && node.memoNotes?.length ? (
+                    <div className="mt-1 space-y-1 text-[11px] text-slate-600">
+                      {node.memoNotes.map((memo, index) => (
+                        <p key={`${node.id}-memo-${index}`}>
+                          <span className="font-semibold">{memo.title}:</span>{' '}
+                          {formatExcerpt(memo.body)}
+                        </p>
+                      ))}
+                    </div>
                   ) : null}
                 </div>
               )
