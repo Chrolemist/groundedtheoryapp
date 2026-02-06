@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Joyride, {
   ACTIONS,
   EVENTS,
@@ -87,6 +87,7 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
 
   const [seen, setSeen] = useState(getStoredSeen)
   const [stepIndex, setStepIndex] = useState(0)
+  const skipScrollRef = useRef(false)
   const shouldRun = run && (!seen || runId > 0)
 
   useEffect(() => {
@@ -116,6 +117,19 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
     if (data.type === EVENTS.STEP_AFTER || data.type === EVENTS.TOOLTIP) {
       const selector = data.step?.target
       if (typeof selector === 'string') {
+        if (selector === '#theory-map-tab' || selector === '#overview-tab') {
+          skipScrollRef.current = true
+          window.scrollTo({ top: 0, behavior: 'auto' })
+          document.documentElement.scrollTop = 0
+          document.body.scrollTop = 0
+          window.setTimeout(() => {
+            skipScrollRef.current = false
+          }, 200)
+          return
+        }
+        if (skipScrollRef.current) {
+          return
+        }
         const element = document.querySelector(selector)
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -138,7 +152,8 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
       run={shouldRun}
       stepIndex={stepIndex}
       continuous
-      scrollToFirstStep
+      disableScrolling
+      scrollToFirstStep={false}
       showProgress
       showSkipButton
       callback={handleCallback}
