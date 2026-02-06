@@ -2,7 +2,6 @@ import { type Category } from '../types'
 
 type SelectiveCodingPanelProps = {
   coreCategoryId: string
-  onCoreCategoryChange: (value: string) => void
   coreCategoryDraft: string
   onCoreCategoryDraftChange: (value: string) => void
   onCreateCoreCategory: () => void
@@ -15,7 +14,6 @@ type SelectiveCodingPanelProps = {
 
 export function SelectiveCodingPanel({
   coreCategoryId,
-  onCoreCategoryChange,
   coreCategoryDraft,
   onCoreCategoryDraftChange,
   onCreateCoreCategory,
@@ -36,25 +34,11 @@ export function SelectiveCodingPanel({
       <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
         <div>
           <label
-            htmlFor="core-category"
+            htmlFor="core-category-new"
             className="text-xs font-semibold uppercase tracking-wide text-slate-400"
           >
             Core Category
           </label>
-          <select
-            id="core-category"
-            name="core-category"
-            value={coreCategoryId}
-            onChange={(event) => onCoreCategoryChange(event.target.value)}
-            className="mt-2 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-          >
-            <option value="">Select the core category</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <input
               id="core-category-new"
@@ -67,16 +51,21 @@ export function SelectiveCodingPanel({
                 onCreateCoreCategory()
               }}
               className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700"
-              placeholder="Create a new core category"
+              placeholder="Skriv din core category"
             />
             <button
               type="button"
               onClick={onCreateCoreCategory}
               className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
             >
-              Create core
+              Spara core
             </button>
           </div>
+          {coreCategoryId ? (
+            <p className="mt-2 text-xs text-slate-500">
+              Aktiv core: {categories.find((category) => category.id === coreCategoryId)?.name}
+            </p>
+          ) : null}
         </div>
         <div>
           <span

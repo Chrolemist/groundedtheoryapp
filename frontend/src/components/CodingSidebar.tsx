@@ -31,7 +31,6 @@ type CodingSidebarProps = {
   onRemoveCodeFromCategory: (categoryId: string, codeId: string) => void
   onAddCategoryMemo: (categoryId: string, categoryName?: string) => void
   onAddGlobalMemo: () => void
-  onCoreCategoryChange: (value: string) => void
   onCoreCategoryDraftChange: (value: string) => void
   onCreateCoreCategory: () => void
   onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
@@ -70,7 +69,6 @@ export function CodingSidebar({
   onRemoveCodeFromCategory,
   onAddCategoryMemo,
   onAddGlobalMemo,
-  onCoreCategoryChange,
   onCoreCategoryDraftChange,
   onCreateCoreCategory,
   onUpdateMemo,
@@ -176,7 +174,6 @@ export function CodingSidebar({
             >
               <SelectiveCodingPanel
                 coreCategoryId={coreCategoryId}
-                onCoreCategoryChange={onCoreCategoryChange}
                 coreCategoryDraft={coreCategoryDraft}
                 onCoreCategoryDraftChange={onCoreCategoryDraftChange}
                 onCreateCoreCategory={onCreateCoreCategory}

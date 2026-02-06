@@ -87,7 +87,12 @@ export function DashboardLayout() {
       onDragEnd={project.handleDragEnd}
     >
       <div className="min-h-screen bg-slate-50 text-slate-900">
-        <OnboardingTour run={tour.run} runId={tour.runId} onFinish={tour.stop} />
+        <OnboardingTour
+          key={tour.runId}
+          run={tour.run}
+          runId={tour.runId}
+          onFinish={tour.stop}
+        />
         <DashboardHeader
           websocketOnline={websocketOnline}
           presenceUsers={presenceUsers}
@@ -174,7 +179,6 @@ export function DashboardLayout() {
             onUpdateCategory={project.updateCategory}
             onRemoveCategory={project.removeCategory}
             onRemoveCodeFromCategory={project.removeCodeFromCategory}
-            onCoreCategoryChange={project.setCoreCategoryId}
             onCoreCategoryDraftChange={project.setCoreCategoryDraft}
             onCreateCoreCategory={project.handleCreateCoreCategory}
             onAddCodeMemo={project.handleAddCodeMemo}

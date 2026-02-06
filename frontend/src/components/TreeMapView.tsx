@@ -1,4 +1,4 @@
-import { type WheelEvent, useMemo, useRef, useState } from 'react'
+import { type WheelEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from './DashboardLayout.types'
 import { cn } from '../lib/cn'
@@ -24,8 +24,13 @@ type TreeMapViewProps = {
 type TreeNode = {
   id: string
   label: string
-  kind: 'root' | 'category' | 'code' | 'excerpt' | 'memo' | 'theory'
+  kind: 'root' | 'core' | 'category' | 'code' | 'excerpt' | 'memo' | 'theory'
   meta?: string
+  logic?: {
+    precondition: string
+    action: string
+    consequence: string
+  }
   payload?: TreeMapExcerptTarget
   children: TreeNode[]
 }
@@ -35,11 +40,15 @@ type NodePosition = {
   y: number
 }
 
-const COLUMN_WIDTH = 280
-const ROW_HEIGHT = 90
 const NODE_WIDTH = 240
 const NODE_HEIGHT = 64
 const CANVAS_PADDING = 80
+const NODE_GAP_X = 60
+const NODE_GAP_Y = 40
+const HORIZONTAL_COLUMN_WIDTH = NODE_WIDTH + NODE_GAP_X
+const HORIZONTAL_ROW_HEIGHT = NODE_HEIGHT + NODE_GAP_Y
+const VERTICAL_COLUMN_WIDTH = NODE_WIDTH + NODE_GAP_X + 20
+const VERTICAL_ROW_HEIGHT = NODE_HEIGHT + NODE_GAP_Y + 30
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
@@ -64,8 +73,63 @@ export function TreeMapView({
   const [offset, setOffset] = useState({ x: 40, y: 40 })
   const [isPanning, setIsPanning] = useState(false)
   const [panAnchor, setPanAnchor] = useState({ x: 0, y: 0 })
+  const [selectedDocId, setSelectedDocId] = useState('__all__')
+  const [showLogic, setShowLogic] = useState(false)
+  const [layoutOrientation, setLayoutOrientation] = useState<'horizontal' | 'vertical'>(() => {
+    if (typeof window === 'undefined') return 'horizontal'
+    const saved = window.localStorage.getItem('gt-theory-map-layout')
+    if (!saved) return 'horizontal'
+    try {
+      const parsed = JSON.parse(saved) as { layoutOrientation?: 'horizontal' | 'vertical' }
+      return parsed.layoutOrientation === 'vertical' ? 'vertical' : 'horizontal'
+    } catch {
+      return 'horizontal'
+    }
+  })
+  const [useManualLayout, setUseManualLayout] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const saved = window.localStorage.getItem('gt-theory-map-layout')
+    if (!saved) return false
+    try {
+      const parsed = JSON.parse(saved) as { useManualLayout?: boolean }
+      return typeof parsed.useManualLayout === 'boolean' ? parsed.useManualLayout : false
+    } catch {
+      return false
+    }
+  })
+  const [manualPositions, setManualPositions] = useState<Record<string, NodePosition>>(() => {
+    if (typeof window === 'undefined') return {}
+    const saved = window.localStorage.getItem('gt-theory-map-layout')
+    if (!saved) return {}
+    try {
+      const parsed = JSON.parse(saved) as { manualPositions?: Record<string, NodePosition> }
+      return parsed.manualPositions ?? {}
+    } catch {
+      return {}
+    }
+  })
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const dragMovedRef = useRef(false)
+  const dragStartRef = useRef({ x: 0, y: 0 })
+  const isFiltered = selectedDocId !== '__all__'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const payload = {
+      manualPositions,
+      useManualLayout,
+      layoutOrientation,
+    }
+    window.localStorage.setItem('gt-theory-map-layout', JSON.stringify(payload))
+  }, [layoutOrientation, manualPositions, useManualLayout])
 
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
+
+  const visibleDocuments = useMemo(() => {
+    if (selectedDocId === '__all__') return documents
+    return documents.filter((doc) => doc.id === selectedDocId)
+  }, [documents, selectedDocId])
 
   const codeExcerpts = useMemo(() => {
     const map = new Map<
@@ -73,7 +137,7 @@ export function TreeMapView({
       Array<{ docId: string; docTitle: string; text: string; highlightIndex: number }>
     >()
     const highlightIndexByKey = new Map<string, number>()
-    documents.forEach((doc) => {
+    visibleDocuments.forEach((doc) => {
       if (!doc.html) return
       const parser = new DOMParser()
       const wrapper = parser.parseFromString(`<div>${doc.html}</div>`, 'text/html')
@@ -101,7 +165,9 @@ export function TreeMapView({
       })
     })
     return map
-  }, [documents])
+  }, [visibleDocuments])
+
+  const hasVisibleExcerpts = codeExcerpts.size > 0
 
   const theoryExcerpt = useMemo(() => {
     if (!theoryHtml) return ''
@@ -115,16 +181,17 @@ export function TreeMapView({
   const rootNode = useMemo<TreeNode>(() => {
     const rootLabel = coreCategoryId ? 'Core Category' : 'Categories'
     const rootChildren: TreeNode[] = []
+    const memoNodes: TreeNode[] = []
     const orderedCategories = [...categories].sort((a, b) => {
-      if (a.id === coreCategoryId) return -1
-      if (b.id === coreCategoryId) return 1
+      if (a.id === coreCategoryId) return 1
+      if (b.id === coreCategoryId) return -1
       return a.name.localeCompare(b.name)
     })
 
     if (showMemos) {
       const globalMemos = memos.filter((memo) => memo.type === 'global')
       globalMemos.forEach((memo) => {
-        rootChildren.push({
+        memoNodes.push({
           id: `memo-${memo.id}`,
           label: memo.title || 'Integrative Memo',
           meta: memo.body,
@@ -134,22 +201,33 @@ export function TreeMapView({
       })
     }
 
-    if (theoryExcerpt) {
-      rootChildren.push({
+    const buildTheoryNode = () =>
+      ({
         id: 'theory-narrative',
         label: 'Theory Narrative',
         meta: theoryExcerpt,
         kind: 'theory',
         children: [],
-      })
-    }
+      }) satisfies TreeNode
 
-    orderedCategories.forEach((category) => {
+    const categoryNodes = orderedCategories.reduce<TreeNode[]>((acc, category) => {
+      const isCore = category.id === coreCategoryId
+      const hasLogic =
+        Boolean(category.precondition?.trim()) ||
+        Boolean(category.action?.trim()) ||
+        Boolean(category.consequence?.trim())
       const categoryNode: TreeNode = {
         id: `category-${category.id}`,
         label: category.name,
-        meta: category.id === coreCategoryId ? 'Core' : undefined,
-        kind: 'category',
+        meta: isCore ? 'Core' : undefined,
+        logic: hasLogic
+          ? {
+              precondition: category.precondition?.trim() ?? '',
+              action: category.action?.trim() ?? '',
+              consequence: category.consequence?.trim() ?? '',
+            }
+          : undefined,
+        kind: isCore ? 'core' : 'category',
         children: [],
       }
 
@@ -171,6 +249,8 @@ export function TreeMapView({
       category.codeIds.forEach((codeId) => {
         const code = codeById.get(codeId)
         if (!code) return
+        const excerpts = codeExcerpts.get(code.id) ?? []
+        if (isFiltered && excerpts.length === 0) return
         const codeNode: TreeNode = {
           id: `code-${code.id}`,
           label: code.label,
@@ -193,7 +273,6 @@ export function TreeMapView({
           })
         }
 
-        const excerpts = codeExcerpts.get(code.id) ?? []
         excerpts.forEach((excerpt, index) => {
           codeNode.children.push({
             id: `excerpt-${code.id}-${index}`,
@@ -212,9 +291,34 @@ export function TreeMapView({
 
         categoryNode.children.push(codeNode)
       })
+      if (isFiltered && categoryNode.children.length === 0) {
+        return acc
+      }
+      acc.push(categoryNode)
+      return acc
+    }, [])
 
-      rootChildren.push(categoryNode)
-    })
+      if (memoNodes.length) {
+        rootChildren.push(...memoNodes)
+      }
+
+      const coreNode = categoryNodes.find((node) => node.kind === 'core') ?? null
+      const nonCoreNodes = categoryNodes.filter((node) => node.kind !== 'core')
+
+      if (coreNode) {
+        coreNode.children = nonCoreNodes
+      }
+
+      const shouldShowTheory = Boolean(theoryExcerpt || coreNode || nonCoreNodes.length)
+      if (shouldShowTheory) {
+        const theoryNode = buildTheoryNode() as TreeNode
+        theoryNode.children = coreNode ? [coreNode] : nonCoreNodes
+        rootChildren.push(theoryNode)
+      } else if (coreNode) {
+        rootChildren.push(coreNode)
+      } else {
+        rootChildren.push(...nonCoreNodes)
+      }
 
     return {
       id: 'root',
@@ -222,22 +326,31 @@ export function TreeMapView({
       kind: 'root',
       children: rootChildren,
     }
-  }, [categories, coreCategoryId, codeById, codeExcerpts, memos, showMemos, theoryExcerpt])
+  }, [categories, coreCategoryId, codeById, codeExcerpts, isFiltered, memos, showMemos, theoryExcerpt])
 
   const { positions, edges, size } = useMemo(() => {
     const map = new Map<string, NodePosition>()
     const connections: Array<{ from: string; to: string }> = []
 
-    const layout = (node: TreeNode, depth: number, row: number): number => {
+    const getPosition = (depth: number, row: number) => {
+      if (layoutOrientation === 'vertical') {
+        return { x: row * VERTICAL_COLUMN_WIDTH, y: depth * VERTICAL_ROW_HEIGHT }
+      }
+      return { x: depth * HORIZONTAL_COLUMN_WIDTH, y: row * HORIZONTAL_ROW_HEIGHT }
+    }
+
+    const layout = (node: TreeNode, depth: number, row: number, isRoot = false): number => {
       if (!node.children.length) {
-        map.set(node.id, { x: depth * COLUMN_WIDTH, y: row * ROW_HEIGHT })
+        map.set(node.id, getPosition(depth, row))
         return 1
       }
 
       let currentRow = row
       let span = 0
       node.children.forEach((child) => {
-        connections.push({ from: node.id, to: child.id })
+        if (!isRoot) {
+          connections.push({ from: node.id, to: child.id })
+        }
         const childSpan = layout(child, depth + 1, currentRow)
         currentRow += childSpan
         span += childSpan
@@ -247,26 +360,64 @@ export function TreeMapView({
       const lastChild = node.children[node.children.length - 1]
       const firstPos = map.get(firstChild.id)
       const lastPos = map.get(lastChild.id)
-      const midY =
-        firstPos && lastPos ? (firstPos.y + lastPos.y) / 2 : row * ROW_HEIGHT
-      map.set(node.id, { x: depth * COLUMN_WIDTH, y: midY })
+      if (layoutOrientation === 'vertical') {
+        const baseX =
+          firstPos && lastPos
+            ? (firstPos.x + lastPos.x) / 2
+            : getPosition(depth, row).x
+        map.set(node.id, { x: baseX, y: depth * VERTICAL_ROW_HEIGHT })
+      } else {
+        const baseY =
+          firstPos && lastPos
+            ? (firstPos.y + lastPos.y) / 2
+            : getPosition(depth, row).y
+        map.set(node.id, { x: depth * HORIZONTAL_COLUMN_WIDTH, y: baseY })
+      }
       return span
     }
 
-    const rows = layout(rootNode, 0, 0)
-    const maxDepth = Math.max(...Array.from(map.values()).map((pos) => pos.x), 0)
+    const rows = layout(rootNode, 0, 0, true)
+    const maxX = Math.max(...Array.from(map.values()).map((pos) => pos.x), 0)
     const maxY = Math.max(...Array.from(map.values()).map((pos) => pos.y), 0)
 
     return {
       positions: map,
       edges: connections,
       size: {
-        width: maxDepth + COLUMN_WIDTH + CANVAS_PADDING * 2,
-        height: maxY + ROW_HEIGHT + CANVAS_PADDING * 2,
+        width:
+          maxX +
+          (layoutOrientation === 'vertical'
+            ? VERTICAL_COLUMN_WIDTH
+            : HORIZONTAL_COLUMN_WIDTH) +
+          CANVAS_PADDING * 2,
+        height:
+          maxY +
+          (layoutOrientation === 'vertical'
+            ? VERTICAL_ROW_HEIGHT
+            : HORIZONTAL_ROW_HEIGHT) +
+          CANVAS_PADDING * 2,
         rows,
       },
     }
-  }, [rootNode])
+  }, [layoutOrientation, rootNode])
+
+  const getEdgePath = (from: NodePosition, to: NodePosition) => {
+    if (layoutOrientation === 'vertical') {
+      const startX = from.x + CANVAS_PADDING + NODE_WIDTH / 2
+      const startY = from.y + CANVAS_PADDING + NODE_HEIGHT
+      const endX = to.x + CANVAS_PADDING + NODE_WIDTH / 2
+      const endY = to.y + CANVAS_PADDING
+      const midY = (startY + endY) / 2
+      return `M ${startX} ${startY} C ${startX} ${midY}, ${endX} ${midY}, ${endX} ${endY}`
+    }
+
+    const startX = from.x + CANVAS_PADDING + NODE_WIDTH
+    const startY = from.y + CANVAS_PADDING + NODE_HEIGHT / 2
+    const endX = to.x + CANVAS_PADDING
+    const endY = to.y + CANVAS_PADDING + NODE_HEIGHT / 2
+    const midX = (startX + endX) / 2
+    return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`
+  }
 
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -280,27 +431,115 @@ export function TreeMapView({
   }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (draggingNodeId) {
+      const canvasX = (event.clientX - offset.x) / scale
+      const canvasY = (event.clientY - offset.y) / scale
+      const movedX = Math.abs(event.clientX - dragStartRef.current.x)
+      const movedY = Math.abs(event.clientY - dragStartRef.current.y)
+      if (movedX > 4 || movedY > 4) {
+        dragMovedRef.current = true
+      }
+      setManualPositions((current) => ({
+        ...current,
+        [draggingNodeId]: {
+          x: canvasX - dragOffset.x,
+          y: canvasY - dragOffset.y,
+        },
+      }))
+      return
+    }
     if (!isPanning) return
     setOffset({ x: event.clientX - panAnchor.x, y: event.clientY - panAnchor.y })
   }
 
   const handlePointerUp = () => {
     setIsPanning(false)
+    setDraggingNodeId(null)
+    window.setTimeout(() => {
+      dragMovedRef.current = false
+    }, 0)
   }
+
+  const renderPositions = useMemo(() => {
+    if (!useManualLayout) return positions
+    const next = new Map(positions)
+    Object.entries(manualPositions).forEach(([id, pos]) => {
+      if (next.has(id)) {
+        next.set(id, pos)
+      }
+    })
+    return next
+  }, [manualPositions, positions, useManualLayout])
+
+  const renderPositionsRef = useRef(renderPositions)
+  useEffect(() => {
+    renderPositionsRef.current = renderPositions
+  }, [renderPositions])
 
   return (
     <section
       id="theory-map-view"
       className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-slate-900">Theory Map</p>
           <p className="text-xs text-slate-500">
             Zoom with mouse wheel, drag to pan, scroll to explore.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <button
+            type="button"
+            onClick={() => setUseManualLayout((current) => !current)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+          >
+            {useManualLayout ? 'Lås noder' : 'Lås upp noder'}
+          </button>
+          {useManualLayout ? (
+            <button
+              type="button"
+              onClick={() => {
+                setManualPositions({})
+                setUseManualLayout(false)
+              }}
+              className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+            >
+              Återställ layout
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() =>
+              setLayoutOrientation((current) =>
+                current === 'horizontal' ? 'vertical' : 'horizontal',
+              )
+            }
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+          >
+            {layoutOrientation === 'horizontal' ? 'Vertikal vy' : 'Horisontell vy'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLogic((current) => !current)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+          >
+            {showLogic ? 'Dolj logik' : 'Visa logik'}
+          </button>
+          <select
+            id="theory-map-document-filter"
+            name="theory-map-document-filter"
+            value={selectedDocId}
+            onChange={(event) => setSelectedDocId(event.target.value)}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+          >
+            <option value="__all__">All documents</option>
+            {documents.map((doc) => (
+              <option key={doc.id} value={doc.id}>
+                {doc.title}
+              </option>
+            ))}
+          </select>
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
             Nodes: {positions.size}
           </span>
@@ -319,96 +558,141 @@ export function TreeMapView({
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
-        <div
-          className="absolute left-0 top-0"
-          style={{
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-            transformOrigin: '0 0',
-            width: size.width,
-            height: size.height,
-          }}
-        >
-          <svg
-            width={size.width}
-            height={size.height}
+        {isFiltered && !hasVisibleExcerpts ? (
+          <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
+            Inga kopplingar hittades för det här dokumentet.
+          </div>
+        ) : (
+          <div
             className="absolute left-0 top-0"
+            style={{
+              transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+              transformOrigin: '0 0',
+              width: size.width,
+              height: size.height,
+            }}
           >
-            {edges.map((edge) => {
-              const from = positions.get(edge.from)
-              const to = positions.get(edge.to)
-              if (!from || !to) return null
-              const startX = from.x + CANVAS_PADDING + NODE_WIDTH
-              const startY = from.y + CANVAS_PADDING + NODE_HEIGHT / 2
-              const endX = to.x + CANVAS_PADDING
-              const endY = to.y + CANVAS_PADDING + NODE_HEIGHT / 2
-              const midX = (startX + endX) / 2
+            <svg
+              width={size.width}
+              height={size.height}
+              className="absolute left-0 top-0"
+            >
+              {edges.map((edge) => {
+                const from = renderPositions.get(edge.from)
+                const to = renderPositions.get(edge.to)
+                if (!from || !to) return null
+                return (
+                  <path
+                    key={`${edge.from}-${edge.to}`}
+                    d={getEdgePath(from, to)}
+                    fill="none"
+                    stroke="#CBD5F5"
+                    strokeWidth={1.5}
+                  />
+                )
+              })}
+            </svg>
+            {Array.from(renderPositions.entries()).map(([id, pos]) => {
+              const node = findNode(rootNode, id)
+              if (!node || node.kind === 'root') return null
+              const isClickable = node.kind === 'excerpt' && Boolean(onExcerptNavigate)
               return (
-                <path
-                  key={`${edge.from}-${edge.to}`}
-                  d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
-                  fill="none"
-                  stroke="#CBD5F5"
-                  strokeWidth={1.5}
-                />
-              )
-            })}
-          </svg>
-          {Array.from(positions.entries()).map(([id, pos]) => {
-            const node = findNode(rootNode, id)
-            if (!node) return null
-            const isClickable = node.kind === 'excerpt' && Boolean(onExcerptNavigate)
-            return (
-              <div
-                key={id}
-                className={cn(
-                  'absolute rounded-xl border bg-white px-3 py-2 text-xs shadow-sm',
-                  node.kind === 'root' && 'border-slate-900 bg-slate-900 text-white',
-                  node.kind === 'category' && 'border-slate-200',
-                  node.kind === 'code' && 'border-slate-200 bg-slate-50',
-                  node.kind === 'excerpt' &&
-                    'border-dashed border-slate-300 bg-white transition hover:border-slate-400 hover:bg-white',
-                  node.kind === 'memo' && 'border-amber-200 bg-amber-50',
-                  node.kind === 'theory' && 'border-emerald-200 bg-emerald-50',
-                  isClickable && 'cursor-pointer',
-                )}
-                style={{
-                  left: pos.x + CANVAS_PADDING,
-                  top: pos.y + CANVAS_PADDING,
-                  width: NODE_WIDTH,
-                  minHeight: NODE_HEIGHT,
-                }}
-                onClick={() => {
-                  if (node.kind !== 'excerpt' || !node.payload) return
-                  onExcerptNavigate?.(node.payload)
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-semibold text-slate-900">
-                    {node.kind === 'root' ? node.label : node.label}
-                  </span>
-                  {node.meta && node.kind !== 'theory' ? (
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
-                      {node.meta}
+                <div
+                  key={id}
+                  className={cn(
+                    'absolute rounded-xl border bg-white px-3 py-2 text-xs shadow-sm',
+                    node.kind === 'core' && 'border-slate-900 bg-slate-900 text-white',
+                    node.kind === 'category' && 'border-slate-200',
+                    node.kind === 'code' && 'border-slate-200 bg-slate-50',
+                    node.kind === 'excerpt' &&
+                      'border-dashed border-slate-300 bg-white transition hover:border-slate-400 hover:bg-white',
+                    node.kind === 'memo' && 'border-amber-200 bg-amber-50',
+                    node.kind === 'theory' && 'border-emerald-200 bg-emerald-50',
+                    isClickable && 'cursor-pointer',
+                  )}
+                  style={{
+                    left: pos.x + CANVAS_PADDING,
+                    top: pos.y + CANVAS_PADDING,
+                    width: NODE_WIDTH,
+                    minHeight: NODE_HEIGHT,
+                  }}
+                  data-node-id={id}
+                  onPointerDown={(event) => {
+                    if (!useManualLayout) return
+                    event.preventDefault()
+                    event.stopPropagation()
+                    dragMovedRef.current = false
+                    dragStartRef.current = { x: event.clientX, y: event.clientY }
+                    const canvasX = (event.clientX - offset.x) / scale
+                    const canvasY = (event.clientY - offset.y) / scale
+                    const currentPos = renderPositionsRef.current.get(id) ?? pos
+                    setDraggingNodeId(id)
+                    setDragOffset({
+                      x: canvasX - currentPos.x,
+                      y: canvasY - currentPos.y,
+                    })
+                  }}
+                  onClick={() => {
+                    if (dragMovedRef.current) return
+                    if (node.kind !== 'excerpt' || !node.payload) return
+                    onExcerptNavigate?.(node.payload)
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={cn(
+                        'font-semibold',
+                        node.kind === 'core' ? 'text-white' : 'text-slate-900',
+                      )}
+                    >
+                      {node.label}
                     </span>
+                    {node.meta && node.kind !== 'theory' ? (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">
+                        {node.meta}
+                      </span>
+                    ) : null}
+                  </div>
+                  {showLogic && node.logic ? (
+                    <div className="mt-2 space-y-1 text-[11px] text-slate-600">
+                      {node.logic.precondition ? (
+                        <p>
+                          <span className="font-semibold">Forutsattning:</span>{' '}
+                          {formatExcerpt(node.logic.precondition)}
+                        </p>
+                      ) : null}
+                      {node.logic.action ? (
+                        <p>
+                          <span className="font-semibold">Handling:</span>{' '}
+                          {formatExcerpt(node.logic.action)}
+                        </p>
+                      ) : null}
+                      {node.logic.consequence ? (
+                        <p>
+                          <span className="font-semibold">Konsekvens:</span>{' '}
+                          {formatExcerpt(node.logic.consequence)}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {node.kind === 'excerpt' && node.meta ? (
+                    <p className="mt-1 text-[11px] text-slate-500">{node.meta}</p>
+                  ) : null}
+                  {node.kind === 'theory' && node.meta ? (
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      {formatExcerpt(node.meta)}
+                    </p>
+                  ) : null}
+                  {node.kind === 'memo' && node.meta ? (
+                    <p className="mt-1 text-[11px] text-slate-600">
+                      {formatExcerpt(node.meta)}
+                    </p>
                   ) : null}
                 </div>
-                {node.kind === 'excerpt' && node.meta ? (
-                  <p className="mt-1 text-[11px] text-slate-500">{node.meta}</p>
-                ) : null}
-                {node.kind === 'theory' && node.meta ? (
-                  <p className="mt-1 text-[11px] text-slate-600">
-                    {formatExcerpt(node.meta)}
-                  </p>
-                ) : null}
-                {node.kind === 'memo' && node.meta ? (
-                  <p className="mt-1 text-[11px] text-slate-600">
-                    {formatExcerpt(node.meta)}
-                  </p>
-                ) : null}
-              </div>
-            )
-          })}
-        </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </section>
   )

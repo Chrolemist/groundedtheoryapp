@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Joyride, {
   ACTIONS,
   EVENTS,
@@ -70,37 +70,9 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
   const [seen, setSeen] = useState(getStoredSeen)
   const [stepIndex, setStepIndex] = useState(0)
   const skipScrollRef = useRef(false)
-  const debugRef = useRef({
-    notFoundCount: 0,
-    lastEvent: '',
-  })
   const shouldRun = run && (!seen || runId > 0)
 
-  useEffect(() => {
-    if (shouldRun) {
-      setStepIndex(0)
-    }
-  }, [shouldRun, runId])
-
   const handleCallback = (data: CallBackProps) => {
-    debugRef.current.lastEvent = data.type
-    if (data.type === EVENTS.TARGET_NOT_FOUND) {
-      debugRef.current.notFoundCount += 1
-      console.log('[tour-debug] target not found', {
-        index: data.index,
-        target: data.step?.target,
-        totalSteps: steps.length,
-        notFoundCount: debugRef.current.notFoundCount,
-      })
-    } else {
-      console.log('[tour-debug] event', {
-        type: data.type,
-        index: data.index,
-        action: data.action,
-        status: data.status,
-        target: data.step?.target,
-      })
-    }
     if (data.type === EVENTS.TARGET_NOT_FOUND) {
       const nextIndex = data.index + 1
       if (nextIndex >= steps.length) {
@@ -143,7 +115,6 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
 
     const finished = data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED
     if (finished) {
-      console.log('[tour-debug] finished', { status: data.status })
       localStorage.setItem(STORAGE_KEY, 'true')
       setSeen(true)
       onFinish()
