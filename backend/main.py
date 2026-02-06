@@ -141,7 +141,12 @@ class ConnectionManager:
                         self.active_connections.remove(old_socket)
                     self.connection_users.pop(old_socket, None)
                     try:
-                        await old_socket.close()
+                        logger.info(
+                            "Closing previous socket for client_id=%s user_id=%s",
+                            client_id,
+                            existing_user_id,
+                        )
+                        await old_socket.close(code=1000, reason="replaced")
                     except Exception:
                         pass
                 if existing_user:

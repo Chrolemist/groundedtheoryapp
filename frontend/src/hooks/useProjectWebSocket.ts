@@ -3,10 +3,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 const getClientId = () => {
   if (typeof window === 'undefined') return ''
   const storageKey = 'gt-client-id'
-  const stored = window.localStorage.getItem(storageKey)
+  const stored = window.sessionStorage.getItem(storageKey)
   if (stored) return stored
   const next = crypto.randomUUID()
-  window.localStorage.setItem(storageKey, next)
+  window.sessionStorage.setItem(storageKey, next)
   return next
 }
 
