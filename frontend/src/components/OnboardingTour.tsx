@@ -1,5 +1,11 @@
-import { useMemo, useState } from 'react'
-import Joyride, { STATUS, type CallBackProps, type Step } from 'react-joyride'
+import { useEffect, useMemo, useState } from 'react'
+import Joyride, {
+  ACTIONS,
+  EVENTS,
+  STATUS,
+  type CallBackProps,
+  type Step,
+} from 'react-joyride'
 
 const STORAGE_KEY = 'grounded-ai-tour-seen'
 
@@ -56,31 +62,13 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
         target: '#theory-map-tab',
         placement: 'bottom',
         content:
-          'Theory Map: visuell karta över kategorier, koder och utdrag. Klicka utdrag för att hoppa till markeringen.',
-      },
-      {
-        target: '#theory-map-view',
-        placement: 'right',
-        content:
-          'Kartan har zoom och pan. Theory narrative visas också här som egen nod.',
+          'Theory Map: visuell karta över kategorier, koder och utdrag. Klicka utdrag för att hoppa till markeringen. Kartan har zoom/pan och visar Theory narrative som egen nod.',
       },
       {
         target: '#overview-tab',
         placement: 'bottom',
         content:
-          'Overview: samlar statistik och diagram på ett ställe.',
-      },
-      {
-        target: '#analysis-overview',
-        placement: 'right',
-        content:
-          'Overview visar totals, memos per typ, starkaste kategorier och mest markerade koder.',
-      },
-      {
-        target: '#memos-tab',
-        placement: 'left',
-        content:
-          'Bonus: integrative memos samlar helheten i en global memo-flik.',
+          'Overview: samlar statistik och diagram på ett ställe. Den visar totals, memos per typ, starkaste kategorier och mest markerade koder.',
       },
       {
         target: '#view-menu',
@@ -98,9 +86,43 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
   )
 
   const [seen, setSeen] = useState(getStoredSeen)
+  const [stepIndex, setStepIndex] = useState(0)
   const shouldRun = run && (!seen || runId > 0)
 
+  useEffect(() => {
+    if (shouldRun) {
+      setStepIndex(0)
+    }
+  }, [shouldRun, runId])
+
   const handleCallback = (data: CallBackProps) => {
+    if (data.type === EVENTS.TARGET_NOT_FOUND) {
+      const nextIndex = data.index + 1
+      if (nextIndex >= steps.length) {
+        localStorage.setItem(STORAGE_KEY, 'true')
+        setSeen(true)
+        onFinish()
+        return
+      }
+      setStepIndex(nextIndex)
+      return
+    }
+
+    if (data.type === EVENTS.STEP_AFTER) {
+      const delta = data.action === ACTIONS.PREV ? -1 : 1
+      setStepIndex(data.index + delta)
+    }
+
+    if (data.type === EVENTS.STEP_AFTER || data.type === EVENTS.TOOLTIP) {
+      const selector = data.step?.target
+      if (typeof selector === 'string') {
+        const element = document.querySelector(selector)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
+      }
+    }
+
     const finished = data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED
     if (finished) {
       localStorage.setItem(STORAGE_KEY, 'true')
@@ -114,6 +136,7 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
       key={runId}
       steps={steps}
       run={shouldRun}
+      stepIndex={stepIndex}
       continuous
       scrollToFirstStep
       showProgress
