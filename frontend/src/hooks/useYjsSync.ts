@@ -57,7 +57,7 @@ export function useYjsSync({
 }: UseYjsSyncArgs) {
   const docRef = useRef<Y.Doc | null>(null)
   const docsMapRef = useRef<Y.Map<Y.Text> | null>(null)
-  const categoriesMapRef = useRef<Y.Map<Y.Map<Y.AbstractType<unknown>>> | null>(null)
+  const categoriesMapRef = useRef<Y.Map<Y.Map<unknown>> | null>(null)
   const theoryTextRef = useRef<Y.Text | null>(null)
   const coreCategoryTextRef = useRef<Y.Text | null>(null)
   const observedDocsRef = useRef(new Map<string, Y.Text>())
@@ -166,7 +166,7 @@ export function useYjsSync({
     categories.forEach((category) => {
       const existing = categoriesMap.get(category.id)
       if (existing) return
-      const map = new Y.Map<Y.AbstractType<unknown>>()
+      const map = new Y.Map<unknown>()
       const name = new Y.Text()
       name.insert(0, category.name)
       const precondition = new Y.Text()
@@ -196,7 +196,7 @@ export function useYjsSync({
       categories.forEach((category) => {
         let map = categoriesMap.get(category.id)
         if (!map) {
-          map = new Y.Map<Y.AbstractType<unknown>>()
+          map = new Y.Map<unknown>()
           categoriesMap.set(category.id, map)
         }
         const name = map.get('name') as Y.Text | undefined
