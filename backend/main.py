@@ -397,7 +397,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     try:
         client_id = websocket.query_params.get("client_id")
         user = await manager.connect(websocket, client_id)
-        logger.info(f"WebSocket accepted. User: {user['id']} ({user['name']})")
+        user_agent = websocket.headers.get("user-agent")
+        origin = websocket.headers.get("origin")
+        logger.info(
+            "WebSocket accepted. User: %s (%s) client_id=%s remote=%s ua=%s origin=%s",
+            user["id"],
+            user["name"],
+            client_id,
+            websocket.client,
+            user_agent,
+            origin,
+        )
     except Exception as e:
         logger.error(f"WebSocket connection failed: {e}")
         return
@@ -455,8 +465,18 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         "sender_id": user_id,
                     }
                 )
-    except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected: {manager.connection_users.get(websocket)}")
+    except WebSocketDisconnect as exc:
+        user_agent = websocket.headers.get("user-agent")
+        origin = websocket.headers.get("origin")
+        logger.info(
+            "WebSocket disconnected: %s (code=%s) client_id=%s remote=%s ua=%s origin=%s",
+            manager.connection_users.get(websocket),
+            getattr(exc, "code", None),
+            client_id,
+            websocket.client,
+            user_agent,
+            origin,
+        )
         user_id = manager.connection_users.get(websocket)
         manager.disconnect(websocket)
         await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
