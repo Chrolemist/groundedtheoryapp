@@ -74,7 +74,17 @@ export function TreeMapView({
   const [isPanning, setIsPanning] = useState(false)
   const [panAnchor, setPanAnchor] = useState({ x: 0, y: 0 })
   const [selectedDocId, setSelectedDocId] = useState('__all__')
-  const [showLogic, setShowLogic] = useState(true)
+  const [showLogic, setShowLogic] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = window.localStorage.getItem('gt-theory-map-layout')
+    if (!saved) return true
+    try {
+      const parsed = JSON.parse(saved) as { showLogic?: boolean }
+      return typeof parsed.showLogic === 'boolean' ? parsed.showLogic : true
+    } catch {
+      return true
+    }
+  })
   const [layoutOrientation, setLayoutOrientation] = useState<'horizontal' | 'vertical'>(() => {
     if (typeof window === 'undefined') return 'vertical'
     const saved = window.localStorage.getItem('gt-theory-map-layout')
@@ -120,9 +130,10 @@ export function TreeMapView({
       manualPositions,
       useManualLayout,
       layoutOrientation,
+      showLogic,
     }
     window.localStorage.setItem('gt-theory-map-layout', JSON.stringify(payload))
-  }, [layoutOrientation, manualPositions, useManualLayout])
+  }, [layoutOrientation, manualPositions, showLogic, useManualLayout])
 
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
 
