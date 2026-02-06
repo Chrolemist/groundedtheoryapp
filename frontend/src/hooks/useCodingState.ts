@@ -24,6 +24,7 @@ type UseCodingStateArgs = {
     memos?: Memo[]
     theoryHtml?: string
     coreCategoryId?: string
+    showMemos?: boolean
   } | null
   pushHistoryRef: MutableRefObject<() => void>
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
@@ -41,11 +42,33 @@ export function useCodingState({
 }: UseCodingStateArgs) {
   const [codes, setCodes] = useState<Code[]>(() => storedState?.codes ?? [])
   const [categories, setCategories] = useState<Category[]>(() => storedState?.categories ?? [])
-  const [memos, setMemos] = useState<Memo[]>(() => storedState?.memos ?? [])
+  const normalizeMemoType = (value?: string): Memo['type'] => {
+    if (value === 'code' || value === 'category' || value === 'global') return value
+    return 'global'
+  }
+
+  const normalizeMemo = (memo: Partial<Memo>): Memo => {
+    const type = normalizeMemoType(memo.type)
+    const refId = type === 'global' ? undefined : memo.refId
+    return {
+      id: memo.id ?? `memo-${crypto.randomUUID()}`,
+      type,
+      refId,
+      title: memo.title ?? 'Untitled memo',
+      body: memo.body ?? '',
+      createdAt: memo.createdAt ?? new Date().toISOString(),
+      updatedAt: memo.updatedAt ?? new Date().toISOString(),
+    }
+  }
+
+  const [memos, setMemos] = useState<Memo[]>(() =>
+    (storedState?.memos ?? []).map((memo) => normalizeMemo(memo)),
+  )
   const [coreCategoryId, setCoreCategoryId] = useState(() => storedState?.coreCategoryId ?? '')
   const [coreCategoryDraft, setCoreCategoryDraft] = useState('')
   const [theoryHtml, setTheoryHtml] = useState(() => storedState?.theoryHtml ?? '')
   const [showCodeLabels, setShowCodeLabels] = useState(true)
+  const [showMemos, setShowMemos] = useState(() => storedState?.showMemos ?? false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const theoryEditorRef = useRef<HTMLDivElement | null>(null)
 
@@ -214,18 +237,32 @@ export function useCodingState({
     )
   }
 
-  const handleAddMemo = () => {
+  const addMemo = (type: Memo['type'], refId?: string, title?: string) => {
     pushHistoryRef.current()
     const now = new Date().toISOString()
     const memo: Memo = {
       id: `memo-${crypto.randomUUID()}`,
-      title: `Memo ${now.slice(0, 10)}`,
+      type,
+      refId: type === 'global' ? undefined : refId,
+      title: title ?? `Memo ${now.slice(0, 10)}`,
       body: '',
       createdAt: now,
       updatedAt: now,
     }
     setMemos((current) => [memo, ...current])
   }
+
+  const handleAddGlobalMemo = () => addMemo('global', undefined, 'Integrative Memo')
+
+  const handleAddCodeMemo = (codeId: string, codeLabel?: string) =>
+    addMemo('code', codeId, codeLabel ? `Code Note: ${codeLabel}` : 'Code Note')
+
+  const handleAddCategoryMemo = (categoryId: string, categoryName?: string) =>
+    addMemo(
+      'category',
+      categoryId,
+      categoryName ? `Theoretical Note: ${categoryName}` : 'Theoretical Note',
+    )
 
   const updateMemo = (memoId: string, patch: Partial<Memo>) => {
     setMemos((current) =>
@@ -320,6 +357,8 @@ export function useCodingState({
     setTheoryHtml,
     showCodeLabels,
     setShowCodeLabels,
+    showMemos,
+    setShowMemos,
     codeById,
     assignedCodeIds,
     ungroupedCodes,
@@ -336,7 +375,9 @@ export function useCodingState({
     handleAddCategory,
     removeCategory,
     removeCodeFromCategory,
-    handleAddMemo,
+    handleAddGlobalMemo,
+    handleAddCodeMemo,
+    handleAddCategoryMemo,
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,

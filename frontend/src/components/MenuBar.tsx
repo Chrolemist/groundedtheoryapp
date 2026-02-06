@@ -22,6 +22,8 @@ type MenuBarProps = {
   onSelectAll: () => void
   onToggleCodeLabels: () => void
   showCodeLabels: boolean
+  onToggleMemos: () => void
+  showMemos: boolean
   onTour: () => void
 }
 
@@ -68,6 +70,8 @@ export function MenuBar({
   onSelectAll,
   onToggleCodeLabels,
   showCodeLabels,
+  onToggleMemos,
+  showMemos,
   onTour,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
@@ -244,6 +248,7 @@ export function MenuBar({
       <div className="relative">
         <button
           type="button"
+          id="view-menu"
           onClick={() => toggleMenu('view')}
           className={cn(
             'inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition',
@@ -259,6 +264,13 @@ export function MenuBar({
               label={showCodeLabels ? 'Hide labels' : 'Show labels'}
               onClick={() => {
                 onToggleCodeLabels()
+                closeMenu()
+              }}
+            />
+            <MenuItem
+              label={showMemos ? 'Hide memos' : 'Show memos'}
+              onClick={() => {
+                onToggleMemos()
                 closeMenu()
               }}
             />

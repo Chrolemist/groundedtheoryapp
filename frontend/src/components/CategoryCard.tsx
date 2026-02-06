@@ -1,23 +1,34 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext } from '@dnd-kit/sortable'
-import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, FileText, Plus, Trash2 } from 'lucide-react'
 import { cn } from '../lib/cn'
-import { type Category, type Code } from '../types'
+import { type Category, type Code, type Memo } from '../types'
 import { CodeChip } from './CodeChip'
+import { MemoList } from './MemoList'
 
 export function CategoryCard({
   category,
   codes,
+  memos,
+  showMemos,
   onUpdate,
   onRemove,
   onRemoveCode,
+  onAddMemo,
+  onUpdateMemo,
+  onRemoveMemo,
 }: {
   category: Category
   codes: Code[]
+  memos: Memo[]
+  showMemos: boolean
   onUpdate: (categoryId: string, patch: Partial<Category>) => void
   onRemove: (categoryId: string) => void
   onRemoveCode: (categoryId: string, codeId: string) => void
+  onAddMemo: (categoryId: string, categoryName?: string) => void
+  onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
+  onRemoveMemo: (memoId: string) => void
 }) {
   const { isOver, setNodeRef } = useDroppable({
     id: category.id,
@@ -28,6 +39,9 @@ export function CategoryCard({
   const assignedCodes = category.codeIds
     .map((codeId) => codes.find((code) => code.id === codeId))
     .filter((code): code is Code => Boolean(code))
+  const categoryMemos = memos.filter(
+    (memo) => memo.type === 'category' && memo.refId === category.id,
+  )
 
   return (
     <div
@@ -49,6 +63,19 @@ export function CategoryCard({
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
             {assignedCodes.length} codes
           </span>
+          {showMemos ? (
+            <button
+              type="button"
+              onClick={() => {
+                onAddMemo(category.id, category.name)
+                setIsExpanded(true)
+              }}
+              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+            >
+              <FileText className="h-3 w-3" />
+              Memo
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => setIsExpanded((current) => !current)}
@@ -138,6 +165,29 @@ export function CategoryCard({
               className="w-full rounded-lg border border-slate-200 bg-emerald-50 px-3 py-2 text-sm text-slate-700"
             />
           </div>
+          {showMemos ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Theoretical Notes
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onAddMemo(category.id, category.name)}
+                  className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Memo
+                </button>
+              </div>
+              <MemoList
+                memos={categoryMemos}
+                onUpdateMemo={onUpdateMemo}
+                onRemoveMemo={onRemoveMemo}
+                emptyText="Skriv en theoretical note om sambanden i denna kategori."
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

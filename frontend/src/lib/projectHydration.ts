@@ -56,13 +56,21 @@ export function hydrateRemoteProject(
     : []
 
   const memos = Array.isArray(project.memos)
-    ? (project.memos as Array<Record<string, unknown>>).map((memo) => ({
-        id: String(memo.id ?? ''),
-        title: String(memo.title ?? 'Untitled memo'),
-        body: String(memo.body ?? ''),
-        createdAt: String(memo.createdAt ?? memo.created_at ?? ''),
-        updatedAt: String(memo.updatedAt ?? memo.updated_at ?? ''),
-      }))
+    ? (project.memos as Array<Record<string, unknown>>).map((memo) => {
+        const type: Memo['type'] =
+          memo.type === 'code' || memo.type === 'category' || memo.type === 'global'
+            ? memo.type
+            : 'global'
+        return {
+          id: String(memo.id ?? ''),
+          type,
+          refId: typeof memo.refId === 'string' ? memo.refId : undefined,
+          title: String(memo.title ?? 'Untitled memo'),
+          body: String(memo.body ?? ''),
+          createdAt: String(memo.createdAt ?? memo.created_at ?? ''),
+          updatedAt: String(memo.updatedAt ?? memo.updated_at ?? ''),
+        }
+      })
     : undefined
 
   const coreCategoryId =

@@ -48,6 +48,7 @@ export function DashboardLayout() {
     documentFontFamily: project.documentFontFamily,
     documentLineHeight: project.documentLineHeight,
     showCodeLabels: project.showCodeLabels,
+    showMemos: project.showMemos,
     setDocuments: project.setDocuments,
     setCodes: project.setCodes,
     setCategories: project.setCategories,
@@ -60,6 +61,7 @@ export function DashboardLayout() {
     setDocumentFontFamilyDisplay: project.setDocumentFontFamilyDisplay,
     setDocumentLineHeight: project.setDocumentLineHeight,
     setShowCodeLabels: project.setShowCodeLabels,
+    setShowMemos: project.setShowMemos,
     getReadableTextColor: project.getReadableTextColor,
   })
 
@@ -108,6 +110,8 @@ export function DashboardLayout() {
           onSelectAll={() => project.executeEditorCommand('selectAll')}
           onToggleCodeLabels={() => project.setShowCodeLabels((current) => !current)}
           showCodeLabels={project.showCodeLabels}
+          onToggleMemos={() => project.setShowMemos((current) => !current)}
+          showMemos={project.showMemos}
           onTour={tour.restart}
         />
 
@@ -159,6 +163,7 @@ export function DashboardLayout() {
             ungroupedCodeCount={project.ungroupedCodes.length}
             memos={project.memos}
             isTheoryEmpty={project.isTheoryEmpty}
+            showMemos={project.showMemos}
             onAddCode={project.addNewCode}
             onApplyCode={project.applyCodeToSelection}
             onUpdateCode={project.updateCode}
@@ -171,7 +176,9 @@ export function DashboardLayout() {
             onCoreCategoryChange={project.setCoreCategoryId}
             onCoreCategoryDraftChange={project.setCoreCategoryDraft}
             onCreateCoreCategory={project.handleCreateCoreCategory}
-            onAddMemo={project.handleAddMemo}
+            onAddCodeMemo={project.handleAddCodeMemo}
+            onAddCategoryMemo={project.handleAddCategoryMemo}
+            onAddGlobalMemo={project.handleAddGlobalMemo}
             onUpdateMemo={project.updateMemo}
             onRemoveMemo={project.removeMemo}
             onApplyEditorCommand={project.applyEditorCommand}

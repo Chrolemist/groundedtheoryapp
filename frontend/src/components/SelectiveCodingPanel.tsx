@@ -1,5 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react'
-import { type Category, type Code, type Memo } from '../types'
+import { type Category, type Code } from '../types'
 
 type CategoryStat = {
   id: string
@@ -26,10 +25,6 @@ type SelectiveCodingPanelProps = {
   codeCount: number
   assignedCodeCount: number
   ungroupedCodeCount: number
-  memos: Memo[]
-  onAddMemo: () => void
-  onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
-  onRemoveMemo: (memoId: string) => void
   isTheoryEmpty: boolean
   onApplyEditorCommand: (command: string, value?: string) => void
   onTheoryInput: (html: string) => void
@@ -49,10 +44,6 @@ export function SelectiveCodingPanel({
   codeCount,
   assignedCodeCount,
   ungroupedCodeCount,
-  memos,
-  onAddMemo,
-  onUpdateMemo,
-  onRemoveMemo,
   isTheoryEmpty,
   onApplyEditorCommand,
   onTheoryInput,
@@ -172,7 +163,7 @@ export function SelectiveCodingPanel({
             </div>
           </div>
         </div>
-        <div id="memos-section">
+        <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
             Categories & Codes Overview
           </p>
@@ -220,61 +211,6 @@ export function SelectiveCodingPanel({
             ) : (
               <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400">
                 Add categories and codes to see the overview here.
-              </div>
-            )}
-          </div>
-        </div>
-        <div>
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Memos</p>
-            <button
-              type="button"
-              onClick={onAddMemo}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
-            >
-              <Plus className="h-3.5 w-3.5" />
-              New Memo
-            </button>
-          </div>
-          <div className="mt-3 space-y-3">
-            {memos.length ? (
-              memos.map((memo) => (
-                <div key={memo.id} className="rounded-lg border border-slate-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <input
-                      id={`memo-title-${memo.id}`}
-                      name={`memo-title-${memo.id}`}
-                      value={memo.title}
-                      onChange={(event) => onUpdateMemo(memo.id, { title: event.target.value })}
-                      className="min-w-[180px] flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700"
-                      placeholder="Memo title"
-                    />
-                    <span className="text-xs text-slate-400">
-                      {(memo.updatedAt || memo.createdAt).slice(0, 10)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onRemoveMemo(memo.id)}
-                      className="rounded-md border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50"
-                      title="Delete memo"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                  <textarea
-                    id={`memo-body-${memo.id}`}
-                    name={`memo-body-${memo.id}`}
-                    value={memo.body}
-                    onChange={(event) => onUpdateMemo(memo.id, { body: event.target.value })}
-                    placeholder="Skriv din analys, hypoteser och aha-upplevelser..."
-                    rows={4}
-                    className="mt-2 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                  />
-                </div>
-              ))
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400">
-                Skapa en memo för att skriva ner dina tolkningar.
               </div>
             )}
           </div>

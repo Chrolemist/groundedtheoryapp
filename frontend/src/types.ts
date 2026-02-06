@@ -19,6 +19,8 @@ export type Category = {
 
 export type Memo = {
   id: string
+  type: 'code' | 'category' | 'global'
+  refId?: string
   title: string
   body: string
   createdAt: string

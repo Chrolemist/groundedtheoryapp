@@ -25,6 +25,8 @@ type DashboardHeaderProps = {
   onSelectAll: () => void
   onToggleCodeLabels: () => void
   showCodeLabels: boolean
+  onToggleMemos: () => void
+  showMemos: boolean
   onTour: () => void
 }
 
@@ -51,6 +53,8 @@ export function DashboardHeader({
   onSelectAll,
   onToggleCodeLabels,
   showCodeLabels,
+  onToggleMemos,
+  showMemos,
   onTour,
 }: DashboardHeaderProps) {
   return (
@@ -92,6 +96,8 @@ export function DashboardHeader({
             onSelectAll={onSelectAll}
             onToggleCodeLabels={onToggleCodeLabels}
             showCodeLabels={showCodeLabels}
+            onToggleMemos={onToggleMemos}
+            showMemos={showMemos}
             onTour={onTour}
           />
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">

@@ -57,6 +57,8 @@ export function isSameProjectSnapshot(a: ProjectSnapshot, b: ProjectSnapshot) {
     const memoA = a.memos[i]
     const memoB = b.memos[i]
     if (memoA.id !== memoB.id) return false
+    if (memoA.type !== memoB.type) return false
+    if (memoA.refId !== memoB.refId) return false
     if (memoA.title !== memoB.title) return false
     if (memoA.body !== memoB.body) return false
     if (memoA.createdAt !== memoB.createdAt) return false

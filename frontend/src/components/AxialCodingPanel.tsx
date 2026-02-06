@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
 import { SortableContext } from '@dnd-kit/sortable'
-import { type Category, type Code } from '../types'
+import { type Category, type Code, type Memo } from '../types'
 import { CodeChip } from './CodeChip'
 import { CategoryCard } from './CategoryCard'
 
@@ -8,11 +8,16 @@ type AxialCodingPanelProps = {
   categories: Category[]
   codes: Code[]
   ungroupedCodes: Code[]
+  memos: Memo[]
+  showMemos: boolean
   onAddCategory: () => void
   onUpdateCategory: (categoryId: string, patch: Partial<Category>) => void
   onRemoveCategory: (categoryId: string) => void
   onRemoveCodeFromCategory: (categoryId: string, codeId: string) => void
   onRemoveCode: (codeId: string) => void
+  onAddCategoryMemo: (categoryId: string, categoryName?: string) => void
+  onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
+  onRemoveMemo: (memoId: string) => void
 }
 
 // Axial grouping UI for categories and ungrouped codes.
@@ -20,14 +25,19 @@ export function AxialCodingPanel({
   categories,
   codes,
   ungroupedCodes,
+  memos,
+  showMemos,
   onAddCategory,
   onUpdateCategory,
   onRemoveCategory,
   onRemoveCodeFromCategory,
   onRemoveCode,
+  onAddCategoryMemo,
+  onUpdateMemo,
+  onRemoveMemo,
 }: AxialCodingPanelProps) {
   return (
-    <div className="space-y-4">
+    <div id="axial-coding-panel" className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-slate-900">Axial Categories</p>
@@ -62,9 +72,14 @@ export function AxialCodingPanel({
             key={category.id}
             category={category}
             codes={codes}
+            memos={memos}
+            showMemos={showMemos}
             onUpdate={onUpdateCategory}
             onRemove={onRemoveCategory}
             onRemoveCode={onRemoveCodeFromCategory}
+            onAddMemo={onAddCategoryMemo}
+            onUpdateMemo={onUpdateMemo}
+            onRemoveMemo={onRemoveMemo}
           />
         ))}
       </div>

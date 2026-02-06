@@ -13,6 +13,7 @@ type UseProjectIOArgs = {
   documentFontFamily: string
   documentLineHeight: string
   showCodeLabels: boolean
+  showMemos: boolean
   setDocuments: (documents: DocumentItem[]) => void
   setCodes: (codes: Code[]) => void
   setCategories: (categories: Category[]) => void
@@ -25,6 +26,7 @@ type UseProjectIOArgs = {
   setDocumentFontFamilyDisplay: (value: string) => void
   setDocumentLineHeight: (value: string) => void
   setShowCodeLabels: (value: boolean) => void
+  setShowMemos: (value: boolean) => void
   getReadableTextColor: (hex: string) => string
 }
 
@@ -41,6 +43,7 @@ export function useProjectIO({
   documentFontFamily,
   documentLineHeight,
   showCodeLabels,
+  showMemos,
   setDocuments,
   setCodes,
   setCategories,
@@ -53,6 +56,7 @@ export function useProjectIO({
   setDocumentFontFamilyDisplay,
   setDocumentLineHeight,
   setShowCodeLabels,
+  setShowMemos,
   getReadableTextColor,
 }: UseProjectIOArgs) {
   const buildProjectState = () => {
@@ -156,6 +160,8 @@ export function useProjectIO({
       })),
       memos: memos.map((memo) => ({
         id: memo.id,
+        type: memo.type,
+        refId: memo.refId ?? null,
         title: memo.title,
         body: memo.body,
         createdAt: memo.createdAt,
@@ -197,6 +203,7 @@ export function useProjectIO({
       documentFontFamily,
       documentLineHeight,
       showCodeLabels,
+      showMemos,
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' })
     downloadBlob(blob, 'project_backup.json')
@@ -209,7 +216,7 @@ export function useProjectIO({
       documents?: DocumentItem[]
       codes?: Code[]
       categories?: Category[]
-      memos?: Memo[]
+      memos?: Array<Partial<Memo>>
       coreCategoryId?: string
       theoryHtml?: string
       activeDocumentId?: string
@@ -217,6 +224,7 @@ export function useProjectIO({
       documentFontFamily?: string
       documentLineHeight?: string
       showCodeLabels?: boolean
+      showMemos?: boolean
     }
 
     if (payload.version && payload.documents?.length) {
@@ -234,7 +242,11 @@ export function useProjectIO({
         )
       setMemos(
         (payload.memos ?? []).map((memo) => ({
-          ...memo,
+          id: memo.id ?? `memo-${crypto.randomUUID()}`,
+          type: memo.type ?? 'global',
+          refId: memo.refId ?? undefined,
+          title: memo.title ?? 'Untitled memo',
+          body: memo.body ?? '',
           createdAt: memo.createdAt ?? new Date().toISOString(),
           updatedAt: memo.updatedAt ?? new Date().toISOString(),
         })),
@@ -248,6 +260,7 @@ export function useProjectIO({
       }
       if (payload.documentLineHeight) setDocumentLineHeight(payload.documentLineHeight)
       if (typeof payload.showCodeLabels === 'boolean') setShowCodeLabels(payload.showCodeLabels)
+      if (typeof payload.showMemos === 'boolean') setShowMemos(payload.showMemos)
       return
     }
 

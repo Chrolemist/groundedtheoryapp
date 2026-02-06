@@ -22,6 +22,7 @@ type UseProjectStateArgs = {
     documentViewMode?: DocumentViewMode
     theoryHtml?: string
     coreCategoryId?: string
+    showMemos?: boolean
   } | null
   sendJson?: (payload: Record<string, unknown>) => void
   hasRemoteState: boolean
@@ -89,6 +90,8 @@ export function useProjectState({
     setTheoryHtml,
     showCodeLabels,
     setShowCodeLabels,
+    showMemos,
+    setShowMemos,
     codeById,
     assignedCodeIds,
     ungroupedCodes,
@@ -105,7 +108,9 @@ export function useProjectState({
     handleAddCategory,
     removeCategory,
     removeCodeFromCategory,
-    handleAddMemo,
+    handleAddGlobalMemo,
+    handleAddCodeMemo,
+    handleAddCategoryMemo,
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,
@@ -190,6 +195,7 @@ export function useProjectState({
       documentViewMode,
       theoryHtml,
       coreCategoryId,
+      showMemos,
     })
   }, [
     storageKey,
@@ -201,6 +207,7 @@ export function useProjectState({
     documentViewMode,
     theoryHtml,
     coreCategoryId,
+    showMemos,
   ])
 
   useEffect(() => {
@@ -263,6 +270,8 @@ export function useProjectState({
     setTheoryHtml,
     showCodeLabels,
     setShowCodeLabels,
+    showMemos,
+    setShowMemos,
     documentLineHeight,
     setDocumentLineHeight,
     documentFontFamily,
@@ -290,7 +299,9 @@ export function useProjectState({
     handleAddCategory,
     removeCategory,
     removeCodeFromCategory,
-    handleAddMemo,
+    handleAddGlobalMemo,
+    handleAddCodeMemo,
+    handleAddCategoryMemo,
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,

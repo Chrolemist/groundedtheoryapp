@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Tag, Layers } from 'lucide-react'
+import { BookOpen, Layers, Tag } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { type Category, type Code, type Memo } from '../types'
 import { OpenCodingPanel } from './OpenCodingPanel'
 import { AxialCodingPanel } from './AxialCodingPanel'
+import { MemosPanel } from './MemosPanel'
 import { SelectiveCodingPanel } from './SelectiveCodingPanel'
 
-type TabKey = 'open' | 'axial' | 'theory'
+type TabKey = 'open' | 'axial' | 'theory' | 'memos'
 
 type CategoryStat = {
   id: string
@@ -34,19 +35,22 @@ type CodingSidebarProps = {
   ungroupedCodeCount: number
   memos: Memo[]
   isTheoryEmpty: boolean
+  showMemos: boolean
   onAddCode: () => void
   onApplyCode: (codeId: string) => void
   onUpdateCode: (codeId: string, patch: Partial<Code>) => void
   onRemoveCode: (codeId: string) => void
+  onAddCodeMemo: (codeId: string, codeLabel?: string) => void
   getReadableTextColor: (hex: string) => string
   onAddCategory: () => void
   onUpdateCategory: (categoryId: string, patch: Partial<Category>) => void
   onRemoveCategory: (categoryId: string) => void
   onRemoveCodeFromCategory: (categoryId: string, codeId: string) => void
+  onAddCategoryMemo: (categoryId: string, categoryName?: string) => void
+  onAddGlobalMemo: () => void
   onCoreCategoryChange: (value: string) => void
   onCoreCategoryDraftChange: (value: string) => void
   onCreateCoreCategory: () => void
-  onAddMemo: () => void
   onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
   onRemoveMemo: (memoId: string) => void
   onApplyEditorCommand: (command: string, value?: string) => void
@@ -58,6 +62,7 @@ const tabConfig: Array<{ key: TabKey; label: string; icon: typeof Tag }> = [
   { key: 'open', label: 'Open Coding', icon: Tag },
   { key: 'axial', label: 'Axial Coding', icon: Layers },
   { key: 'theory', label: 'Selective Coding', icon: Tag },
+  { key: 'memos', label: 'Memos', icon: BookOpen },
 ]
 
 // Right-side panel stack for open/axial/selective coding.
@@ -74,19 +79,22 @@ export function CodingSidebar({
   ungroupedCodeCount,
   memos,
   isTheoryEmpty,
+  showMemos,
   onAddCode,
   onApplyCode,
   onUpdateCode,
   onRemoveCode,
+  onAddCodeMemo,
   getReadableTextColor,
   onAddCategory,
   onUpdateCategory,
   onRemoveCategory,
   onRemoveCodeFromCategory,
+  onAddCategoryMemo,
+  onAddGlobalMemo,
   onCoreCategoryChange,
   onCoreCategoryDraftChange,
   onCreateCoreCategory,
-  onAddMemo,
   onUpdateMemo,
   onRemoveMemo,
   onApplyEditorCommand,
@@ -94,21 +102,32 @@ export function CodingSidebar({
   onTheoryEditorRef,
 }: CodingSidebarProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('open')
+  const resolvedActiveTab = !showMemos && activeTab === 'memos' ? 'open' : activeTab
 
   return (
     <aside className="space-y-4">
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex gap-2">
-          {tabConfig.map((tab) => {
+          {tabConfig
+            .filter((tab) => (tab.key === 'memos' ? showMemos : true))
+            .map((tab) => {
             const Icon = tab.icon
             return (
               <button
-                id={tab.key === 'axial' ? 'axial-tab' : tab.key === 'theory' ? 'theory-tab' : undefined}
+                id={
+                  tab.key === 'axial'
+                    ? 'axial-tab'
+                    : tab.key === 'theory'
+                      ? 'theory-tab'
+                      : tab.key === 'memos'
+                        ? 'memos-tab'
+                        : undefined
+                }
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 className={cn(
                   'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
-                  activeTab === tab.key
+                  resolvedActiveTab === tab.key
                     ? 'bg-slate-900 text-white shadow-sm'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
                 )}
@@ -123,7 +142,7 @@ export function CodingSidebar({
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <AnimatePresence mode="wait">
-          {activeTab === 'open' ? (
+          {resolvedActiveTab === 'open' ? (
             <motion.div
               key="open-coding"
               initial={{ opacity: 0, y: 8 }}
@@ -133,14 +152,19 @@ export function CodingSidebar({
             >
               <OpenCodingPanel
                 codes={codes}
+                memos={memos}
+                showMemos={showMemos}
                 onAddCode={onAddCode}
                 onApplyCode={onApplyCode}
                 onUpdateCode={onUpdateCode}
                 onRemoveCode={onRemoveCode}
+                onAddCodeMemo={onAddCodeMemo}
+                onUpdateMemo={onUpdateMemo}
+                onRemoveMemo={onRemoveMemo}
                 getReadableTextColor={getReadableTextColor}
               />
             </motion.div>
-          ) : activeTab === 'axial' ? (
+          ) : resolvedActiveTab === 'axial' ? (
             <motion.div
               key="axial-coding"
               initial={{ opacity: 0, y: 8 }}
@@ -152,14 +176,19 @@ export function CodingSidebar({
                 categories={categories}
                 codes={codes}
                 ungroupedCodes={ungroupedCodes}
+                memos={memos}
+                showMemos={showMemos}
                 onAddCategory={onAddCategory}
                 onUpdateCategory={onUpdateCategory}
                 onRemoveCategory={onRemoveCategory}
                 onRemoveCodeFromCategory={onRemoveCodeFromCategory}
                 onRemoveCode={onRemoveCode}
+                onAddCategoryMemo={onAddCategoryMemo}
+                onUpdateMemo={onUpdateMemo}
+                onRemoveMemo={onRemoveMemo}
               />
             </motion.div>
-          ) : (
+          ) : resolvedActiveTab === 'theory' ? (
             <motion.div
               key="selective-coding"
               initial={{ opacity: 0, y: 8 }}
@@ -180,14 +209,25 @@ export function CodingSidebar({
                 codeCount={codes.length}
                 assignedCodeCount={assignedCodeCount}
                 ungroupedCodeCount={ungroupedCodeCount}
-                memos={memos}
-                onAddMemo={onAddMemo}
-                onUpdateMemo={onUpdateMemo}
-                onRemoveMemo={onRemoveMemo}
                 isTheoryEmpty={isTheoryEmpty}
                 onApplyEditorCommand={onApplyEditorCommand}
                 onTheoryInput={onTheoryInput}
                 theoryEditorRef={onTheoryEditorRef}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="memos"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              className="space-y-4"
+            >
+              <MemosPanel
+                memos={memos}
+                onAddGlobalMemo={onAddGlobalMemo}
+                onUpdateMemo={onUpdateMemo}
+                onRemoveMemo={onRemoveMemo}
               />
             </motion.div>
           )}

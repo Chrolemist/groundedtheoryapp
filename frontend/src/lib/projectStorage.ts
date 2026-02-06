@@ -10,6 +10,7 @@ type StoredProjectState = {
   documentViewMode?: DocumentViewMode
   theoryHtml?: string
   coreCategoryId?: string
+  showMemos?: boolean
 }
 
 export const loadStoredProjectState = (storageKey: string): StoredProjectState | null => {

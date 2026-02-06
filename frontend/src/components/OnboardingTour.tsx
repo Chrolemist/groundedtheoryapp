@@ -20,7 +20,13 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
       {
         target: 'body',
         placement: 'center',
-        content: 'Valkommen! Rundturen visar open, axial och selective coding.',
+        content: 'Valkommen! Memos lopar genom hela processen.',
+      },
+      {
+        target: '#view-menu',
+        placement: 'left',
+        content:
+          'Memos: sla pa eller av i View-menyn. Memon lopar parallellt med hela processen.',
       },
       {
         target: '#document-viewer',
@@ -29,10 +35,16 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
           'Open coding: markera text och applicera codes direkt i dokumentet.',
       },
       {
-        target: '#axial-tab',
+        target: '#open-coding-panel',
         placement: 'left',
         content:
-          'Axial coding: dra codes in i kategorier och fyll i precondition, action och consequence.',
+          'Code Notes: hogerklicka en kod for att skriva definitioner och spontana tankar.',
+      },
+      {
+        target: '#axial-coding-panel',
+        placement: 'left',
+        content:
+          'Theoretical Notes: lagg memos i kategori-korten for att forklara sambanden.',
       },
       {
         target: '#core-category',
@@ -41,10 +53,10 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
           'Selective coding: valj eller skapa en core category som bar teorin.',
       },
       {
-        target: '#memos-section',
+        target: '#memos-tab',
         placement: 'left',
         content:
-          'Memos: skriv hypoteser, tolkningar och beslut medan du jobbar.',
+          'Integrative memos: samla helheten i en global memo-flik.',
       },
       {
         target: '#theory-narrative',
