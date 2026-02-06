@@ -100,6 +100,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       }
 
       socket.onmessage = (event) => {
+        console.info('[WebSocket] message', { size: event.data?.length ?? 0 })
         if (!messageHandlerRef.current) return
         try {
           const payload = JSON.parse(event.data)
@@ -137,11 +138,16 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   }, [])
 
   const sendJson = useCallback((payload: unknown) => {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) return false
+    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[WebSocket] send skipped (not open)')
+      return false
+    }
     try {
       socketRef.current.send(JSON.stringify(payload))
+      console.info('[WebSocket] send', payload)
       return true
     } catch {
+      console.error('[WebSocket] send failed')
       return false
     }
   }, [])
