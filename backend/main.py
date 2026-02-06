@@ -6,6 +6,7 @@ from pathlib import Path
 import json
 import logging
 import hashlib
+import random
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -103,12 +104,14 @@ class ConnectionManager:
             "Vesslan",
             "Grodan",
         ]
-        index = len(self.users)
-        base = f"{first_parts[index % len(first_parts)]} {second_parts[index % len(second_parts)]}"
         existing = {user["name"] for user in self.users.values()}
-        if base not in existing:
-            return base
+        max_attempts = max(20, len(first_parts) * len(second_parts))
+        for _ in range(max_attempts):
+            base = f"{random.choice(first_parts)} {random.choice(second_parts)}"
+            if base not in existing:
+                return base
         suffix = 2
+        base = f"{first_parts[0]} {second_parts[0]}"
         while f"{base} {suffix}" in existing:
             suffix += 1
         return f"{base} {suffix}"
@@ -440,6 +443,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
             message_type = data.get("type")
             user_id = manager.connection_users.get(websocket)
+            if message_type == "ping":
+                await websocket.send_json({"type": "pong", "ts": data.get("ts")})
+                continue
             if message_type == "presence:rename" and user_id:
                 next_name = str(data.get("name", "")).strip()
                 if next_name:

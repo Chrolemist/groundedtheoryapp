@@ -55,7 +55,7 @@ const scheduleSharedReconnect = (connect: () => void) => {
   if (sharedReconnectTimer) return
   const retry = sharedRetryCount
   const delay = Math.min(10000, 500 * Math.pow(2, retry))
-  console.info('[WebSocket] reconnect scheduled', { retry, delay })
+  
   sharedReconnectTimer = window.setTimeout(() => {
     sharedReconnectTimer = null
     connect()
@@ -63,19 +63,16 @@ const scheduleSharedReconnect = (connect: () => void) => {
 }
 
 const connectSharedSocket = (url: string) => {
-  if (isSocketActive(sharedSocket)) {
-    console.info('[WebSocket] connect skipped', { state: sharedSocket?.readyState })
-    return
-  }
+  if (isSocketActive(sharedSocket)) return
 
   const socket = new WebSocket(url)
   sharedSocket = socket
-  console.info('[WebSocket] connecting', url)
+  
 
   socket.onopen = () => {
     sharedRetryCount = 0
     notifyStatus(true)
-    console.info('[WebSocket] connected')
+    
     clearSharedPing()
     sharedPingTimer = window.setInterval(() => {
       if (socket.readyState === WebSocket.OPEN) {
@@ -86,13 +83,7 @@ const connectSharedSocket = (url: string) => {
 
   socket.onclose = (event) => {
     notifyStatus(false)
-    console.warn('[WebSocket] closed', {
-      code: event.code,
-      reason: event.reason,
-      wasClean: event.wasClean,
-      online: navigator.onLine,
-      visibility: document.visibilityState,
-    })
+    
     clearSharedPing()
     sharedRetryCount += 1
     sharedSocket = null
@@ -101,7 +92,7 @@ const connectSharedSocket = (url: string) => {
 
   socket.onerror = () => {
     notifyStatus(false)
-    console.error('[WebSocket] error')
+    
     clearSharedPing()
     sharedRetryCount += 1
     sharedSocket = null
@@ -109,7 +100,7 @@ const connectSharedSocket = (url: string) => {
   }
 
   socket.onmessage = (event) => {
-    console.info('[WebSocket] message', { size: event.data?.length ?? 0 })
+    
     let payload: unknown = event.data
     try {
       payload = JSON.parse(event.data)
@@ -139,7 +130,6 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     }
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
-        console.info('[WebSocket] visibility change: visible')
         connectSharedSocket(url)
       }
     }
@@ -151,14 +141,13 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       sharedUrl = url
     }
     if (sharedUrl !== url) {
-      console.warn('[WebSocket] url changed', { previous: sharedUrl, next: url })
       sharedUrl = url
     }
     connectSharedSocket(sharedUrl)
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
-      console.info('[WebSocket] disposed')
+      
       document.removeEventListener('visibilitychange', handleVisibility)
       sharedHandlers.delete(handleMessage)
       sharedStatusHandlers.delete(handleStatus)
@@ -178,16 +167,11 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   }, [])
 
   const sendJson = useCallback((payload: unknown) => {
-    if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) {
-      console.warn('[WebSocket] send skipped (not open)')
-      return false
-    }
+    if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return false
     try {
       sharedSocket.send(JSON.stringify(payload))
-      console.info('[WebSocket] send', payload)
       return true
     } catch {
-      console.error('[WebSocket] send failed')
       return false
     }
   }, [])
