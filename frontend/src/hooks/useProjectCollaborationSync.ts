@@ -55,6 +55,7 @@ export function useProjectCollaborationSync({
 }: UseProjectCollaborationSyncArgs) {
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
+  const idlePersistDelayMs = 1200
 
   useEffect(() => {
     return () => {
@@ -114,7 +115,7 @@ export function useProjectCollaborationSync({
         if (latestProjectRef.current) {
           persistProject(latestProjectRef.current)
         }
-      }, 800)
+      }, idlePersistDelayMs)
     }
   }, [
     documents,
