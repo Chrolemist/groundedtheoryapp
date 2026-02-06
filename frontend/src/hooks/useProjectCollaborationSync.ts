@@ -26,6 +26,7 @@ type UseProjectCollaborationSyncArgs = {
   setTheoryHtml: Dispatch<SetStateAction<string>>
   getReadableTextColor: (hex: string) => string
   persistProject?: (projectRaw: Record<string, unknown>) => void
+  enableProjectSync?: boolean
 }
 
 // Sync local project state with remote collaboration events.
@@ -52,6 +53,7 @@ export function useProjectCollaborationSync({
   setTheoryHtml,
   getReadableTextColor,
   persistProject,
+  enableProjectSync = true,
 }: UseProjectCollaborationSyncArgs) {
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
@@ -105,7 +107,7 @@ export function useProjectCollaborationSync({
     }
     lastSyncedPayloadRef.current = payload
 
-    if (hasRemoteState && sendJson) {
+    if (enableProjectSync && hasRemoteState && sendJson) {
       sendJson({
         type: 'project:update',
         project_raw: projectRaw,

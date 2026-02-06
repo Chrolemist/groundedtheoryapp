@@ -464,6 +464,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await manager.broadcast_except(
                     {"type": "cursor:clear", "userId": user_id}, websocket
                 )
+            elif message_type == "yjs:update" and user_id:
+                update = data.get("update")
+                if update:
+                    await manager.broadcast_except(
+                        {
+                            "type": "yjs:update",
+                            "update": update,
+                        },
+                        websocket,
+                    )
             elif message_type == "project:update" and user_id:
                 project_payload = data.get("project", {})
                 project_raw = data.get("project_raw") or project_payload

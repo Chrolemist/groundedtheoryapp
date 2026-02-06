@@ -81,7 +81,7 @@ const connectSharedSocket = (url: string) => {
     }, 25000)
   }
 
-  socket.onclose = (event) => {
+  socket.onclose = () => {
     notifyStatus(false)
     
     clearSharedPing()

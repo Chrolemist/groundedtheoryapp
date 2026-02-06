@@ -10,6 +10,7 @@ import { useHistory } from './useHistory'
 import { useHighlighting } from './useHighlighting'
 import { useProjectCollaborationSync } from './useProjectCollaborationSync'
 import { useUndoRedoShortcuts } from './useUndoRedoShortcuts'
+import { useYjsSync } from './useYjsSync'
 
 type UseProjectStateArgs = {
   storageKey: string
@@ -248,6 +249,19 @@ export function useProjectState({
     setTheoryHtml,
     getReadableTextColor,
     persistProject,
+    enableProjectSync: false,
+  })
+
+  useYjsSync({
+    documents,
+    categories,
+    theoryHtml,
+    coreCategoryId,
+    setDocuments,
+    setCategories,
+    setTheoryHtml,
+    setCoreCategoryId,
+    isApplyingRemoteRef,
   })
 
   return {
