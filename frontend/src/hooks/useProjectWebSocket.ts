@@ -23,13 +23,106 @@ type UseProjectWebSocketOptions = {
   onMessage?: (data: unknown) => void
 }
 
+type MessageHandler = (data: unknown) => void
+type StatusHandler = (online: boolean) => void
+
+let sharedSocket: WebSocket | null = null
+let sharedUrl: string | null = null
+let sharedHandlers = new Set<MessageHandler>()
+let sharedStatusHandlers = new Set<StatusHandler>()
+let sharedPingTimer: number | null = null
+let sharedReconnectTimer: number | null = null
+let sharedRetryCount = 0
+let sharedRefCount = 0
+
+const isSocketActive = (socket: WebSocket | null) => {
+  if (!socket) return false
+  return socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING
+}
+
+const clearSharedPing = () => {
+  if (sharedPingTimer) {
+    window.clearInterval(sharedPingTimer)
+    sharedPingTimer = null
+  }
+}
+
+const notifyStatus = (online: boolean) => {
+  sharedStatusHandlers.forEach((handler) => handler(online))
+}
+
+const scheduleSharedReconnect = (connect: () => void) => {
+  if (sharedReconnectTimer) return
+  const retry = sharedRetryCount
+  const delay = Math.min(10000, 500 * Math.pow(2, retry))
+  console.info('[WebSocket] reconnect scheduled', { retry, delay })
+  sharedReconnectTimer = window.setTimeout(() => {
+    sharedReconnectTimer = null
+    connect()
+  }, delay)
+}
+
+const connectSharedSocket = (url: string) => {
+  if (isSocketActive(sharedSocket)) {
+    console.info('[WebSocket] connect skipped', { state: sharedSocket?.readyState })
+    return
+  }
+
+  const socket = new WebSocket(url)
+  sharedSocket = socket
+  console.info('[WebSocket] connecting', url)
+
+  socket.onopen = () => {
+    sharedRetryCount = 0
+    notifyStatus(true)
+    console.info('[WebSocket] connected')
+    clearSharedPing()
+    sharedPingTimer = window.setInterval(() => {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify({ type: 'ping', ts: Date.now() }))
+      }
+    }, 25000)
+  }
+
+  socket.onclose = (event) => {
+    notifyStatus(false)
+    console.warn('[WebSocket] closed', {
+      code: event.code,
+      reason: event.reason,
+      wasClean: event.wasClean,
+      online: navigator.onLine,
+      visibility: document.visibilityState,
+    })
+    clearSharedPing()
+    sharedRetryCount += 1
+    sharedSocket = null
+    scheduleSharedReconnect(() => connectSharedSocket(url))
+  }
+
+  socket.onerror = () => {
+    notifyStatus(false)
+    console.error('[WebSocket] error')
+    clearSharedPing()
+    sharedRetryCount += 1
+    sharedSocket = null
+    scheduleSharedReconnect(() => connectSharedSocket(url))
+  }
+
+  socket.onmessage = (event) => {
+    console.info('[WebSocket] message', { size: event.data?.length ?? 0 })
+    let payload: unknown = event.data
+    try {
+      payload = JSON.parse(event.data)
+    } catch {
+      // Keep raw payload.
+    }
+    sharedHandlers.forEach((handler) => handler(payload))
+  }
+}
+
 export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
-  const socketRef = useRef<WebSocket | null>(null)
-  const reconnectTimerRef = useRef<number | null>(null)
-  const pingTimerRef = useRef<number | null>(null)
-  const retryCountRef = useRef(0)
 
   useEffect(() => {
     messageHandlerRef.current = options.onMessage
@@ -38,127 +131,59 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   useEffect(() => {
     const url = getWebSocketUrl()
     if (!url) return undefined
-    let isDisposed = false
-
-    const isSocketActive = (socket: WebSocket | null) => {
-      if (!socket) return false
-      return (
-        socket.readyState === WebSocket.OPEN ||
-        socket.readyState === WebSocket.CONNECTING
-      )
+    const handleMessage = (payload: unknown) => {
+      messageHandlerRef.current?.(payload)
     }
-
-    const clearPing = () => {
-      if (pingTimerRef.current) {
-        window.clearInterval(pingTimerRef.current)
-        pingTimerRef.current = null
-      }
+    const handleStatus = (online: boolean) => {
+      setIsOnline(online)
     }
-
-    const scheduleReconnect = () => {
-      if (isDisposed) return
-      if (reconnectTimerRef.current) return
-      const retry = retryCountRef.current
-      const delay = Math.min(10000, 500 * Math.pow(2, retry))
-      console.info('[WebSocket] reconnect scheduled', { retry, delay })
-      reconnectTimerRef.current = window.setTimeout(() => {
-        reconnectTimerRef.current = null
-        connect()
-      }, delay)
-    }
-
-    const connect = () => {
-      if (isDisposed) return
-      if (isSocketActive(socketRef.current)) {
-        console.info('[WebSocket] connect skipped', {
-          state: socketRef.current?.readyState,
-        })
-        return
-      }
-
-      const socket = new WebSocket(url)
-      socketRef.current = socket
-      console.info('[WebSocket] connecting', url)
-
-      socket.onopen = () => {
-        retryCountRef.current = 0
-        setIsOnline(true)
-        console.info('[WebSocket] connected')
-        clearPing()
-        pingTimerRef.current = window.setInterval(() => {
-          if (socket.readyState === WebSocket.OPEN) {
-            socket.send(JSON.stringify({ type: 'ping', ts: Date.now() }))
-          }
-        }, 25000)
-      }
-
-      socket.onclose = (event) => {
-        setIsOnline(false)
-        console.warn('[WebSocket] closed', {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          online: navigator.onLine,
-          visibility: document.visibilityState,
-        })
-        clearPing()
-        retryCountRef.current += 1
-        scheduleReconnect()
-      }
-
-      socket.onerror = () => {
-        setIsOnline(false)
-        console.error('[WebSocket] error')
-        clearPing()
-        retryCountRef.current += 1
-        scheduleReconnect()
-      }
-
-      socket.onmessage = (event) => {
-        console.info('[WebSocket] message', { size: event.data?.length ?? 0 })
-        if (!messageHandlerRef.current) return
-        try {
-          const payload = JSON.parse(event.data)
-          messageHandlerRef.current(payload)
-        } catch {
-          messageHandlerRef.current(event.data)
-        }
-      }
-    }
-
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         console.info('[WebSocket] visibility change: visible')
-        if (!isSocketActive(socketRef.current)) {
-          connect()
-        }
+        connectSharedSocket(url)
       }
     }
 
-    connect()
+    sharedHandlers.add(handleMessage)
+    sharedStatusHandlers.add(handleStatus)
+    sharedRefCount += 1
+    if (!sharedUrl) {
+      sharedUrl = url
+    }
+    if (sharedUrl !== url) {
+      console.warn('[WebSocket] url changed', { previous: sharedUrl, next: url })
+      sharedUrl = url
+    }
+    connectSharedSocket(sharedUrl)
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
-      isDisposed = true
       console.info('[WebSocket] disposed')
       document.removeEventListener('visibilitychange', handleVisibility)
-      clearPing()
-      if (reconnectTimerRef.current) {
-        window.clearTimeout(reconnectTimerRef.current)
-        reconnectTimerRef.current = null
+      sharedHandlers.delete(handleMessage)
+      sharedStatusHandlers.delete(handleStatus)
+      sharedRefCount = Math.max(0, sharedRefCount - 1)
+      if (sharedRefCount === 0) {
+        clearSharedPing()
+        if (sharedReconnectTimer) {
+          window.clearTimeout(sharedReconnectTimer)
+          sharedReconnectTimer = null
+        }
+        sharedSocket?.close()
+        sharedSocket = null
+        sharedUrl = null
+        sharedRetryCount = 0
       }
-      socketRef.current?.close()
-      socketRef.current = null
     }
   }, [])
 
   const sendJson = useCallback((payload: unknown) => {
-    if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+    if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) {
       console.warn('[WebSocket] send skipped (not open)')
       return false
     }
     try {
-      socketRef.current.send(JSON.stringify(payload))
+      sharedSocket.send(JSON.stringify(payload))
       console.info('[WebSocket] send', payload)
       return true
     } catch {
