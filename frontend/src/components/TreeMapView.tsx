@@ -74,7 +74,7 @@ export function TreeMapView({
   const [isPanning, setIsPanning] = useState(false)
   const [panAnchor, setPanAnchor] = useState({ x: 0, y: 0 })
   const [selectedDocId, setSelectedDocId] = useState('__all__')
-  const [showLogic, setShowLogic] = useState(false)
+  const [showLogic, setShowLogic] = useState(true)
   const [layoutOrientation, setLayoutOrientation] = useState<'horizontal' | 'vertical'>(() => {
     if (typeof window === 'undefined') return 'vertical'
     const saved = window.localStorage.getItem('gt-theory-map-layout')
