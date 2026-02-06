@@ -24,7 +24,11 @@ declare module 'react-joyride' {
   }
 
   export type CallBackProps = {
+    action?: string
+    index?: number
     status: string
+    step?: Step
+    type?: string
   }
 
   export const STATUS: {
@@ -32,10 +36,26 @@ declare module 'react-joyride' {
     SKIPPED: string
   }
 
+  export const ACTIONS: {
+    PREV: string
+    NEXT: string
+    CLOSE: string
+    SKIP: string
+    START: string
+  }
+
+  export const EVENTS: {
+    STEP_AFTER: string
+    TARGET_NOT_FOUND: string
+    TOOLTIP: string
+  }
+
   const Joyride: ComponentType<{
     steps: Step[]
     run?: boolean
+    stepIndex?: number
     continuous?: boolean
+    disableScrolling?: boolean
     scrollToFirstStep?: boolean
     showProgress?: boolean
     showSkipButton?: boolean
