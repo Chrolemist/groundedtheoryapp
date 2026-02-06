@@ -41,34 +41,16 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
           'Code Notes: öppna en kod och skriv definitioner och spontana tankar.',
       },
       {
-        target: '#axial-coding-panel',
+        target: '#axial-tab',
         placement: 'left',
         content:
-          'Theoretical Notes: lägg memos i kategori-korten för att förklara sambanden.',
+          'Axial coding: klicka fliken för att se kategorier och relationer.',
       },
       {
-        target: '#core-category',
+        target: '#theory-tab',
         placement: 'left',
         content:
-          'Selective coding: välj eller skapa en core category som bär teorin.',
-      },
-      {
-        target: '#theory-narrative',
-        placement: 'left',
-        content:
-          'Theory narrative: formulera storyline och hur kategorierna hänger ihop.',
-      },
-      {
-        target: '#theory-map-tab',
-        placement: 'bottom',
-        content:
-          'Theory Map: visuell karta över kategorier, koder och utdrag. Klicka utdrag för att hoppa till markeringen. Kartan har zoom/pan och visar Theory narrative som egen nod.',
-      },
-      {
-        target: '#overview-tab',
-        placement: 'bottom',
-        content:
-          'Overview: samlar statistik och diagram på ett ställe. Den visar totals, memos per typ, starkaste kategorier och mest markerade koder.',
+          'Selective coding: klicka fliken och skriv core category + theory narrative.',
       },
       {
         target: '#view-menu',
@@ -88,6 +70,10 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
   const [seen, setSeen] = useState(getStoredSeen)
   const [stepIndex, setStepIndex] = useState(0)
   const skipScrollRef = useRef(false)
+  const debugRef = useRef({
+    notFoundCount: 0,
+    lastEvent: '',
+  })
   const shouldRun = run && (!seen || runId > 0)
 
   useEffect(() => {
@@ -97,6 +83,24 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
   }, [shouldRun, runId])
 
   const handleCallback = (data: CallBackProps) => {
+    debugRef.current.lastEvent = data.type
+    if (data.type === EVENTS.TARGET_NOT_FOUND) {
+      debugRef.current.notFoundCount += 1
+      console.log('[tour-debug] target not found', {
+        index: data.index,
+        target: data.step?.target,
+        totalSteps: steps.length,
+        notFoundCount: debugRef.current.notFoundCount,
+      })
+    } else {
+      console.log('[tour-debug] event', {
+        type: data.type,
+        index: data.index,
+        action: data.action,
+        status: data.status,
+        target: data.step?.target,
+      })
+    }
     if (data.type === EVENTS.TARGET_NOT_FOUND) {
       const nextIndex = data.index + 1
       if (nextIndex >= steps.length) {
@@ -139,6 +143,7 @@ export function OnboardingTour({ run, runId, onFinish }: OnboardingTourProps) {
 
     const finished = data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED
     if (finished) {
+      console.log('[tour-debug] finished', { status: data.status })
       localStorage.setItem(STORAGE_KEY, 'true')
       setSeen(true)
       onFinish()

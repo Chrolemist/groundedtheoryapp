@@ -1,9 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+const getClientId = () => {
+  if (typeof window === 'undefined') return ''
+  const storageKey = 'gt-client-id'
+  const stored = window.localStorage.getItem(storageKey)
+  if (stored) return stored
+  const next = crypto.randomUUID()
+  window.localStorage.setItem(storageKey, next)
+  return next
+}
+
 const getWebSocketUrl = () => {
   if (typeof window === 'undefined') return ''
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  return `${protocol}://${window.location.host}/ws`
+  const clientId = getClientId()
+  const query = clientId ? `?client_id=${encodeURIComponent(clientId)}` : ''
+  return `${protocol}://${window.location.host}/ws${query}`
 }
 
 type UseProjectWebSocketOptions = {

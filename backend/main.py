@@ -68,6 +68,8 @@ class ConnectionManager:
         self.active_connections: List[WebSocket] = []
         self.connection_users: Dict[WebSocket, str] = {}
         self.users: Dict[str, Dict[str, str]] = {}
+        self.client_users: Dict[str, str] = {}
+        self.user_connections: Dict[str, WebSocket] = {}
 
     def _generate_user_name(self) -> str:
         first_parts = [
@@ -121,17 +123,43 @@ class ConnectionManager:
         ]
         return palette[len(self.users) % len(palette)]
 
-    async def connect(self, websocket: WebSocket) -> Dict[str, str]:
+    async def connect(self, websocket: WebSocket, client_id: Optional[str] = None) -> Dict[str, str]:
         await websocket.accept()
+        user_id: Optional[str] = None
+        user: Optional[Dict[str, str]] = None
+
+        if client_id:
+            existing_user_id = self.client_users.get(client_id)
+            if existing_user_id:
+                existing_user = self.users.get(existing_user_id)
+                old_socket = self.user_connections.get(existing_user_id)
+                if old_socket:
+                    if old_socket in self.active_connections:
+                        self.active_connections.remove(old_socket)
+                    self.connection_users.pop(old_socket, None)
+                    try:
+                        await old_socket.close()
+                    except Exception:
+                        pass
+                if existing_user:
+                    user_id = existing_user_id
+                    user = existing_user
+
+        if not user_id or not user:
+            user_id = str(uuid4())
+            user = {
+                "id": user_id,
+                "name": self._generate_user_name(),
+                "color": self._generate_user_color(),
+            }
+
         self.active_connections.append(websocket)
-        user_id = str(uuid4())
-        user = {
-            "id": user_id,
-            "name": self._generate_user_name(),
-            "color": self._generate_user_color(),
-        }
         self.connection_users[websocket] = user_id
         self.users[user_id] = user
+        self.user_connections[user_id] = websocket
+        if client_id:
+            self.client_users[client_id] = user_id
+            self.users[user_id]["client_id"] = client_id
         return user
 
     def disconnect(self, websocket: WebSocket) -> None:
@@ -139,7 +167,13 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
         user_id = self.connection_users.pop(websocket, None)
         if user_id and user_id in self.users:
+            client_id = self.users[user_id].get("client_id")
             self.users.pop(user_id, None)
+            self.user_connections.pop(user_id, None)
+            if client_id:
+                existing = self.client_users.get(client_id)
+                if existing == user_id:
+                    self.client_users.pop(client_id, None)
 
     def get_users(self) -> List[Dict[str, str]]:
         return list(self.users.values())
@@ -343,7 +377,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     global in_memory_project
     global in_memory_project_raw
     try:
-        user = await manager.connect(websocket)
+        client_id = websocket.query_params.get("client_id")
+        user = await manager.connect(websocket, client_id)
         logger.info(f"WebSocket accepted. User: {user['id']} ({user['name']})")
     except Exception as e:
         logger.error(f"WebSocket connection failed: {e}")
