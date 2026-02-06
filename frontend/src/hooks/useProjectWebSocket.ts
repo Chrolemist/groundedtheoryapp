@@ -40,6 +40,14 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     if (!url) return undefined
     let isDisposed = false
 
+    const isSocketActive = (socket: WebSocket | null) => {
+      if (!socket) return false
+      return (
+        socket.readyState === WebSocket.OPEN ||
+        socket.readyState === WebSocket.CONNECTING
+      )
+    }
+
     const clearPing = () => {
       if (pingTimerRef.current) {
         window.clearInterval(pingTimerRef.current)
@@ -61,7 +69,12 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
     const connect = () => {
       if (isDisposed) return
-      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) return
+      if (isSocketActive(socketRef.current)) {
+        console.info('[WebSocket] connect skipped', {
+          state: socketRef.current?.readyState,
+        })
+        return
+      }
 
       const socket = new WebSocket(url)
       socketRef.current = socket
@@ -85,6 +98,8 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
           code: event.code,
           reason: event.reason,
           wasClean: event.wasClean,
+          online: navigator.onLine,
+          visibility: document.visibilityState,
         })
         clearPing()
         retryCountRef.current += 1
@@ -114,7 +129,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
         console.info('[WebSocket] visibility change: visible')
-        if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+        if (!isSocketActive(socketRef.current)) {
           connect()
         }
       }
