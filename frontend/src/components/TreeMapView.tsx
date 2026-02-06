@@ -76,14 +76,14 @@ export function TreeMapView({
   const [selectedDocId, setSelectedDocId] = useState('__all__')
   const [showLogic, setShowLogic] = useState(false)
   const [layoutOrientation, setLayoutOrientation] = useState<'horizontal' | 'vertical'>(() => {
-    if (typeof window === 'undefined') return 'horizontal'
+    if (typeof window === 'undefined') return 'vertical'
     const saved = window.localStorage.getItem('gt-theory-map-layout')
-    if (!saved) return 'horizontal'
+    if (!saved) return 'vertical'
     try {
       const parsed = JSON.parse(saved) as { layoutOrientation?: 'horizontal' | 'vertical' }
       return parsed.layoutOrientation === 'vertical' ? 'vertical' : 'horizontal'
     } catch {
-      return 'horizontal'
+      return 'vertical'
     }
   })
   const [useManualLayout, setUseManualLayout] = useState(() => {
