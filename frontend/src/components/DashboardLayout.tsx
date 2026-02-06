@@ -119,6 +119,12 @@ export function DashboardLayout() {
         <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
           <DocumentViewerPanel
             documents={project.documents}
+            codes={project.codes}
+            categories={project.categories}
+            memos={project.memos}
+            coreCategoryId={project.coreCategoryId}
+            showMemos={project.showMemos}
+            theoryHtml={project.theoryHtml}
             activeDocumentId={project.activeDocumentId}
             documentViewMode={project.documentViewMode}
             onDocumentViewModeChange={project.setDocumentViewMode}
@@ -154,13 +160,8 @@ export function DashboardLayout() {
             codes={project.codes}
             categories={project.categories}
             ungroupedCodes={project.ungroupedCodes}
-            codeById={project.codeById}
-            categoryStats={project.categoryStats}
-            sharedCodes={project.sharedCodes}
             coreCategoryId={project.coreCategoryId}
             coreCategoryDraft={project.coreCategoryDraft}
-            assignedCodeCount={project.assignedCodeIds.size}
-            ungroupedCodeCount={project.ungroupedCodes.length}
             memos={project.memos}
             isTheoryEmpty={project.isTheoryEmpty}
             showMemos={project.showMemos}

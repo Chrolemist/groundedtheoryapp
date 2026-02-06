@@ -203,6 +203,16 @@ export function useDocumentState({ storedState, pushHistoryRef }: UseDocumentSta
     }
   }
 
+  const stripMapFocus = (value: string) => {
+    if (!value.includes('map-focus')) return value
+    const container = document.createElement('div')
+    container.innerHTML = value
+    container.querySelectorAll('.map-focus').forEach((node) => {
+      node.classList.remove('map-focus')
+    })
+    return container.innerHTML
+  }
+
   useEffect(() => {
     if (documentViewMode !== 'single') {
       lastEditDocumentIdRef.current = null
@@ -213,7 +223,11 @@ export function useDocumentState({ storedState, pushHistoryRef }: UseDocumentSta
     if (lastEditDocumentIdRef.current === activeDocumentId) return
     const activeDoc = documents.find((doc) => doc.id === activeDocumentId)
     const nextHtml = activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
-    editor.innerHTML = nextHtml
+    const normalizedCurrent = stripMapFocus(editor.innerHTML)
+    const normalizedNext = stripMapFocus(nextHtml)
+    if (normalizedCurrent !== normalizedNext) {
+      editor.innerHTML = nextHtml
+    }
     lastEditDocumentIdRef.current = activeDocumentId
   }, [activeDocumentId, documents, documentViewMode])
 
@@ -227,6 +241,15 @@ export function useDocumentState({ storedState, pushHistoryRef }: UseDocumentSta
     documentEditorRef,
     setDocumentEditorRef: (node: HTMLDivElement | null) => {
       documentEditorRef.current = node
+      if (!node || documentViewMode !== 'single') return
+      const activeDoc = documents.find((doc) => doc.id === activeDocumentId)
+      const nextHtml = activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
+      const normalizedCurrent = stripMapFocus(node.innerHTML)
+      const normalizedNext = stripMapFocus(nextHtml)
+      if (normalizedCurrent !== normalizedNext) {
+        node.innerHTML = nextHtml
+      }
+      lastEditDocumentIdRef.current = activeDocumentId
     },
     documentLineHeight,
     setDocumentLineHeight,

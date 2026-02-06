@@ -1,16 +1,4 @@
-import { type Category, type Code } from '../types'
-
-type CategoryStat = {
-  id: string
-  name: string
-  codeCount: number
-  codes: Code[]
-}
-
-type SharedCode = {
-  code: Code
-  count: number
-}
+import { type Category } from '../types'
 
 type SelectiveCodingPanelProps = {
   coreCategoryId: string
@@ -19,12 +7,6 @@ type SelectiveCodingPanelProps = {
   onCoreCategoryDraftChange: (value: string) => void
   onCreateCoreCategory: () => void
   categories: Category[]
-  codeById: Map<string, Code>
-  categoryStats: CategoryStat[]
-  sharedCodes: SharedCode[]
-  codeCount: number
-  assignedCodeCount: number
-  ungroupedCodeCount: number
   isTheoryEmpty: boolean
   onApplyEditorCommand: (command: string, value?: string) => void
   onTheoryInput: (html: string) => void
@@ -38,12 +20,6 @@ export function SelectiveCodingPanel({
   onCoreCategoryDraftChange,
   onCreateCoreCategory,
   categories,
-  codeById,
-  categoryStats,
-  sharedCodes,
-  codeCount,
-  assignedCodeCount,
-  ungroupedCodeCount,
   isTheoryEmpty,
   onApplyEditorCommand,
   onTheoryInput,
@@ -100,119 +76,6 @@ export function SelectiveCodingPanel({
             >
               Create core
             </button>
-          </div>
-        </div>
-        <div className="rounded-lg border border-slate-200 bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Analysis Snapshot
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-600">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-              Categories: {categories.length}
-            </span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-              Codes: {codeCount}
-            </span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-              Grouped codes: {assignedCodeCount}
-            </span>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-1">
-              Ungrouped codes: {ungroupedCodeCount}
-            </span>
-          </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Strongest categories
-              </p>
-              <div className="mt-2 space-y-2 text-xs text-slate-600">
-                {categoryStats.length ? (
-                  categoryStats.slice(0, 3).map((category) => (
-                    <div
-                      key={category.id}
-                      className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-2 py-1"
-                    >
-                      <span className="font-semibold text-slate-700">{category.name}</span>
-                      <span>{category.codeCount} codes</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-slate-400">No categories yet.</div>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Most shared codes
-              </p>
-              <div className="mt-2 space-y-2 text-xs text-slate-600">
-                {sharedCodes.length ? (
-                  sharedCodes.slice(0, 4).map((entry) => (
-                    <div
-                      key={entry.code.id}
-                      className="flex items-center justify-between rounded-md border border-slate-200 bg-slate-50 px-2 py-1"
-                    >
-                      <span className="font-semibold text-slate-700">{entry.code.label}</span>
-                      <span>{entry.count} categories</span>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-slate-400">No shared codes yet.</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Categories & Codes Overview
-          </p>
-          <div className="mt-2 grid gap-3 md:grid-cols-2">
-            {categories.length ? (
-              categories.map((category) => (
-                <div
-                  key={category.id}
-                  className="rounded-lg border border-slate-200 bg-white p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold text-slate-800">{category.name}</p>
-                    {coreCategoryId === category.id ? (
-                      <span className="rounded-full bg-slate-900 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                        Core
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {category.codeIds.length ? (
-                      category.codeIds
-                        .map((codeId) => codeById.get(codeId))
-                        .filter((code): code is Code => Boolean(code))
-                        .map((code) => (
-                          <span
-                            key={code.id}
-                            className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                            style={{
-                              backgroundColor: code.colorHex ?? '#E2E8F0',
-                              color: code.textHex ?? '#0F172A',
-                              boxShadow: `inset 0 0 0 1px ${
-                                code.ringHex ?? 'rgba(148,163,184,0.4)'
-                              }`,
-                            }}
-                          >
-                            {code.label}
-                          </span>
-                        ))
-                    ) : (
-                      <span className="text-xs text-slate-400">No codes yet</span>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400">
-                Add categories and codes to see the overview here.
-              </div>
-            )}
           </div>
         </div>
         <div>

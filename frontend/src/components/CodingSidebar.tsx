@@ -10,29 +10,12 @@ import { SelectiveCodingPanel } from './SelectiveCodingPanel'
 
 type TabKey = 'open' | 'axial' | 'theory' | 'memos'
 
-type CategoryStat = {
-  id: string
-  name: string
-  codeCount: number
-  codes: Code[]
-}
-
-type SharedCode = {
-  code: Code
-  count: number
-}
-
 type CodingSidebarProps = {
   codes: Code[]
   categories: Category[]
   ungroupedCodes: Code[]
-  codeById: Map<string, Code>
-  categoryStats: CategoryStat[]
-  sharedCodes: SharedCode[]
   coreCategoryId: string
   coreCategoryDraft: string
-  assignedCodeCount: number
-  ungroupedCodeCount: number
   memos: Memo[]
   isTheoryEmpty: boolean
   showMemos: boolean
@@ -70,13 +53,8 @@ export function CodingSidebar({
   codes,
   categories,
   ungroupedCodes,
-  codeById,
-  categoryStats,
-  sharedCodes,
   coreCategoryId,
   coreCategoryDraft,
-  assignedCodeCount,
-  ungroupedCodeCount,
   memos,
   isTheoryEmpty,
   showMemos,
@@ -203,12 +181,6 @@ export function CodingSidebar({
                 onCoreCategoryDraftChange={onCoreCategoryDraftChange}
                 onCreateCoreCategory={onCreateCoreCategory}
                 categories={categories}
-                codeById={codeById}
-                categoryStats={categoryStats}
-                sharedCodes={sharedCodes}
-                codeCount={codes.length}
-                assignedCodeCount={assignedCodeCount}
-                ungroupedCodeCount={ungroupedCodeCount}
                 isTheoryEmpty={isTheoryEmpty}
                 onApplyEditorCommand={onApplyEditorCommand}
                 onTheoryInput={onTheoryInput}
