@@ -12,7 +12,7 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
 from docx import Document
-from fastapi import FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -446,13 +446,54 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             await manager.broadcast({"type": "cursor:clear", "userId": user_id})
 
 
+@app.get("/project/state")
+async def get_project_state() -> Dict[str, Optional[Dict]]:
+    global in_memory_project
+    global in_memory_project_raw
+    project_raw = load_project_from_firestore()
+    if project_raw:
+        in_memory_project_raw = project_raw
+        in_memory_project = normalize_project_state(project_raw)
+    elif not in_memory_project_raw and in_memory_project.documents:
+        in_memory_project_raw = in_memory_project.model_dump()
+
+    return {
+        "project_raw": in_memory_project_raw or None,
+        "project": in_memory_project.model_dump(),
+    }
+
+
+@app.post("/project/state")
+async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
+    global in_memory_project
+    global in_memory_project_raw
+
+    project_raw = payload.get("project_raw") or payload.get("project") or payload
+    if not isinstance(project_raw, dict):
+        return {"status": "invalid"}
+
+    in_memory_project_raw = project_raw
+    in_memory_project = normalize_project_state(project_raw)
+    save_project_to_firestore(in_memory_project_raw)
+    await manager.broadcast(
+        {
+            "type": "project:update",
+            "project": in_memory_project.model_dump(),
+            "project_raw": in_memory_project_raw,
+        }
+    )
+    return {"status": "ok"}
+
+
 @app.post("/project/load")
 async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
     payload = await file.read()
     project_state = ProjectState.model_validate_json(payload)
 
     global in_memory_project
+    global in_memory_project_raw
     in_memory_project = project_state
+    in_memory_project_raw = project_state.model_dump()
     save_project_to_firestore(project_state.model_dump())
     await manager.broadcast(in_memory_project.model_dump())
 

@@ -5,6 +5,9 @@ import { cn } from '../lib/cn'
 
 type DashboardHeaderProps = {
   websocketOnline: boolean
+  isSaving: boolean
+  lastSavedAt: number | null
+  saveError: string | null
   presenceUsers: PresenceUser[]
   localUser: PresenceUser | null
   fileInputRef: MutableRefObject<HTMLInputElement | null>
@@ -33,6 +36,9 @@ type DashboardHeaderProps = {
 // Top navigation with app actions and collaborator presence.
 export function DashboardHeader({
   websocketOnline,
+  isSaving,
+  lastSavedAt,
+  saveError,
   presenceUsers,
   localUser,
   fileInputRef,
@@ -57,6 +63,20 @@ export function DashboardHeader({
   showMemos,
   onTour,
 }: DashboardHeaderProps) {
+  const formatSavedTime = (value: number) =>
+    new Date(value).toLocaleTimeString('sv-SE', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+
+  const saveLabel = isSaving
+    ? 'Sparar...'
+    : saveError
+      ? 'Sparande misslyckades'
+      : lastSavedAt
+        ? `Sparad ${formatSavedTime(lastSavedAt)}`
+        : 'Ej sparad'
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -75,6 +95,20 @@ export function DashboardHeader({
                   )}
                 />
                 <span>{websocketOnline ? 'Online' : 'Offline'} WebSocket</span>
+                <span className="mx-1 text-slate-300">•</span>
+                <span
+                  className={cn(
+                    'h-2 w-2 rounded-full',
+                    isSaving
+                      ? 'bg-amber-500'
+                      : saveError
+                        ? 'bg-rose-500'
+                        : lastSavedAt
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-300',
+                  )}
+                />
+                <span>{saveLabel}</span>
               </div>
             </div>
           </div>

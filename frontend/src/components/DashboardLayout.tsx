@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DndContext } from '@dnd-kit/core'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
@@ -17,6 +17,16 @@ export function DashboardLayout() {
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const tour = useOnboardingTour()
+  const saveSeqRef = useRef(0)
+  const [isSaving, setIsSaving] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  const apiBase = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    if (window.location.port === '5173') return 'http://localhost:8000'
+    return window.location.origin
+  }, [])
 
   const {
     websocketOnline,
@@ -34,6 +44,39 @@ export function DashboardLayout() {
     storedState,
     sendJson,
     hasRemoteState,
+    persistProject: useCallback(
+      (projectRaw: Record<string, unknown>) => {
+        if (!apiBase) return
+        const seq = saveSeqRef.current + 1
+        saveSeqRef.current = seq
+        setIsSaving(true)
+        setSaveError(null)
+        fetch(`${apiBase}/project/state`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ project_raw: projectRaw }),
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(`Save failed: ${response.status}`)
+            }
+            if (saveSeqRef.current !== seq) return
+            setLastSavedAt(Date.now())
+          })
+          .catch((error) => {
+            if (saveSeqRef.current !== seq) return
+            const message = error instanceof Error ? error.message : 'Save failed'
+            setSaveError(message)
+            console.error('[Project Save]', message)
+          })
+          .finally(() => {
+            if (saveSeqRef.current === seq) {
+              setIsSaving(false)
+            }
+          })
+      },
+      [apiBase],
+    ),
   })
 
   const { handleSaveProject, handleLoadProject, exportReport } = useProjectIO({
@@ -69,6 +112,34 @@ export function DashboardLayout() {
     projectUpdateRef.current = project.applyRemoteProject
   }, [project.applyRemoteProject])
 
+  useEffect(() => {
+    if (!apiBase) return
+    if (hasRemoteState) return
+    const controller = new AbortController()
+    const loadRemote = async () => {
+      try {
+        const response = await fetch(`${apiBase}/project/state`, {
+          signal: controller.signal,
+        })
+        if (!response.ok) return
+        const data = (await response.json()) as {
+          project_raw?: Record<string, unknown>
+          project?: Record<string, unknown>
+        }
+        const projectRaw = data.project_raw ?? data.project
+        if (projectRaw) {
+          project.applyRemoteProject(projectRaw)
+        }
+      } catch {
+        return
+      }
+    }
+    loadRemote()
+    return () => {
+      controller.abort()
+    }
+  }, [apiBase, hasRemoteState, project.applyRemoteProject])
+
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))
   }, [presenceUsers])
@@ -95,6 +166,9 @@ export function DashboardLayout() {
         />
         <DashboardHeader
           websocketOnline={websocketOnline}
+          isSaving={isSaving}
+          lastSavedAt={lastSavedAt}
+          saveError={saveError}
           presenceUsers={presenceUsers}
           localUser={localUser}
           fileInputRef={fileInputRef}

@@ -1,4 +1,4 @@
-import { useEffect, type MutableRefObject, type Dispatch, type SetStateAction } from 'react'
+import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 import { hydrateRemoteProject } from '../lib/projectHydration'
@@ -25,6 +25,7 @@ type UseProjectCollaborationSyncArgs = {
   setCoreCategoryId: Dispatch<SetStateAction<string>>
   setTheoryHtml: Dispatch<SetStateAction<string>>
   getReadableTextColor: (hex: string) => string
+  persistProject?: (projectRaw: Record<string, unknown>) => void
 }
 
 // Sync local project state with remote collaboration events.
@@ -50,7 +51,19 @@ export function useProjectCollaborationSync({
   setCoreCategoryId,
   setTheoryHtml,
   getReadableTextColor,
+  persistProject,
 }: UseProjectCollaborationSyncArgs) {
+  const persistTimerRef = useRef<number | null>(null)
+  const latestProjectRef = useRef<Record<string, unknown> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (persistTimerRef.current) {
+        window.clearTimeout(persistTimerRef.current)
+        persistTimerRef.current = null
+      }
+    }
+  }, [])
   const applyRemoteProject = (project: Record<string, unknown>) => {
     isApplyingRemoteRef.current = true
 
@@ -76,19 +89,33 @@ export function useProjectCollaborationSync({
 
   useEffect(() => {
     if (isApplyingRemoteRef.current) return
-    if (!hasRemoteState) return
-    if (!sendJson) return
-    sendJson({
-      type: 'project:update',
-      project_raw: {
-        documents,
-        codes,
-        categories,
-        memos,
-        coreCategoryId,
-        theoryHtml,
-      },
-    })
+    const projectRaw = {
+      documents,
+      codes,
+      categories,
+      memos,
+      coreCategoryId,
+      theoryHtml,
+    }
+
+    if (hasRemoteState && sendJson) {
+      sendJson({
+        type: 'project:update',
+        project_raw: projectRaw,
+      })
+    }
+
+    if (persistProject) {
+      latestProjectRef.current = projectRaw
+      if (persistTimerRef.current) {
+        window.clearTimeout(persistTimerRef.current)
+      }
+      persistTimerRef.current = window.setTimeout(() => {
+        if (latestProjectRef.current) {
+          persistProject(latestProjectRef.current)
+        }
+      }, 800)
+    }
   }, [
     documents,
     codes,
@@ -99,6 +126,7 @@ export function useProjectCollaborationSync({
     sendJson,
     hasRemoteState,
     isApplyingRemoteRef,
+    persistProject,
   ])
 
   useEffect(() => {

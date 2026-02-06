@@ -26,6 +26,7 @@ type UseProjectStateArgs = {
   } | null
   sendJson?: (payload: Record<string, unknown>) => void
   hasRemoteState: boolean
+  persistProject?: (projectRaw: Record<string, unknown>) => void
 }
 
 // Core state + editing behavior for grounded theory workflows.
@@ -34,6 +35,7 @@ export function useProjectState({
   storedState,
   sendJson,
   hasRemoteState,
+  persistProject,
 }: UseProjectStateArgs) {
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
@@ -243,6 +245,7 @@ export function useProjectState({
     setCoreCategoryId,
     setTheoryHtml,
     getReadableTextColor,
+    persistProject,
   })
 
   return {
