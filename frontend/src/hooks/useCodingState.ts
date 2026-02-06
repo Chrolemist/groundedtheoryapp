@@ -30,6 +30,7 @@ type UseCodingStateArgs = {
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
   syncDocumentsForCodes: (current: DocumentItem[], nextCodeMap: Map<string, Code>) => DocumentItem[]
   syncEditorForCodes: (nextCodeMap: Map<string, Code>) => void
+  isApplyingRemoteRef?: MutableRefObject<boolean>
 }
 
 // Coding state for codes, categories, memos, theory, and drag handling.
@@ -39,6 +40,7 @@ export function useCodingState({
   setDocuments,
   syncDocumentsForCodes,
   syncEditorForCodes,
+  isApplyingRemoteRef,
 }: UseCodingStateArgs) {
   const [codes, setCodes] = useState<Code[]>(() => storedState?.codes ?? [])
   const [categories, setCategories] = useState<Category[]>(() => storedState?.categories ?? [])
@@ -336,7 +338,7 @@ export function useCodingState({
   useEffect(() => {
     const editor = theoryEditorRef.current
     if (!editor) return
-    if (document.activeElement === editor) return
+    if (document.activeElement === editor && !isApplyingRemoteRef?.current) return
     if (editor.innerHTML !== theoryHtml) {
       editor.innerHTML = theoryHtml
     }

@@ -45,6 +45,7 @@ export function useProjectState({
   const documentState = useDocumentState({
     storedState,
     pushHistoryRef,
+    isApplyingRemoteRef,
   })
 
   const codingState = useCodingState({
@@ -53,6 +54,7 @@ export function useProjectState({
     setDocuments: documentState.setDocuments,
     syncDocumentsForCodes: documentState.syncDocumentsForCodes,
     syncEditorForCodes: documentState.syncEditorForCodes,
+    isApplyingRemoteRef,
   })
 
   const {

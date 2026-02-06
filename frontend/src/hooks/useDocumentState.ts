@@ -9,10 +9,15 @@ type UseDocumentStateArgs = {
     documentViewMode?: DocumentViewMode
   } | null
   pushHistoryRef: MutableRefObject<() => void>
+  isApplyingRemoteRef?: MutableRefObject<boolean>
 }
 
 // Document state, editor refs, and document syncing helpers.
-export function useDocumentState({ storedState, pushHistoryRef }: UseDocumentStateArgs) {
+export function useDocumentState({
+  storedState,
+  pushHistoryRef,
+  isApplyingRemoteRef,
+}: UseDocumentStateArgs) {
   const [documents, setDocuments] = useState<DocumentItem[]>(() =>
     storedState?.documents?.length
       ? storedState.documents
@@ -220,7 +225,9 @@ export function useDocumentState({ storedState, pushHistoryRef }: UseDocumentSta
     }
     const editor = documentEditorRef.current
     if (!editor) return
-    if (lastEditDocumentIdRef.current === activeDocumentId) return
+    if (!isApplyingRemoteRef?.current && lastEditDocumentIdRef.current === activeDocumentId) {
+      return
+    }
     const activeDoc = documents.find((doc) => doc.id === activeDocumentId)
     const nextHtml = activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
     const normalizedCurrent = stripMapFocus(editor.innerHTML)
