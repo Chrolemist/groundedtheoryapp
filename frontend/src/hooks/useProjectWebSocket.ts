@@ -15,7 +15,8 @@ const getWebSocketUrl = () => {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const clientId = getClientId()
   const query = clientId ? `?client_id=${encodeURIComponent(clientId)}` : ''
-  return `${protocol}://${window.location.host}/ws${query}`
+  const host = window.location.port === '5173' ? 'localhost:8000' : window.location.host
+  return `${protocol}://${host}/ws${query}`
 }
 
 type UseProjectWebSocketOptions = {
@@ -63,10 +64,12 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
       const socket = new WebSocket(url)
       socketRef.current = socket
+      console.info('[WebSocket] connecting', url)
 
       socket.onopen = () => {
         retryCountRef.current = 0
         setIsOnline(true)
+        console.info('[WebSocket] connected')
         clearPing()
         pingTimerRef.current = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
@@ -75,8 +78,13 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         }, 25000)
       }
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         setIsOnline(false)
+        console.warn('[WebSocket] closed', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean,
+        })
         clearPing()
         retryCountRef.current += 1
         scheduleReconnect()
@@ -84,6 +92,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
       socket.onerror = () => {
         setIsOnline(false)
+        console.error('[WebSocket] error')
         clearPing()
         retryCountRef.current += 1
         scheduleReconnect()
