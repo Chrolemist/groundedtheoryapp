@@ -69,8 +69,17 @@ export function useProjectCollaborationSync({
   const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
     const incomingUpdatedAt =
       typeof project.updated_at === 'number' ? project.updated_at : 0
+    const localEmpty =
+      documents.length === 0 &&
+      codes.length === 0 &&
+      categories.length === 0 &&
+      memos.length === 0 &&
+      !coreCategoryId &&
+      !theoryHtml
     const shouldApply =
-      incomingUpdatedAt > projectUpdatedAtRef.current || projectUpdatedAtRef.current === 0
+      localEmpty ||
+      incomingUpdatedAt > projectUpdatedAtRef.current ||
+      projectUpdatedAtRef.current === 0
     if (!shouldApply) return
 
     isApplyingRemoteRef.current = true
@@ -97,6 +106,12 @@ export function useProjectCollaborationSync({
       isApplyingRemoteRef.current = false
     }, 0)
   }, [
+    documents.length,
+    codes.length,
+    categories.length,
+    memos.length,
+    coreCategoryId,
+    theoryHtml,
     getReadableTextColor,
     isApplyingRemoteRef,
     projectUpdatedAtRef,
