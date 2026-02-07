@@ -66,7 +66,7 @@ export function DashboardLayout() {
     apiBase,
     remoteLoadedRef,
     applyRemoteProject: project.applyRemoteProject,
-    autoCreateIfEmpty: true,
+    autoCreateIfEmpty: false,
     onActiveProjectChange: (projectId, name) => {
       activeProjectIdRef.current = projectId
       document.title = name
