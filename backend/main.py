@@ -680,6 +680,35 @@ async def get_projects_storage() -> Dict[str, int]:
     }
 
 
+@app.post("/projects/purge")
+async def purge_projects() -> Dict[str, int | str]:
+    global last_saved_project_hash
+    client = get_firestore_client()
+    if not client:
+        return {"status": "error", "message": "Firestore not available"}
+    collection = os.getenv("FIRESTORE_COLLECTION", "projects")
+    deleted = 0
+    batch = client.batch()
+    batch_count = 0
+    try:
+        snapshots = client.collection(collection).stream()
+        for snapshot in snapshots:
+            batch.delete(snapshot.reference)
+            deleted += 1
+            batch_count += 1
+            if batch_count >= 450:
+                batch.commit()
+                batch = client.batch()
+                batch_count = 0
+        if batch_count:
+            batch.commit()
+        last_saved_project_hash.clear()
+        return {"status": "ok", "deleted": deleted}
+    except Exception as exc:
+        logger.warning(f"Failed to purge projects: {exc}")
+        return {"status": "error", "message": "Failed to purge projects"}
+
+
 @app.post("/projects")
 async def create_project(payload: Dict = Body(...)) -> Dict[str, Optional[Dict]]:
     client = get_firestore_client()

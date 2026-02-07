@@ -31,6 +31,7 @@ type UseProjectCatalogResult = {
   renameProject: (projectId: string, name: string) => Promise<void>
   deleteProject: (projectId: string) => Promise<boolean>
   closeProject: () => void
+  purgeProjects: () => Promise<number>
 }
 
 const defaultProjectPayload = () => ({
@@ -257,6 +258,35 @@ export function useProjectCatalog({
     }
   }, [storageKey])
 
+  const purgeProjects = useCallback(async () => {
+    if (!apiBase) return 0
+    setProjectError(null)
+    try {
+      const response = await fetch(`${apiBase}/projects/purge`, { method: 'POST' })
+      if (!response.ok) {
+        throw new Error(`Failed to purge projects: ${response.status}`)
+      }
+      const data = (await response.json()) as { deleted?: number }
+      const deleted = typeof data.deleted === 'number' ? data.deleted : 0
+      setProjects([])
+      setActiveProjectId(null)
+      setActiveProjectName('')
+      suppressAutoLoadRef.current = true
+      suppressAutoCreateRef.current = true
+      try {
+        localStorage.removeItem(storageKey)
+      } catch {
+        // Ignore storage failures.
+      }
+      await refreshStorage()
+      return deleted
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to purge projects'
+      setProjectError(message)
+      return 0
+    }
+  }, [apiBase, refreshStorage, storageKey])
+
   useEffect(() => {
     if (didInitRef.current) return
     if (!apiBase) return
@@ -306,5 +336,6 @@ export function useProjectCatalog({
     renameProject,
     deleteProject,
     closeProject,
+    purgeProjects,
   }
 }

@@ -128,6 +128,27 @@ export function DashboardLayout() {
     setIsProjectModalOpen(false)
   }
 
+  const handlePurgeProjects = async () => {
+    const ok = window.confirm(
+      'Delete ALL projects permanently? This cannot be undone.',
+    )
+    if (!ok) return
+    const deleted = await catalog.purgeProjects()
+    if (deleted > 0) {
+      activeProjectIdRef.current = null
+      remoteLoadedRef.current = false
+      project.setDocuments([])
+      project.setCodes([])
+      project.setCategories([])
+      project.setMemos([])
+      project.setCoreCategoryId('')
+      project.setTheoryHtml('')
+      project.setActiveDocumentId('')
+      project.setDocumentViewMode('all')
+      document.title = 'GT · Grounded Theory'
+    }
+  }
+
   const handleRenameProject = async (name: string) => {
     if (!catalog.activeProjectId) return
     await catalog.renameProject(catalog.activeProjectId, name)
@@ -198,6 +219,7 @@ export function DashboardLayout() {
         onSelect={(projectId: string) => void handleSelectProject(projectId)}
         onCreate={(name: string) => void handleCreateProject(name)}
         onDelete={(projectId: string) => void handleDeleteProject(projectId)}
+        onPurge={() => void handlePurgeProjects()}
       />
       <OnboardingTour key={tour.runId} run={tour.run} runId={tour.runId} onFinish={tour.stop} />
       <DashboardHeader

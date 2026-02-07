@@ -19,6 +19,7 @@ type ProjectPickerModalProps = {
   onSelect: (projectId: string) => void
   onCreate: (name: string) => void
   onDelete: (projectId: string) => void
+  onPurge: () => void
 }
 
 const formatTimestamp = (value?: string | null) => {
@@ -45,6 +46,7 @@ export function ProjectPickerModal({
   onSelect,
   onCreate,
   onDelete,
+  onPurge,
 }: ProjectPickerModalProps) {
   const [name, setName] = useState('')
   const sortedProjects = useMemo(() => {
@@ -97,13 +99,22 @@ export function ProjectPickerModal({
 
         <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
           <span>{isLoading ? 'Loading...' : `${sortedProjects.length} projects`}</span>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
-          >
-            Refresh
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+            >
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={onPurge}
+              className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600"
+            >
+              Delete all
+            </button>
+          </div>
         </div>
 
         {error && (
