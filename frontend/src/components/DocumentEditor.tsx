@@ -181,7 +181,7 @@ export function DocumentEditor({
       </div>
       <EditorContent
         editor={editor}
-        className="document-content min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+        className="document-content relative min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
         style={{ fontFamily, lineHeight }}
         data-editor="tiptap"
         ref={editorRef}

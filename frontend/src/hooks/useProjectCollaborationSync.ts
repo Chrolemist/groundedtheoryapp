@@ -64,6 +64,8 @@ export function useProjectCollaborationSync({
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
   const lastSyncedPayloadRef = useRef<string | null>(null)
   const idlePersistDelayMs = 1200
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const broadcastRef = useRef<BroadcastChannel | null>(null)
 
   useEffect(() => {
     return () => {
@@ -73,6 +75,7 @@ export function useProjectCollaborationSync({
       }
     }
   }, [])
+
   const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
     const incomingUpdatedAt =
       typeof project.updated_at === 'number' ? project.updated_at : 0
@@ -116,6 +119,26 @@ export function useProjectCollaborationSync({
   ])
 
   useEffect(() => {
+    if (!disableWs) return undefined
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return undefined
+    const channel = new BroadcastChannel('gt-project')
+    broadcastRef.current = channel
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data as Record<string, unknown> | undefined
+      if (!data || data.type !== 'project:update') return
+      const projectRaw = (data.project_raw ?? data.project) as Record<string, unknown> | undefined
+      if (!projectRaw) return
+      applyRemoteProject(projectRaw)
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+      broadcastRef.current = null
+    }
+  }, [applyRemoteProject, disableWs])
+
+  useEffect(() => {
     if (isApplyingRemoteRef.current) return
     const projectRaw = {
       documents,
@@ -134,6 +157,13 @@ export function useProjectCollaborationSync({
 
     if (enableProjectSync && hasRemoteState && sendJson) {
       sendJson({
+        type: 'project:update',
+        project_raw: projectRaw,
+      })
+    }
+
+    if (disableWs && broadcastRef.current) {
+      broadcastRef.current.postMessage({
         type: 'project:update',
         project_raw: projectRaw,
       })
@@ -160,6 +190,8 @@ export function useProjectCollaborationSync({
     projectUpdatedAtRef,
     sendJson,
     hasRemoteState,
+    enableProjectSync,
+    disableWs,
     isApplyingRemoteRef,
     persistProject,
   ])
@@ -288,6 +320,7 @@ export function useProjectCollaborationSync({
     getSelectionDocumentId,
     selectionRangeRef,
     selectionDocumentIdRef,
+    documentEditorInstancesRef,
   ])
 
   return { applyRemoteProject }

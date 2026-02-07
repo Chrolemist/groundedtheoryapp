@@ -74,19 +74,19 @@ const pickDistinctColor = (palette: string[], used: Set<string>, fallbackIndex: 
 
 // WebSocket-backed presence and cursor tracking.
 export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const [localUser, setLocalUser] = useState<PresenceUser | null>(null)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, CursorPresence>>({})
-  const [hasRemoteState, setHasRemoteState] = useState(false)
+  const [hasRemoteState, setHasRemoteState] = useState(disableWs)
   const localUserRef = useRef<PresenceUser | null>(null)
   const broadcastRef = useRef<BroadcastChannel | null>(null)
-  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const presenceTimerRef = useRef<number | null>(null)
   const presenceKeyPrefix = 'gt-presence:'
   const colorKeyPrefix = 'gt-tab-color:'
   const colorKeyRef = useRef<string | null>(null)
 
-  const getLocalIdentity = () => {
+  const getLocalIdentity = useCallback(() => {
     if (typeof window === 'undefined') {
       return { id: 'local', name: 'Local', color: '#7C3AED' }
     }
@@ -123,7 +123,7 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
     window.localStorage.setItem(colorKey, color)
     colorKeyRef.current = colorKey
     return { id, name, color }
-  }
+  }, [disableWs])
 
   const { isOnline: websocketOnline, sendJson } = useProjectWebSocket({
     onMessage: (payload) => {
@@ -389,7 +389,7 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         }
       }
     }
-  }, [disableWs])
+  }, [disableWs, getLocalIdentity])
 
   useEffect(() => {
     const interval = window.setInterval(() => {

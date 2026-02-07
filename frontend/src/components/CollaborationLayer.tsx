@@ -25,7 +25,7 @@ export function CollaborationLayer({
 
     const container = cursor.documentId
       ? (document.querySelector(
-          `[data-doc-id="${cursor.documentId}"]`,
+          `[data-doc-id="${cursor.documentId}"] .document-content`,
         ) as HTMLElement | null)
       : null
 
@@ -37,9 +37,13 @@ export function CollaborationLayer({
           const containerRect = container.getBoundingClientRect()
           const left = coords.left - containerRect.left
           const top = coords.top - containerRect.top
+          const caretHeight = Math.max(2, coords.bottom - coords.top)
           return createPortal(
             <div key={userId} className="absolute" style={{ left, top }}>
-              <div className="h-5 w-0.5" style={{ backgroundColor: user.color }} />
+              <div
+                className="w-0.5"
+                style={{ backgroundColor: user.color, height: caretHeight }}
+              />
               <div
                 className="-mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
                 style={{ backgroundColor: user.color }}
