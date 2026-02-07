@@ -55,6 +55,7 @@ export function useProjectState({
       storedState?.coreCategoryId,
   )
   const projectUpdatedAtRef = useRef<number>(storedState?.updatedAt ?? 0)
+  const hasLocalProjectUpdateRef = useRef(false)
   const didInitRef = useRef(false)
 
   const documentState = useDocumentState({
@@ -255,6 +256,7 @@ export function useProjectState({
     const nextUpdatedAt = Date.now()
     if (nextUpdatedAt === projectUpdatedAtRef.current) return
     projectUpdatedAtRef.current = nextUpdatedAt
+    hasLocalProjectUpdateRef.current = true
   }, [
     codes,
     categories,
@@ -268,11 +270,13 @@ export function useProjectState({
   ])
 
   const { ydoc } = useYjsSync({
+    documents,
     codes,
     categories,
     memos,
     theoryHtml,
     coreCategoryId,
+    setDocuments,
     setCodes,
     setCategories,
     setMemos,
@@ -335,6 +339,7 @@ export function useProjectState({
     coreCategoryId,
     theoryHtml,
     projectUpdatedAtRef,
+    hasLocalProjectUpdateRef,
     setDocuments,
     setCodes,
     setCategories,

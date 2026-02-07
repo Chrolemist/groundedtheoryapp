@@ -21,6 +21,7 @@ type UseProjectCollaborationSyncArgs = {
   coreCategoryId: string
   theoryHtml: string
   projectUpdatedAtRef: MutableRefObject<number>
+  hasLocalProjectUpdateRef: MutableRefObject<boolean>
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
   setCodes: Dispatch<SetStateAction<Code[]>>
   setCategories: Dispatch<SetStateAction<Category[]>>
@@ -50,6 +51,7 @@ export function useProjectCollaborationSync({
   coreCategoryId,
   theoryHtml,
   projectUpdatedAtRef,
+  hasLocalProjectUpdateRef,
   setDocuments,
   setCodes,
   setCategories,
@@ -87,7 +89,7 @@ export function useProjectCollaborationSync({
 
     const hydrated = hydrateRemoteProject(project, getReadableTextColor)
 
-    setDocuments((prev) => hydrated.documents.length ? hydrated.documents : prev)
+    setDocuments(hydrated.documents)
     if (hydrated.codes.length) setCodes(hydrated.codes)
     if (hydrated.categories.length) setCategories(hydrated.categories)
     if (hydrated.memos) setMemos(hydrated.memos)
@@ -140,6 +142,21 @@ export function useProjectCollaborationSync({
 
   useEffect(() => {
     if (isApplyingRemoteRef.current) return
+    const isEmptyProject =
+      documents.length === 0 &&
+      codes.length === 0 &&
+      categories.length === 0 &&
+      memos.length === 0 &&
+      !coreCategoryId &&
+      !theoryHtml
+    if (isEmptyProject && !hasLocalProjectUpdateRef.current) return
+    hasLocalProjectUpdateRef.current = true
+    let nextUpdatedAt = projectUpdatedAtRef.current
+    if (!nextUpdatedAt) {
+      nextUpdatedAt = Date.now()
+      projectUpdatedAtRef.current = nextUpdatedAt
+    }
+
     const projectRaw = {
       documents,
       codes,
@@ -147,7 +164,7 @@ export function useProjectCollaborationSync({
       memos,
       coreCategoryId,
       theoryHtml,
-      updated_at: projectUpdatedAtRef.current,
+      updated_at: nextUpdatedAt,
     }
     const payload = JSON.stringify(projectRaw)
     if (payload === lastSyncedPayloadRef.current) {
@@ -188,6 +205,7 @@ export function useProjectCollaborationSync({
     coreCategoryId,
     theoryHtml,
     projectUpdatedAtRef,
+    hasLocalProjectUpdateRef,
     sendJson,
     hasRemoteState,
     enableProjectSync,

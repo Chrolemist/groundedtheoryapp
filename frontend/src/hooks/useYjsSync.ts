@@ -12,11 +12,13 @@ import { type Category, type Code, type Memo } from '../types'
 import { useProjectWebSocket } from './useProjectWebSocket'
 
 type UseYjsSyncArgs = {
+  documents: { id: string; title: string; text: string; html: string }[]
   codes: Code[]
   categories: Category[]
   memos: Memo[]
   theoryHtml: string
   coreCategoryId: string
+  setDocuments: Dispatch<SetStateAction<{ id: string; title: string; text: string; html: string }[]>>
   setCodes: Dispatch<SetStateAction<Code[]>>
   setCategories: Dispatch<SetStateAction<Category[]>>
   setMemos: Dispatch<SetStateAction<Memo[]>>
@@ -25,6 +27,7 @@ type UseYjsSyncArgs = {
   isApplyingRemoteRef: MutableRefObject<boolean>
 }
 
+type DocumentMapValue = Y.Text
 type CodeMapValue = Y.Text
 type CategoryMapValue = Y.Text | Y.Array<string>
 type MemoMapValue = Y.Text
@@ -79,11 +82,13 @@ const normalizeOrder = (order: string[], ids: string[]) => {
 }
 
 export function useYjsSync({
+  documents,
   codes,
   categories,
   memos,
   theoryHtml,
   coreCategoryId,
+  setDocuments,
   setCodes,
   setCategories,
   setMemos,
@@ -92,6 +97,8 @@ export function useYjsSync({
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
   const [ydoc] = useState(() => new Y.Doc())
+  const documentsMapRef = useRef<Y.Map<Y.Map<DocumentMapValue>> | null>(null)
+  const documentsOrderRef = useRef<Y.Array<string> | null>(null)
   const codesMapRef = useRef<Y.Map<Y.Map<CodeMapValue>> | null>(null)
   const codesOrderRef = useRef<Y.Array<string> | null>(null)
   const categoriesMapRef = useRef<Y.Map<Y.Map<CategoryMapValue>> | null>(null)
@@ -164,6 +171,29 @@ export function useYjsSync({
     })
   }, [])
 
+  const readDocumentsFromYjs = useCallback(
+    (current: { id: string; title: string; text: string; html: string }[]) => {
+      const documentsMap = documentsMapRef.current
+      const order = documentsOrderRef.current
+      if (!documentsMap) return current
+      const ids = Array.from(documentsMap.keys())
+      if (!ids.length) return []
+      const orderedIds = normalizeOrder(order?.toArray() ?? [], ids)
+      const currentById = new Map(current.map((doc) => [doc.id, doc]))
+      return orderedIds.map((id) => {
+        const map = documentsMap.get(id)
+        const fallback = currentById.get(id)
+        return {
+          id,
+          title: (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? '',
+          text: fallback?.text ?? '',
+          html: fallback?.html ?? '',
+        }
+      })
+    },
+    [],
+  )
+
   const readCategoriesFromYjs = useCallback((current: Category[]) => {
     const categoriesMap = categoriesMapRef.current
     const order = categoriesOrderRef.current
@@ -228,13 +258,28 @@ export function useYjsSync({
   }, [])
 
   const refreshFromYjs = useCallback(() => {
+    const documentsMap = documentsMapRef.current
     const categoriesMap = categoriesMapRef.current
     const codesMap = codesMapRef.current
     const memosMap = memosMapRef.current
     const theoryText = theoryTextRef.current
     const coreCategoryText = coreCategoryTextRef.current
-    if (!categoriesMap || !codesMap || !memosMap || !theoryText || !coreCategoryText) return
+    if (!documentsMap || !categoriesMap || !codesMap || !memosMap || !theoryText || !coreCategoryText) return
     isApplyingRemoteRef.current = true
+    setDocuments((current) => {
+      const next = readDocumentsFromYjs(current)
+      if (next.length === current.length) {
+        let changed = false
+        for (let i = 0; i < next.length; i += 1) {
+          if (next[i].id !== current[i].id || next[i].title !== current[i].title) {
+            changed = true
+            break
+          }
+        }
+        if (!changed) return current
+      }
+      return next
+    })
     setCodes((current) => {
       const next = readCodesFromYjs(current)
       if (next.length === current.length) {
@@ -323,9 +368,11 @@ export function useYjsSync({
   }, [
     coreCategoryId,
     isApplyingRemoteRef,
+    readDocumentsFromYjs,
     readCategoriesFromYjs,
     readCodesFromYjs,
     readMemosFromYjs,
+    setDocuments,
     setCodes,
     setCategories,
     setCoreCategoryId,
@@ -338,15 +385,29 @@ export function useYjsSync({
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return
     const channel = new BroadcastChannel('gt-yjs')
     broadcastChannelRef.current = channel
+    const clientId = ydoc.clientID
 
     const handleMessage = (event: MessageEvent) => {
-      const data = event.data as { type?: string; update?: string } | undefined
-      if (!data || data.type !== 'yjs:update' || typeof data.update !== 'string') return
-      const decoded = fromBase64(data.update)
-      Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
+      const data = event.data as { type?: string; update?: string; from?: number } | undefined
+      if (!data || typeof data.type !== 'string') return
+      if (data.type === 'yjs:update' && typeof data.update === 'string') {
+        const decoded = fromBase64(data.update)
+        Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
+        return
+      }
+      if (data.type === 'yjs:sync' && typeof data.update === 'string') {
+        const decoded = fromBase64(data.update)
+        Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
+        return
+      }
+      if (data.type === 'yjs:hello' && typeof data.from === 'number' && data.from !== clientId) {
+        const update = Y.encodeStateAsUpdate(ydoc)
+        channel.postMessage({ type: 'yjs:sync', update: toBase64(update), from: clientId })
+      }
     }
 
     channel.addEventListener('message', handleMessage)
+    channel.postMessage({ type: 'yjs:hello', from: clientId })
     return () => {
       channel.removeEventListener('message', handleMessage)
       channel.close()
@@ -370,6 +431,8 @@ export function useYjsSync({
   }, [refreshFromYjs])
 
   useEffect(() => {
+    documentsMapRef.current = ydoc.getMap<Y.Map<DocumentMapValue>>('documents')
+    documentsOrderRef.current = ydoc.getArray<string>('documentsOrder')
     codesMapRef.current = ydoc.getMap<Y.Map<CodeMapValue>>('codes')
     codesOrderRef.current = ydoc.getArray<string>('codesOrder')
     categoriesMapRef.current = ydoc.getMap<Y.Map<CategoryMapValue>>('categories')
@@ -399,17 +462,20 @@ export function useYjsSync({
   // Single effect: ensure every React category is represented in the Yjs map
   // and that mutable Yjs values match React state.
   useEffect(() => {
+    const documentsMap = documentsMapRef.current
+    const documentsOrder = documentsOrderRef.current
     const codesMap = codesMapRef.current
     const codesOrder = codesOrderRef.current
     const categoriesMap = categoriesMapRef.current
     const categoriesOrder = categoriesOrderRef.current
     const memosMap = memosMapRef.current
     const memosOrder = memosOrderRef.current
-    if (!ydoc || !codesMap || !codesOrder || !categoriesMap || !categoriesOrder || !memosMap || !memosOrder) return
+    if (!ydoc || !documentsMap || !documentsOrder || !codesMap || !codesOrder || !categoriesMap || !categoriesOrder || !memosMap || !memosOrder) return
     // Skip syncing React→Yjs when we're applying a remote change to avoid loops
     if (isApplyingRemoteRef.current) return
 
     const hasRemoteData =
+      documentsMap.size > 0 ||
       codesMap.size > 0 ||
       categoriesMap.size > 0 ||
       memosMap.size > 0 ||
@@ -493,6 +559,21 @@ export function useYjsSync({
         }
       }
 
+      const documentIds = documents.map((doc) => doc.id)
+      syncOrder(documentsOrder, documentIds)
+      documents.forEach((doc) => {
+        let map = documentsMap.get(doc.id)
+        if (!map) {
+          map = new Y.Map<DocumentMapValue>()
+          documentsMap.set(doc.id, map)
+        }
+        ensureText(map as Y.Map<Y.Text>, 'title', doc.title)
+      })
+      Array.from(documentsMap.keys()).forEach((id) => {
+        if (documentIds.includes(id)) return
+        documentsMap.delete(id)
+      })
+
       const codeIds = codes.map((code) => code.id)
       syncOrder(codesOrder, codeIds)
       codes.forEach((code) => {
@@ -553,6 +634,7 @@ export function useYjsSync({
       })
     }, LOCAL_ORIGIN)
   }, [
+    documents,
     codes,
     categories,
     memos,

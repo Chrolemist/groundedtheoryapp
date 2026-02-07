@@ -112,55 +112,65 @@ export function useHighlighting({
   }
 
   const applyCodeToSelection = (codeId: string) => {
-    // Find the TipTap editor that currently has a non-collapsed selection.
-    // Because the Apply button uses onMouseDown preventDefault, the editor
-    // never loses focus, so editor.state.selection is always valid.
     let tiptapEditor: Editor | null = null
     let tiptapFrom: number | null = null
     let tiptapTo: number | null = null
-    if (documentEditorInstancesRef) {
-      for (const [, editor] of documentEditorInstancesRef.current.entries()) {
+
+    const storedRange = selectionRangeRef.current
+    const selectionDocumentId = selectionDocumentIdRef.current
+    if (selectionDocumentId) {
+      const editor =
+        documentEditorInstancesRef?.current.get(selectionDocumentId) ||
+        documentEditorInstanceRef?.current
+      if (editor) {
         const { from, to } = editor.state.selection
         if (from !== to) {
           tiptapEditor = editor
           tiptapFrom = from
           tiptapTo = to
-          break
+        } else if (storedRange) {
+          try {
+            if (!editor.view.dom.contains(storedRange.commonAncestorContainer)) {
+              throw new Error('selection-outside-editor')
+            }
+            const start = editor.view.posAtDOM(
+              storedRange.startContainer,
+              storedRange.startOffset,
+            )
+            const end = editor.view.posAtDOM(
+              storedRange.endContainer,
+              storedRange.endOffset,
+            )
+            if (start >= 0 && end >= 0 && start !== end) {
+              tiptapEditor = editor
+              tiptapFrom = Math.min(start, end)
+              tiptapTo = Math.max(start, end)
+            }
+          } catch {
+            // Ignore invalid range mapping.
+          }
         }
       }
     }
-    if (!tiptapEditor && documentEditorInstanceRef?.current) {
-      const { from, to } = documentEditorInstanceRef.current.state.selection
-      if (from !== to) {
-        tiptapEditor = documentEditorInstanceRef.current
-        tiptapFrom = from
-        tiptapTo = to
-      }
-    }
 
-    const storedRange = selectionRangeRef.current
-    const selectionDocumentId = selectionDocumentIdRef.current
-    if (!tiptapEditor && storedRange && selectionDocumentId) {
-      const editor =
-        documentEditorInstancesRef?.current.get(selectionDocumentId) ||
-        documentEditorInstanceRef?.current
-      if (editor) {
-        try {
-          const start = editor.view.posAtDOM(
-            storedRange.startContainer,
-            storedRange.startOffset,
-          )
-          const end = editor.view.posAtDOM(
-            storedRange.endContainer,
-            storedRange.endOffset,
-          )
-          if (start >= 0 && end >= 0 && start !== end) {
+    if (!tiptapEditor) {
+      if (documentEditorInstancesRef) {
+        for (const [, editor] of documentEditorInstancesRef.current.entries()) {
+          const { from, to } = editor.state.selection
+          if (from !== to) {
             tiptapEditor = editor
-            tiptapFrom = Math.min(start, end)
-            tiptapTo = Math.max(start, end)
+            tiptapFrom = from
+            tiptapTo = to
+            break
           }
-        } catch {
-          // Fall back to DOM-only flow below.
+        }
+      }
+      if (!tiptapEditor && documentEditorInstanceRef?.current) {
+        const { from, to } = documentEditorInstanceRef.current.state.selection
+        if (from !== to) {
+          tiptapEditor = documentEditorInstanceRef.current
+          tiptapFrom = from
+          tiptapTo = to
         }
       }
     }
@@ -186,17 +196,50 @@ export function useHighlighting({
         .command(({ tr, state }) => {
           const nodeType = state.schema.nodes.codeHighlight
           if (!nodeType) return false
-          const content = state.doc.cut(resolvedFrom, resolvedTo).content
-          const node = nodeType.create(attrs, content)
-          tr.replaceRangeWith(resolvedFrom, resolvedTo, node)
-          tr.setSelection(TextSelection.create(tr.doc, resolvedFrom + node.nodeSize))
-          return true
+
+          const ranges: Array<{ from: number; to: number }> = []
+          state.doc.nodesBetween(resolvedFrom, resolvedTo, (node, pos) => {
+            if (!node.isTextblock) return
+            const blockFrom = Math.max(resolvedFrom, pos + 1)
+            const blockTo = Math.min(resolvedTo, pos + node.nodeSize - 1)
+            if (blockFrom < blockTo) {
+              ranges.push({ from: blockFrom, to: blockTo })
+            }
+          })
+
+          if (!ranges.length) return false
+
+          for (let index = ranges.length - 1; index >= 0; index -= 1) {
+            const { from: rangeFrom, to: rangeTo } = ranges[index]
+            const mappedFrom = tr.mapping.map(rangeFrom, -1)
+            const mappedTo = tr.mapping.map(rangeTo, 1)
+            if (mappedFrom >= mappedTo) continue
+            const slice = state.doc.slice(rangeFrom, rangeTo).content
+            const fallbackText = state.doc.textBetween(rangeFrom, rangeTo, '\n', '\n')
+            const nodeContent = nodeType.validContent(slice)
+              ? slice
+              : fallbackText
+                ? state.schema.text(fallbackText)
+                : null
+            if (!nodeContent) continue
+            const node = nodeType.create(attrs, nodeContent)
+            tr.replaceRangeWith(mappedFrom, mappedTo, node)
+          }
+
+          const mappedSelection = tr.mapping.map(resolvedTo, 1)
+          tr.setSelection(TextSelection.create(tr.doc, mappedSelection))
+          return tr.docChanged
         })
         .run()
       selectionRangeRef.current = null
       selectionDocumentIdRef.current = null
       return
     }
+
+    if (documentEditorInstancesRef?.current.size || documentEditorInstanceRef?.current) {
+      return
+    }
+
     const selectionRef = window.getSelection()
     if (!storedRange || storedRange.collapsed || !selectionDocumentId) return
 
