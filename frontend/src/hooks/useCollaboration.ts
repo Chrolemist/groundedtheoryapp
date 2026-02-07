@@ -180,13 +180,6 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         const userId = data.userId as string | undefined
         const selection = data.selection as SelectionPresence | undefined
         if (!userId || !selection) return
-        if (window.localStorage.getItem('gt-debug-selection') === 'true') {
-          console.info('[Selection Receive]', {
-            userId,
-            docId: selection.documentId,
-            count: selection.rects?.length ?? 0,
-          })
-        }
         setRemoteSelections((current) => ({ ...current, [userId]: selection }))
         return
       }
@@ -382,13 +375,6 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         const userId = data.userId as string | undefined
         const selection = data.selection as SelectionPresence | undefined
         if (!userId || !selection) return
-        if (window.localStorage.getItem('gt-debug-selection') === 'true') {
-          console.info('[Selection Receive]', {
-            userId,
-            docId: selection.documentId,
-            count: selection.rects?.length ?? 0,
-          })
-        }
         setRemoteSelections((current) => ({ ...current, [userId]: selection }))
         return
       }

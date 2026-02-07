@@ -439,13 +439,6 @@ export function useProjectCollaborationSync({
           .filter((rect) => rect.width > 0 && rect.height > 0)
 
         if (rects.length) {
-          if (window.localStorage.getItem('gt-debug-selection') === 'true') {
-            console.info('[Selection Send]', {
-              docId,
-              count: rects.length,
-              wsEnabled: import.meta.env.VITE_DISABLE_WS !== 'true',
-            })
-          }
           sendJson?.({
             type: 'selection:update',
             selection: {
