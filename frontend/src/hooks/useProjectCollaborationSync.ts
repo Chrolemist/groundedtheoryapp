@@ -64,7 +64,7 @@ export function useProjectCollaborationSync({
 }: UseProjectCollaborationSyncArgs) {
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
-  const lastSyncedPayloadRef = useRef<string | null>(null)
+  const lastSyncedDataRef = useRef<string | null>(null)
   const idlePersistDelayMs = 1200
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const broadcastRef = useRef<BroadcastChannel | null>(null)
@@ -150,27 +150,28 @@ export function useProjectCollaborationSync({
       !coreCategoryId &&
       !theoryHtml
     if (isEmptyProject && !hasLocalProjectUpdateRef.current) return
-    hasLocalProjectUpdateRef.current = true
-    let nextUpdatedAt = projectUpdatedAtRef.current
-    if (!nextUpdatedAt) {
-      nextUpdatedAt = Date.now()
-      projectUpdatedAtRef.current = nextUpdatedAt
-    }
 
-    const projectRaw = {
+    const dataSnapshot = {
       documents,
       codes,
       categories,
       memos,
       coreCategoryId,
       theoryHtml,
-      updated_at: nextUpdatedAt,
     }
-    const payload = JSON.stringify(projectRaw)
-    if (payload === lastSyncedPayloadRef.current) {
+    const dataPayload = JSON.stringify(dataSnapshot)
+    if (dataPayload === lastSyncedDataRef.current) {
       return
     }
-    lastSyncedPayloadRef.current = payload
+    lastSyncedDataRef.current = dataPayload
+    hasLocalProjectUpdateRef.current = true
+    const nextUpdatedAt = Date.now()
+    projectUpdatedAtRef.current = nextUpdatedAt
+
+    const projectRaw = {
+      ...dataSnapshot,
+      updated_at: nextUpdatedAt,
+    }
 
     if (enableProjectSync && hasRemoteState && sendJson) {
       sendJson({

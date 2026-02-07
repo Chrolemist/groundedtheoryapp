@@ -262,7 +262,12 @@ def get_firestore_doc_ref():
 
 def compute_project_hash(project_raw: Dict) -> Optional[str]:
     try:
-        payload = json.dumps(project_raw, sort_keys=True, separators=(",", ":"))
+        if isinstance(project_raw, dict) and "updated_at" in project_raw:
+            sanitized = dict(project_raw)
+            sanitized.pop("updated_at", None)
+        else:
+            sanitized = project_raw
+        payload = json.dumps(sanitized, sort_keys=True, separators=(",", ":"))
     except Exception:
         return None
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

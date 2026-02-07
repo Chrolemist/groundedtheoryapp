@@ -262,11 +262,8 @@ export function useProjectState({
     categories,
     memos,
     documents,
-    activeDocumentId,
-    documentViewMode,
     theoryHtml,
     coreCategoryId,
-    showMemos,
   ])
 
   const { ydoc } = useYjsSync({
