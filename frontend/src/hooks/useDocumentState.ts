@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import type { Editor } from '@tiptap/react'
 import { type Code } from '../types'
 import { type DocumentItem, type DocumentViewMode } from '../components/DashboardLayout.types'
 
@@ -37,7 +38,14 @@ export function useDocumentState({
     () => storedState?.documentViewMode ?? 'single',
   )
   const documentEditorRef = useRef<HTMLDivElement | null>(null)
+  const documentEditorInstanceRef = useRef<Editor | null>(null)
+  const documentEditorInstancesRef = useRef(new Map<string, Editor>())
   const lastEditDocumentIdRef = useRef<string | null>(null)
+  const isTipTapActive = (node?: HTMLDivElement | null) =>
+    documentEditorInstancesRef.current.size > 0 ||
+    !!documentEditorInstanceRef.current ||
+    node?.dataset.editor === 'tiptap' ||
+    !!node?.querySelector('.ProseMirror')
   const [documentLineHeight, setDocumentLineHeight] = useState('1.75')
   const [documentFontFamily, setDocumentFontFamily] = useState('Inter, ui-sans-serif, system-ui')
   const [documentFontFamilyDisplay, setDocumentFontFamilyDisplay] = useState(
@@ -184,7 +192,7 @@ export function useDocumentState({
 
   const syncEditorForCodes = (nextCodeMap: Map<string, Code>) => {
     const editor = documentEditorRef.current
-    if (!editor) return
+    if (!editor || isTipTapActive(editor)) return
     const container = document.createElement('div')
     container.innerHTML = editor.innerHTML
     applyCodeStylesToContainer(container, nextCodeMap)
@@ -199,7 +207,7 @@ export function useDocumentState({
 
   const applyCodeStylesToEditor = (nextCodeMap: Map<string, Code>) => {
     const editor = documentEditorRef.current
-    if (!editor) return
+    if (!editor || isTipTapActive(editor)) return
     const container = document.createElement('div')
     container.innerHTML = editor.innerHTML
     applyCodeStylesToContainer(container, nextCodeMap)
@@ -221,6 +229,13 @@ export function useDocumentState({
   useEffect(() => {
     if (documentViewMode !== 'single') {
       lastEditDocumentIdRef.current = null
+      return
+    }
+    // When a TipTap editor instance exists, skip direct innerHTML manipulation
+    // — TipTap + Yjs manages the content.
+    const hasTipTap = isTipTapActive(documentEditorRef.current)
+    if (hasTipTap) {
+      lastEditDocumentIdRef.current = activeDocumentId
       return
     }
     const editor = documentEditorRef.current
@@ -246,9 +261,17 @@ export function useDocumentState({
     documentViewMode,
     setDocumentViewMode,
     documentEditorRef,
+    documentEditorInstanceRef,
+    documentEditorInstancesRef,
     setDocumentEditorRef: (node: HTMLDivElement | null) => {
       documentEditorRef.current = node
-      if (!node || documentViewMode !== 'single') return
+      // When TipTap editors exist, skip direct innerHTML — TipTap manages content.
+      if (!node) return
+      if (isTipTapActive(node)) {
+        lastEditDocumentIdRef.current = activeDocumentId
+        return
+      }
+      if (documentViewMode !== 'single') return
       const activeDoc = documents.find((doc) => doc.id === activeDocumentId)
       const nextHtml = activeDoc?.html || activeDoc?.text.replace(/\n/g, '<br />') || ''
       const normalizedCurrent = stripMapFocus(node.innerHTML)
@@ -264,6 +287,17 @@ export function useDocumentState({
     setDocumentFontFamily,
     documentFontFamilyDisplay,
     setDocumentFontFamilyDisplay,
+    setDocumentEditorInstance: (documentId: string, editor: Editor | null) => {
+      if (editor) {
+        documentEditorInstanceRef.current = editor
+        documentEditorInstancesRef.current.set(documentId, editor)
+      } else {
+        documentEditorInstancesRef.current.delete(documentId)
+        if (documentEditorInstanceRef.current && documentEditorInstanceRef.current.isDestroyed) {
+          documentEditorInstanceRef.current = null
+        }
+      }
+    },
     updateDocument,
     getDocumentById,
     addNewDocument,

@@ -1,5 +1,4 @@
 import { Plus } from 'lucide-react'
-import { SortableContext } from '@dnd-kit/sortable'
 import { type Category, type Code, type Memo } from '../types'
 import { CodeChip } from './CodeChip'
 import { CategoryCard } from './CategoryCard'
@@ -18,9 +17,11 @@ type AxialCodingPanelProps = {
   onAddCategoryMemo: (categoryId: string, categoryName?: string) => void
   onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
   onRemoveMemo: (memoId: string) => void
+  onMoveCode: (codeId: string, targetId: string) => void
 }
 
 // Axial grouping UI for categories and ungrouped codes.
+// Uses native HTML5 drag-and-drop for guaranteed single-update-on-drop reliability.
 export function AxialCodingPanel({
   categories,
   codes,
@@ -35,7 +36,21 @@ export function AxialCodingPanel({
   onAddCategoryMemo,
   onUpdateMemo,
   onRemoveMemo,
+  onMoveCode,
 }: AxialCodingPanelProps) {
+  const handleUngroupedDragOver = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes('application/x-code-id')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleUngroupedDrop = (event: React.DragEvent) => {
+    event.preventDefault()
+    const codeId = event.dataTransfer.getData('application/x-code-id')
+    if (!codeId) return
+    onMoveCode(codeId, 'ungrouped')
+  }
+
   return (
     <div id="axial-coding-panel" className="space-y-4">
       <div className="flex items-center justify-between">
@@ -52,14 +67,16 @@ export function AxialCodingPanel({
         </button>
       </div>
 
-      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3">
+      <div
+        onDragOver={handleUngroupedDragOver}
+        onDrop={handleUngroupedDrop}
+        className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3"
+      >
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Ungrouped Codes</p>
         <div className="mt-3 flex flex-wrap gap-2">
-          <SortableContext items={ungroupedCodes.map((code) => code.id)}>
-            {ungroupedCodes.map((code) => (
-              <CodeChip key={code.id} code={code} onRemove={onRemoveCode} />
-            ))}
-          </SortableContext>
+          {ungroupedCodes.map((code) => (
+            <CodeChip key={code.id} code={code} onRemove={onRemoveCode} />
+          ))}
         </div>
         {!ungroupedCodes.length && (
           <p className="mt-2 text-xs text-slate-400">All codes are grouped.</p>
@@ -80,6 +97,7 @@ export function AxialCodingPanel({
             onAddMemo={onAddCategoryMemo}
             onUpdateMemo={onUpdateMemo}
             onRemoveMemo={onRemoveMemo}
+            onMoveCode={onMoveCode}
           />
         ))}
       </div>

@@ -1,4 +1,4 @@
-import { type WheelEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from './DashboardLayout.types'
 import { cn } from '../lib/cn'
@@ -423,11 +423,19 @@ export function TreeMapView({
     return `M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`
   }
 
-  const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
-    event.preventDefault()
-    const delta = event.deltaY > 0 ? -0.08 : 0.08
-    setScale((current) => clamp(current + delta, 0.4, 2.4))
-  }
+  useEffect(() => {
+    const node = wrapperRef.current
+    if (!node) return
+    const handleWheel = (event: globalThis.WheelEvent) => {
+      event.preventDefault()
+      const delta = event.deltaY > 0 ? -0.08 : 0.08
+      setScale((current) => clamp(current + delta, 0.4, 2.4))
+    }
+    node.addEventListener('wheel', handleWheel, { passive: false })
+    return () => {
+      node.removeEventListener('wheel', handleWheel)
+    }
+  }, [])
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     setIsPanning(true)
@@ -556,7 +564,6 @@ export function TreeMapView({
       <div
         ref={wrapperRef}
         className="relative mt-4 h-[620px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
-        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}

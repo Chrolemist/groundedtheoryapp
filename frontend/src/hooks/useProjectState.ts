@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem, type DocumentViewMode } from '../components/DashboardLayout.types'
 import { saveStoredProjectState } from '../lib/projectStorage'
@@ -24,6 +24,7 @@ type UseProjectStateArgs = {
     theoryHtml?: string
     coreCategoryId?: string
     showMemos?: boolean
+    updatedAt?: number
   } | null
   sendJson?: (payload: Record<string, unknown>) => void
   hasRemoteState: boolean
@@ -38,10 +39,23 @@ export function useProjectState({
   hasRemoteState,
   persistProject,
 }: UseProjectStateArgs) {
+  const disableLocalStoragePersist = true
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
   const isApplyingRemoteRef = useRef(false)
   const pushHistoryRef = useRef<() => void>(() => {})
+  const removeHighlightsByCodeIdRef = useRef<(codeId: string) => void>(() => {})
+  const clearYjsFragmentsForRemovedCodeRef = useRef<(codeId: string) => void>(() => {})
+  const storedHasData = Boolean(
+    storedState?.codes?.length ||
+      storedState?.categories?.length ||
+      storedState?.documents?.length ||
+      storedState?.memos?.length ||
+      storedState?.theoryHtml ||
+      storedState?.coreCategoryId,
+  )
+  const projectUpdatedAtRef = useRef<number>(storedState?.updatedAt ?? 0)
+  const didInitRef = useRef(false)
 
   const documentState = useDocumentState({
     storedState,
@@ -55,6 +69,9 @@ export function useProjectState({
     setDocuments: documentState.setDocuments,
     syncDocumentsForCodes: documentState.syncDocumentsForCodes,
     syncEditorForCodes: documentState.syncEditorForCodes,
+    removeHighlightsByCodeId: (codeId) => removeHighlightsByCodeIdRef.current(codeId),
+    clearYjsFragmentsForRemovedCode: (codeId) =>
+      clearYjsFragmentsForRemovedCodeRef.current(codeId),
     isApplyingRemoteRef,
   })
 
@@ -66,7 +83,10 @@ export function useProjectState({
     documentViewMode,
     setDocumentViewMode,
     documentEditorRef,
+    documentEditorInstanceRef,
+    documentEditorInstancesRef,
     setDocumentEditorRef,
+    setDocumentEditorInstance,
     documentLineHeight,
     setDocumentLineHeight,
     documentFontFamily,
@@ -76,7 +96,7 @@ export function useProjectState({
     updateDocument,
     getDocumentById,
     addNewDocument,
-    removeDocument,
+    removeDocument: removeDocumentState,
     applyCodeStylesToEditor,
   } = documentState
 
@@ -103,8 +123,6 @@ export function useProjectState({
     categoryStats,
     sharedCodes,
     isTheoryEmpty,
-    sensors,
-    activeCode,
     getReadableTextColor,
     addNewCode,
     updateCode,
@@ -119,8 +137,7 @@ export function useProjectState({
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,
-    handleDragStart,
-    handleDragEnd,
+    moveCodeToCategory,
     theoryEditorRef,
     setTheoryEditorRef,
   } = codingState
@@ -176,6 +193,7 @@ export function useProjectState({
     getClosestRemoveButton,
     applyCodeToSelection,
     removeHighlightSpan,
+    removeHighlightsByCodeId,
     getSelectionDocumentId,
   } = useHighlighting({
     codeById,
@@ -183,7 +201,13 @@ export function useProjectState({
     selectionDocumentIdRef,
     updateDocument,
     pushHistory,
+    documentEditorInstanceRef,
+    documentEditorInstancesRef,
+    activeDocumentId,
   })
+  useEffect(() => {
+    removeHighlightsByCodeIdRef.current = removeHighlightsByCodeId
+  }, [removeHighlightsByCodeId])
 
   useUndoRedoShortcuts({
     onUndo: handleUndo,
@@ -191,6 +215,10 @@ export function useProjectState({
   })
 
   useEffect(() => {
+    if (disableLocalStoragePersist) return
+    if (projectUpdatedAtRef.current === 0 && storedHasData) {
+      projectUpdatedAtRef.current = Date.now()
+    }
     saveStoredProjectState(storageKey, {
       codes,
       categories,
@@ -201,9 +229,33 @@ export function useProjectState({
       theoryHtml,
       coreCategoryId,
       showMemos,
+      updatedAt: projectUpdatedAtRef.current,
     })
   }, [
+    disableLocalStoragePersist,
     storageKey,
+    codes,
+    categories,
+    memos,
+    documents,
+    activeDocumentId,
+    documentViewMode,
+    theoryHtml,
+    coreCategoryId,
+    showMemos,
+    storedHasData,
+  ])
+
+  useEffect(() => {
+    if (isApplyingRemoteRef.current) return
+    if (!didInitRef.current) {
+      didInitRef.current = true
+      return
+    }
+    const nextUpdatedAt = Date.now()
+    if (nextUpdatedAt === projectUpdatedAtRef.current) return
+    projectUpdatedAtRef.current = nextUpdatedAt
+  }, [
     codes,
     categories,
     memos,
@@ -215,8 +267,47 @@ export function useProjectState({
     showMemos,
   ])
 
+  const { ydoc } = useYjsSync({
+    codes,
+    categories,
+    memos,
+    theoryHtml,
+    coreCategoryId,
+    setCodes,
+    setCategories,
+    setMemos,
+    setTheoryHtml,
+    setCoreCategoryId,
+    isApplyingRemoteRef,
+  })
+
+  const handleRemoveDocument = (documentId: string) => {
+    removeDocumentState(documentId)
+    documentEditorInstancesRef.current.delete(documentId)
+    if (ydoc) {
+      const fragment = ydoc.getXmlFragment(documentId)
+      if (fragment.length > 0) fragment.delete(0, fragment.length)
+    }
+  }
+
+  const clearYjsFragmentsForRemovedCode = useCallback((codeId: string) => {
+    if (!ydoc) return
+    const openDocIds = new Set(documentEditorInstancesRef.current.keys())
+    documents.forEach((doc) => {
+      if (openDocIds.has(doc.id)) return
+      if (!doc.html || !doc.html.includes(codeId)) return
+      const fragment = ydoc.getXmlFragment(doc.id)
+      if (fragment.length > 0) fragment.delete(0, fragment.length)
+    })
+  }, [ydoc, documents, documentEditorInstancesRef])
+
+  useEffect(() => {
+    clearYjsFragmentsForRemovedCodeRef.current = clearYjsFragmentsForRemovedCode
+  }, [clearYjsFragmentsForRemovedCode])
+
   useEffect(() => {
     if (documentViewMode !== 'single') return
+    if (ydoc) return
     applyCodeStylesToEditor(codeById)
   }, [
     activeDocumentId,
@@ -224,6 +315,7 @@ export function useProjectState({
     documentViewMode,
     codeById,
     applyCodeStylesToEditor,
+    ydoc,
   ])
 
   const { applyRemoteProject } = useProjectCollaborationSync({
@@ -241,6 +333,7 @@ export function useProjectState({
     memos,
     coreCategoryId,
     theoryHtml,
+    projectUpdatedAtRef,
     setDocuments,
     setCodes,
     setCategories,
@@ -252,18 +345,6 @@ export function useProjectState({
     enableProjectSync: false,
   })
 
-  useYjsSync({
-    documents,
-    categories,
-    theoryHtml,
-    coreCategoryId,
-    setDocuments,
-    setCategories,
-    setTheoryHtml,
-    setCoreCategoryId,
-    isApplyingRemoteRef,
-  })
-
   return {
     documents,
     setDocuments,
@@ -272,8 +353,11 @@ export function useProjectState({
     documentViewMode,
     setDocumentViewMode,
     documentEditorRef,
+    documentEditorInstanceRef,
+    documentEditorInstancesRef,
     theoryEditorRef,
     setDocumentEditorRef,
+    setDocumentEditorInstance,
     setTheoryEditorRef,
     codes,
     setCodes,
@@ -303,14 +387,12 @@ export function useProjectState({
     categoryStats,
     sharedCodes,
     isTheoryEmpty,
-    sensors,
-    activeCode,
     getReadableTextColor,
     applyRemoteProject,
     updateDocument,
     getDocumentById,
     addNewDocument,
-    removeDocument,
+    removeDocument: handleRemoveDocument,
     addNewCode,
     updateCode,
     removeCode,
@@ -324,8 +406,7 @@ export function useProjectState({
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,
-    handleDragStart,
-    handleDragEnd,
+    moveCodeToCategory,
     applyEditorCommand,
     applyDocumentCommand,
     executeEditorCommand,
@@ -337,5 +418,6 @@ export function useProjectState({
     removeHighlightSpan,
     handleUndo,
     handleRedo,
+    ydoc,
   }
 }

@@ -38,6 +38,7 @@ type CodingSidebarProps = {
   onApplyEditorCommand: (command: string, value?: string) => void
   onTheoryInput: (html: string) => void
   onTheoryEditorRef: (node: HTMLDivElement | null) => void
+  onMoveCode: (codeId: string, targetId: string) => void
 }
 
 const tabConfig: Array<{ key: TabKey; label: string; icon: typeof Tag }> = [
@@ -76,6 +77,7 @@ export function CodingSidebar({
   onApplyEditorCommand,
   onTheoryInput,
   onTheoryEditorRef,
+  onMoveCode,
 }: CodingSidebarProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('open')
   const resolvedActiveTab = !showMemos && activeTab === 'memos' ? 'open' : activeTab
@@ -117,13 +119,14 @@ export function CodingSidebar({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           {resolvedActiveTab === 'open' ? (
             <motion.div
               key="open-coding"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="space-y-4"
             >
               <OpenCodingPanel
@@ -143,9 +146,10 @@ export function CodingSidebar({
           ) : resolvedActiveTab === 'axial' ? (
             <motion.div
               key="axial-coding"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="space-y-4"
             >
               <AxialCodingPanel
@@ -162,14 +166,16 @@ export function CodingSidebar({
                 onAddCategoryMemo={onAddCategoryMemo}
                 onUpdateMemo={onUpdateMemo}
                 onRemoveMemo={onRemoveMemo}
+                onMoveCode={onMoveCode}
               />
             </motion.div>
           ) : resolvedActiveTab === 'theory' ? (
             <motion.div
               key="selective-coding"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="space-y-4"
             >
               <SelectiveCodingPanel
@@ -187,9 +193,10 @@ export function CodingSidebar({
           ) : (
             <motion.div
               key="memos"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.12 }}
               className="space-y-4"
             >
               <MemosPanel

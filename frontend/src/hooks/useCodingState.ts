@@ -7,13 +7,6 @@ import {
   type MutableRefObject,
   type SetStateAction,
 } from 'react'
-import {
-  PointerSensor,
-  type DragEndEvent,
-  type DragStartEvent,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 
@@ -30,6 +23,8 @@ type UseCodingStateArgs = {
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
   syncDocumentsForCodes: (current: DocumentItem[], nextCodeMap: Map<string, Code>) => DocumentItem[]
   syncEditorForCodes: (nextCodeMap: Map<string, Code>) => void
+  removeHighlightsByCodeId?: (codeId: string) => void
+  clearYjsFragmentsForRemovedCode?: (codeId: string) => void
   isApplyingRemoteRef?: MutableRefObject<boolean>
 }
 
@@ -40,6 +35,8 @@ export function useCodingState({
   setDocuments,
   syncDocumentsForCodes,
   syncEditorForCodes,
+  removeHighlightsByCodeId,
+  clearYjsFragmentsForRemovedCode,
   isApplyingRemoteRef,
 }: UseCodingStateArgs) {
   const [codes, setCodes] = useState<Code[]>(() => storedState?.codes ?? [])
@@ -71,7 +68,6 @@ export function useCodingState({
   const [theoryHtml, setTheoryHtml] = useState(() => storedState?.theoryHtml ?? '')
   const [showCodeLabels, setShowCodeLabels] = useState(true)
   const [showMemos, setShowMemos] = useState(() => storedState?.showMemos ?? false)
-  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const theoryEditorRef = useRef<HTMLDivElement | null>(null)
 
   const codeById = useMemo(() => {
@@ -117,8 +113,6 @@ export function useCodingState({
   }, [categories, codeById])
 
   const isTheoryEmpty = theoryHtml.replace(/<[^>]*>/g, '').trim().length === 0
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
-  const activeCode = activeDragId ? codeById.get(activeDragId) ?? null : null
 
   const getReadableTextColor = (hex: string) => {
     const value = hex.replace('#', '')
@@ -187,13 +181,18 @@ export function useCodingState({
       })),
     )
 
+    removeHighlightsByCodeId?.(codeId)
+    clearYjsFragmentsForRemovedCode?.(codeId)
+
     setDocuments((current) =>
       current.map((doc) => {
         if (!doc.html) return doc
         const container = document.createElement('div')
         container.innerHTML = doc.html
         container.querySelectorAll(`span[data-code-id="${codeId}"]`).forEach((span) => {
-          span.replaceWith(document.createTextNode(span.textContent ?? ''))
+          const content = span.querySelector('.code-content') as HTMLElement | null
+          const text = content?.textContent ?? span.textContent ?? ''
+          span.replaceWith(document.createTextNode(text))
         })
         return { ...doc, html: container.innerHTML, text: container.innerText }
       }),
@@ -313,26 +312,23 @@ export function useCodingState({
     setCoreCategoryDraft('')
   }
 
-  const handleDragStart = (event: DragStartEvent) => {
-    setActiveDragId(String(event.active.id))
-  }
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setActiveDragId(null)
-    if (!event.over) return
-
-    const targetId = String(event.over.id)
-    if (!targetId.startsWith('category-')) return
-
-    const movedCodeId = String(event.active.id)
-    setCategories((current) =>
-      current.map((category) => {
-        const filtered = category.codeIds.filter((id) => id !== movedCodeId)
-        if (category.id !== targetId) return { ...category, codeIds: filtered }
-        if (filtered.includes(movedCodeId)) return { ...category, codeIds: filtered }
-        return { ...category, codeIds: [...filtered, movedCodeId] }
-      }),
-    )
+  const moveCodeToCategory = (codeId: string, targetId: string) => {
+    if (targetId === 'ungrouped') {
+      setCategories((current) =>
+        current.map((category) => ({
+          ...category,
+          codeIds: category.codeIds.filter((id) => id !== codeId),
+        })),
+      )
+    } else {
+      setCategories((current) =>
+        current.map((category) => {
+          const filtered = category.codeIds.filter((id) => id !== codeId)
+          if (category.id !== targetId) return { ...category, codeIds: filtered }
+          return { ...category, codeIds: [...filtered, codeId] }
+        }),
+      )
+    }
   }
 
   useEffect(() => {
@@ -367,8 +363,6 @@ export function useCodingState({
     categoryStats,
     sharedCodes,
     isTheoryEmpty,
-    sensors,
-    activeCode,
     getReadableTextColor,
     addNewCode,
     updateCode,
@@ -383,8 +377,7 @@ export function useCodingState({
     updateMemo,
     removeMemo,
     handleCreateCoreCategory,
-    handleDragStart,
-    handleDragEnd,
+    moveCodeToCategory,
     theoryEditorRef,
     setTheoryEditorRef: (node: HTMLDivElement | null) => {
       theoryEditorRef.current = node

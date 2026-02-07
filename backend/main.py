@@ -205,6 +205,8 @@ manager = ConnectionManager()
 
 in_memory_project = ProjectState()
 in_memory_project_raw: Dict = {}
+yjs_update_log: List[str] = []
+yjs_update_limit = 200
 
 firestore_client: Optional[firestore.Client] = None
 last_saved_project_hash: Optional[str] = None
@@ -431,6 +433,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             "project_raw": in_memory_project_raw or None,
         }
     )
+    if yjs_update_log:
+        await websocket.send_json({"type": "yjs:sync", "updates": yjs_update_log})
     await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
     try:
         while True:
@@ -467,6 +471,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             elif message_type == "yjs:update" and user_id:
                 update = data.get("update")
                 if update:
+                    yjs_update_log.append(update)
+                    if len(yjs_update_log) > yjs_update_limit:
+                        yjs_update_log[:] = yjs_update_log[-yjs_update_limit:]
                     await manager.broadcast_except(
                         {
                             "type": "yjs:update",

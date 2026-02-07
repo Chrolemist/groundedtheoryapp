@@ -1,4 +1,4 @@
-import { useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 import { hydrateRemoteProject } from '../lib/projectHydration'
@@ -18,6 +18,7 @@ type UseProjectCollaborationSyncArgs = {
   memos: Memo[]
   coreCategoryId: string
   theoryHtml: string
+  projectUpdatedAtRef: MutableRefObject<number>
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
   setCodes: Dispatch<SetStateAction<Code[]>>
   setCategories: Dispatch<SetStateAction<Category[]>>
@@ -45,6 +46,7 @@ export function useProjectCollaborationSync({
   memos,
   coreCategoryId,
   theoryHtml,
+  projectUpdatedAtRef,
   setDocuments,
   setCodes,
   setCategories,
@@ -68,12 +70,18 @@ export function useProjectCollaborationSync({
       }
     }
   }, [])
-  const applyRemoteProject = (project: Record<string, unknown>) => {
+  const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
+    const incomingUpdatedAt =
+      typeof project.updated_at === 'number' ? project.updated_at : 0
+    const shouldApply =
+      incomingUpdatedAt > projectUpdatedAtRef.current || projectUpdatedAtRef.current === 0
+    if (!shouldApply) return
+
     isApplyingRemoteRef.current = true
 
     const hydrated = hydrateRemoteProject(project, getReadableTextColor)
 
-    setDocuments(hydrated.documents.length ? hydrated.documents : documents)
+    setDocuments((prev) => hydrated.documents.length ? hydrated.documents : prev)
     if (hydrated.codes.length) setCodes(hydrated.codes)
     if (hydrated.categories.length) setCategories(hydrated.categories)
     if (hydrated.memos) setMemos(hydrated.memos)
@@ -86,10 +94,23 @@ export function useProjectCollaborationSync({
       setTheoryHtml(hydrated.theoryHtml)
     }
 
+    const nextUpdatedAt = incomingUpdatedAt || Date.now()
+    projectUpdatedAtRef.current = nextUpdatedAt
+
     setTimeout(() => {
       isApplyingRemoteRef.current = false
     }, 0)
-  }
+  }, [
+    getReadableTextColor,
+    isApplyingRemoteRef,
+    projectUpdatedAtRef,
+    setDocuments,
+    setCodes,
+    setCategories,
+    setMemos,
+    setCoreCategoryId,
+    setTheoryHtml,
+  ])
 
   useEffect(() => {
     if (isApplyingRemoteRef.current) return
@@ -100,6 +121,7 @@ export function useProjectCollaborationSync({
       memos,
       coreCategoryId,
       theoryHtml,
+      updated_at: projectUpdatedAtRef.current,
     }
     const payload = JSON.stringify(projectRaw)
     if (payload === lastSyncedPayloadRef.current) {
@@ -132,6 +154,7 @@ export function useProjectCollaborationSync({
     memos,
     coreCategoryId,
     theoryHtml,
+    projectUpdatedAtRef,
     sendJson,
     hasRemoteState,
     isApplyingRemoteRef,

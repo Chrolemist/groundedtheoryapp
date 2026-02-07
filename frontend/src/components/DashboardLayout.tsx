@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DndContext } from '@dnd-kit/core'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
 import { DocumentViewerPanel } from './DocumentViewerPanel'
@@ -13,9 +12,11 @@ import { useProjectIO } from '../hooks/useProjectIO'
 
 export function DashboardLayout() {
   const storageKey = 'grounded-theory-app-state'
-  const storedState = loadStoredProjectState(storageKey)
+  const disableLocalStorage = true
+  const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const remoteLoadedRef = useRef(false)
   const tour = useOnboardingTour()
   const saveSeqRef = useRef(0)
   const [isSaving, setIsSaving] = useState(false)
@@ -115,6 +116,7 @@ export function DashboardLayout() {
   useEffect(() => {
     if (!apiBase) return
     if (hasRemoteState) return
+    if (remoteLoadedRef.current) return
     const controller = new AbortController()
     const loadRemote = async () => {
       try {
@@ -128,6 +130,7 @@ export function DashboardLayout() {
         }
         const projectRaw = data.project_raw ?? data.project
         if (projectRaw) {
+          remoteLoadedRef.current = true
           project.applyRemoteProject(projectRaw)
         }
       } catch {
@@ -138,7 +141,7 @@ export function DashboardLayout() {
     return () => {
       controller.abort()
     }
-  }, [apiBase, hasRemoteState, project.applyRemoteProject])
+  }, [apiBase, hasRemoteState])
 
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))
@@ -152,13 +155,8 @@ export function DashboardLayout() {
   }
 
   return (
-    <DndContext
-      sensors={project.sensors}
-      onDragStart={project.handleDragStart}
-      onDragEnd={project.handleDragEnd}
-    >
-      <div className="min-h-screen bg-slate-50 text-slate-900">
-        <OnboardingTour
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <OnboardingTour
           key={tour.runId}
           run={tour.run}
           runId={tour.runId}
@@ -204,6 +202,7 @@ export function DashboardLayout() {
             coreCategoryId={project.coreCategoryId}
             showMemos={project.showMemos}
             theoryHtml={project.theoryHtml}
+            ydoc={project.ydoc}
             activeDocumentId={project.activeDocumentId}
             documentViewMode={project.documentViewMode}
             onDocumentViewModeChange={project.setDocumentViewMode}
@@ -220,7 +219,7 @@ export function DashboardLayout() {
             onDocumentLineHeightChange={project.setDocumentLineHeight}
             showCodeLabels={project.showCodeLabels}
             onDocumentInput={(documentId, patch) => project.updateDocument(documentId, patch)}
-            onDocumentCommand={project.applyDocumentCommand}
+            onEditorReady={project.setDocumentEditorInstance}
             onHighlightMouseDown={project.handleHighlightMouseDown}
             onHighlightMouseUp={project.handleSelection}
             onHighlightClick={(event) => {
@@ -228,9 +227,10 @@ export function DashboardLayout() {
               if (!removeButton) return
               const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
               if (!highlight) return
+              const handled = project.removeHighlightSpan(highlight)
+              if (!handled) return
               event.preventDefault()
               event.stopPropagation()
-              project.removeHighlightSpan(highlight)
             }}
             onEditorRef={project.setDocumentEditorRef}
           />
@@ -263,6 +263,7 @@ export function DashboardLayout() {
             onApplyEditorCommand={project.applyEditorCommand}
             onTheoryInput={project.setTheoryHtml}
             onTheoryEditorRef={project.setTheoryEditorRef}
+            onMoveCode={project.moveCodeToCategory}
           />
         </main>
 
@@ -270,9 +271,7 @@ export function DashboardLayout() {
           remoteCursors={remoteCursors}
           presenceById={presenceById}
           localUser={localUser}
-          activeCode={project.activeCode}
         />
       </div>
-    </DndContext>
   )
 }

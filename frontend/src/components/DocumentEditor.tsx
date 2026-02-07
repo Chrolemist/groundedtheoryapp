@@ -1,13 +1,21 @@
-import { type FormEvent } from 'react'
+import { useEffect } from 'react'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import Collaboration from '@tiptap/extension-collaboration'
+import Underline from '@tiptap/extension-underline'
+import { CodeHighlight } from '../tiptap/CodeHighlight'
+import type * as Y from 'yjs'
 
 type DocumentEditorProps = {
-  onCommand: (command: string, value?: string) => void
-  onInput: (event: FormEvent<HTMLDivElement>) => void
-  onPaste: (event: React.ClipboardEvent<HTMLDivElement>) => void
+  documentId: string
+  initialHtml: string
+  onUpdate: (html: string, text: string) => void
+  onEditorReady: (documentId: string, editor: ReturnType<typeof useEditor> | null) => void
   onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseUp?: (event: React.MouseEvent<HTMLDivElement>) => void
   onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
   editorRef: (node: HTMLDivElement | null) => void
+  ydoc: Y.Doc
   fontFamily: string
   fontFamilyValue: string
   lineHeight: string
@@ -16,32 +24,101 @@ type DocumentEditorProps = {
 }
 
 export function DocumentEditor({
-  onCommand,
-  onInput,
-  onPaste,
+  documentId,
+  initialHtml,
+  onUpdate,
+  onEditorReady,
   onMouseDown,
   onMouseUp,
   onClick,
   editorRef,
+  ydoc,
   fontFamily,
   fontFamilyValue,
   lineHeight,
   setFontFamily,
   setLineHeight,
 }: DocumentEditorProps) {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({ history: false }),
+      Underline,
+      CodeHighlight,
+      Collaboration.configure({
+        document: ydoc,
+        field: documentId,
+      }),
+    ],
+    content: '',
+    onUpdate: ({ editor }) => {
+      onUpdate(editor.getHTML(), editor.getText())
+    },
+  })
+
+  useEffect(() => {
+    onEditorReady(documentId, editor)
+    return () => {
+      onEditorReady(documentId, null)
+    }
+  }, [documentId, editor, onEditorReady])
+
+  useEffect(() => {
+    if (!editor) return
+    const fragment = ydoc.getXmlFragment(documentId)
+    if (fragment.toString().length === 0 && initialHtml) {
+      editor.commands.setContent(initialHtml, false)
+    }
+  }, [editor, documentId, initialHtml, ydoc])
+
+  const runCommand = (command: string, value?: string) => {
+    if (!editor) return
+    const chain = editor.chain().focus()
+    switch (command) {
+      case 'bold':
+        chain.toggleBold().run()
+        break
+      case 'italic':
+        chain.toggleItalic().run()
+        break
+      case 'underline':
+        chain.toggleUnderline?.().run()
+        break
+      case 'fontSize':
+        break
+      case 'foreColor':
+        break
+      default:
+        break
+    }
+    if (value) {
+      void value
+    }
+  }
+
+  const handleMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (editor && event.target === event.currentTarget) {
+      editor.commands.focus('end')
+    }
+    onMouseDown?.(event)
+  }
+
+  const handleMouseUp = (event: React.MouseEvent<HTMLDivElement>) => {
+    onMouseUp?.(event)
+  }
+
   return (
-    <div className="rounded-xl border border-slate-200 bg-white">
+    <div className="rounded-xl bg-white">
       <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
         <button
           type="button"
-          onClick={() => onCommand('bold')}
+          onClick={() => runCommand('bold')}
           className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
         >
           Bold
         </button>
         <button
           type="button"
-          onClick={() => onCommand('italic')}
+          onClick={() => runCommand('italic')}
           className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
         >
           Italic
@@ -49,7 +126,7 @@ export function DocumentEditor({
         <select
           id="doc-font-size"
           name="doc-font-size"
-          onChange={(event) => onCommand('fontSize', event.target.value)}
+          onChange={(event) => runCommand('fontSize', event.target.value)}
           className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
           defaultValue="3"
         >
@@ -102,17 +179,15 @@ export function DocumentEditor({
           <option value="2">Loose</option>
         </select>
       </div>
-      <div
-        ref={editorRef}
+      <EditorContent
+        editor={editor}
         className="document-content min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
         style={{ fontFamily, lineHeight }}
-        contentEditable
+        data-editor="tiptap"
+        ref={editorRef}
         spellCheck={false}
-        suppressContentEditableWarning
-        onInput={onInput}
-        onPaste={onPaste}
-        onMouseDown={onMouseDown}
-        onMouseUp={onMouseUp}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
         onClick={onClick}
       />
     </div>

@@ -69,6 +69,7 @@ export function OpenCodingPanel({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => onApplyCode(code.id)}
                   className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
                   style={{

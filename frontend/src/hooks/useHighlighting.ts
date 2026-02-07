@@ -1,4 +1,6 @@
-import { type MouseEvent, type MutableRefObject } from 'react'
+import { useEffect, type MouseEvent, type MutableRefObject } from 'react'
+import type { Editor } from '@tiptap/react'
+import { TextSelection } from '@tiptap/pm/state'
 import { type Code } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 
@@ -8,6 +10,9 @@ type UseHighlightingArgs = {
   selectionDocumentIdRef: MutableRefObject<string | null>
   updateDocument: (documentId: string, patch: Partial<DocumentItem>) => void
   pushHistory: () => void
+  documentEditorInstanceRef?: MutableRefObject<Editor | null>
+  documentEditorInstancesRef?: MutableRefObject<Map<string, Editor>>
+  activeDocumentId?: string
 }
 
 // Selection tracking and highlight rendering for document codes.
@@ -17,6 +22,9 @@ export function useHighlighting({
   selectionDocumentIdRef,
   updateDocument,
   pushHistory,
+  documentEditorInstanceRef,
+  documentEditorInstancesRef,
+  activeDocumentId,
 }: UseHighlightingArgs) {
   const placeCaretInContent = (content: HTMLElement, event?: MouseEvent<HTMLElement>) => {
     const selection = window.getSelection()
@@ -54,6 +62,28 @@ export function useHighlighting({
     return container?.getAttribute('data-doc-id') ?? null
   }
 
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selectionRef = window.getSelection()
+      if (!selectionRef || selectionRef.isCollapsed) return
+
+      const range = selectionRef.getRangeAt(0)
+      const text = selectionRef.toString().trim()
+      if (!text) return
+
+      const docId = getSelectionDocumentId(range)
+      if (!docId) return
+
+      selectionRangeRef.current = range.cloneRange()
+      selectionDocumentIdRef.current = docId
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+    }
+  }, [selectionDocumentIdRef, selectionRangeRef])
+
   const handleSelection = () => {
     const selectionRef = window.getSelection()
     if (!selectionRef || selectionRef.isCollapsed) {
@@ -68,8 +98,11 @@ export function useHighlighting({
     if (!text) {
       return
     }
+    const docId = getSelectionDocumentId(range)
+    if (!docId) return
+
     selectionRangeRef.current = range.cloneRange()
-    selectionDocumentIdRef.current = getSelectionDocumentId(range)
+    selectionDocumentIdRef.current = docId
   }
 
   const getClosestRemoveButton = (target: EventTarget | null) => {
@@ -79,9 +112,92 @@ export function useHighlighting({
   }
 
   const applyCodeToSelection = (codeId: string) => {
-    const selectionRef = window.getSelection()
+    // Find the TipTap editor that currently has a non-collapsed selection.
+    // Because the Apply button uses onMouseDown preventDefault, the editor
+    // never loses focus, so editor.state.selection is always valid.
+    let tiptapEditor: Editor | null = null
+    let tiptapFrom: number | null = null
+    let tiptapTo: number | null = null
+    if (documentEditorInstancesRef) {
+      for (const [, editor] of documentEditorInstancesRef.current.entries()) {
+        const { from, to } = editor.state.selection
+        if (from !== to) {
+          tiptapEditor = editor
+          tiptapFrom = from
+          tiptapTo = to
+          break
+        }
+      }
+    }
+    if (!tiptapEditor && documentEditorInstanceRef?.current) {
+      const { from, to } = documentEditorInstanceRef.current.state.selection
+      if (from !== to) {
+        tiptapEditor = documentEditorInstanceRef.current
+        tiptapFrom = from
+        tiptapTo = to
+      }
+    }
+
     const storedRange = selectionRangeRef.current
     const selectionDocumentId = selectionDocumentIdRef.current
+    if (!tiptapEditor && storedRange && selectionDocumentId) {
+      const editor =
+        documentEditorInstancesRef?.current.get(selectionDocumentId) ||
+        documentEditorInstanceRef?.current
+      if (editor) {
+        try {
+          const start = editor.view.posAtDOM(
+            storedRange.startContainer,
+            storedRange.startOffset,
+          )
+          const end = editor.view.posAtDOM(
+            storedRange.endContainer,
+            storedRange.endOffset,
+          )
+          if (start >= 0 && end >= 0 && start !== end) {
+            tiptapEditor = editor
+            tiptapFrom = Math.min(start, end)
+            tiptapTo = Math.max(start, end)
+          }
+        } catch {
+          // Fall back to DOM-only flow below.
+        }
+      }
+    }
+
+    if (tiptapEditor) {
+      const codeToApply = codeById.get(codeId)
+      if (!codeToApply) return
+      const { from, to } = tiptapEditor.state.selection
+      const resolvedFrom = tiptapFrom ?? from
+      const resolvedTo = tiptapTo ?? to
+      if (resolvedFrom === resolvedTo) return
+      const attrs = {
+        codeId: codeToApply.id,
+        label: codeToApply.label,
+        colorHex: codeToApply.colorHex ?? '#E2E8F0',
+        textHex: codeToApply.textHex ?? '#334155',
+        ringHex: codeToApply.ringHex ?? 'rgba(148,163,184,0.4)',
+      }
+
+      tiptapEditor
+        .chain()
+        .focus()
+        .command(({ tr, state }) => {
+          const nodeType = state.schema.nodes.codeHighlight
+          if (!nodeType) return false
+          const content = state.doc.cut(resolvedFrom, resolvedTo).content
+          const node = nodeType.create(attrs, content)
+          tr.replaceRangeWith(resolvedFrom, resolvedTo, node)
+          tr.setSelection(TextSelection.create(tr.doc, resolvedFrom + node.nodeSize))
+          return true
+        })
+        .run()
+      selectionRangeRef.current = null
+      selectionDocumentIdRef.current = null
+      return
+    }
+    const selectionRef = window.getSelection()
     if (!storedRange || storedRange.collapsed || !selectionDocumentId) return
 
     const codeToApply = codeById.get(codeId)
@@ -208,6 +324,9 @@ export function useHighlighting({
   }
 
   const removeHighlightSpan = (element: HTMLElement) => {
+    if (documentEditorInstancesRef?.current.size || documentEditorInstanceRef?.current) {
+      return false
+    }
     pushHistory()
     const container = element.closest('[data-doc-id]') as HTMLElement | null
     const documentId = container?.getAttribute('data-doc-id') ?? null
@@ -223,6 +342,54 @@ export function useHighlighting({
         text: documentContent.innerText,
       })
     }
+    return true
+  }
+
+  const removeHighlightsByCodeId = (codeId: string) => {
+    const removeFromEditor = (editor: Editor) => {
+      const { state, view } = editor
+      const ranges: Array<{ from: number; to: number; text: string }> = []
+      state.doc.descendants((node, pos) => {
+        if (node.type.name !== 'codeHighlight') return
+        if (node.attrs.codeId !== codeId) return
+        ranges.push({ from: pos, to: pos + node.nodeSize, text: node.textContent || '' })
+      })
+
+      if (!ranges.length) return false
+      let tr = state.tr
+      for (let index = ranges.length - 1; index >= 0; index -= 1) {
+        const { from, to, text } = ranges[index]
+        if (text) {
+          tr = tr.replaceWith(from, to, state.schema.text(text))
+        } else {
+          tr = tr.delete(from, to)
+        }
+      }
+      if (tr.docChanged) view.dispatch(tr)
+      return tr.docChanged
+    }
+
+    let changed = false
+    if (documentEditorInstancesRef?.current.size) {
+      documentEditorInstancesRef.current.forEach((editor, docId) => {
+        if (removeFromEditor(editor)) {
+          changed = true
+          updateDocument(docId, { html: editor.getHTML(), text: editor.getText() })
+        }
+      })
+    }
+    if (documentEditorInstanceRef?.current) {
+      if (removeFromEditor(documentEditorInstanceRef.current)) {
+        changed = true
+        if (activeDocumentId) {
+          updateDocument(activeDocumentId, {
+            html: documentEditorInstanceRef.current.getHTML(),
+            text: documentEditorInstanceRef.current.getText(),
+          })
+        }
+      }
+    }
+    return changed
   }
 
   return {
@@ -231,6 +398,7 @@ export function useHighlighting({
     getClosestRemoveButton,
     applyCodeToSelection,
     removeHighlightSpan,
+    removeHighlightsByCodeId,
     getSelectionDocumentId,
   }
 }

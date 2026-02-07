@@ -1,6 +1,4 @@
 import { useState } from 'react'
-import { useDroppable } from '@dnd-kit/core'
-import { SortableContext } from '@dnd-kit/sortable'
 import { ChevronDown, ChevronUp, FileText, Plus, Trash2 } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { type Category, type Code, type Memo } from '../types'
@@ -18,6 +16,7 @@ export function CategoryCard({
   onAddMemo,
   onUpdateMemo,
   onRemoveMemo,
+  onMoveCode,
 }: {
   category: Category
   codes: Code[]
@@ -29,12 +28,22 @@ export function CategoryCard({
   onAddMemo: (categoryId: string, categoryName?: string) => void
   onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
   onRemoveMemo: (memoId: string) => void
+  onMoveCode: (codeId: string, targetId: string) => void
 }) {
-  const { isOver, setNodeRef } = useDroppable({
-    id: category.id,
-  })
-
   const [isExpanded, setIsExpanded] = useState(false)
+
+  const handleDragOver = (event: React.DragEvent) => {
+    if (!event.dataTransfer.types.includes('application/x-code-id')) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+  }
+
+  const handleDrop = (event: React.DragEvent) => {
+    event.preventDefault()
+    const codeId = event.dataTransfer.getData('application/x-code-id')
+    if (!codeId) return
+    onMoveCode(codeId, category.id)
+  }
 
   const assignedCodes = category.codeIds
     .map((codeId) => codes.find((code) => code.id === codeId))
@@ -45,10 +54,10 @@ export function CategoryCard({
 
   return (
     <div
-      ref={setNodeRef}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
       className={cn(
         'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition',
-        isOver && 'border-slate-400 bg-slate-50',
       )}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -96,15 +105,13 @@ export function CategoryCard({
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {assignedCodes.length ? (
-          <SortableContext items={assignedCodes.map((code) => code.id)}>
-            {assignedCodes.map((code) => (
-              <CodeChip
-                key={code.id}
-                code={code}
-                onRemove={(codeId) => onRemoveCode(category.id, codeId)}
-              />
-            ))}
-          </SortableContext>
+          assignedCodes.map((code) => (
+            <CodeChip
+              key={code.id}
+              code={code}
+              onRemove={(codeId) => onRemoveCode(category.id, codeId)}
+            />
+          ))
         ) : (
           <span className="text-xs text-slate-400">Drop codes here</span>
         )}

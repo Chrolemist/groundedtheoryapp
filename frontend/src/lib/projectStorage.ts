@@ -11,6 +11,7 @@ type StoredProjectState = {
   theoryHtml?: string
   coreCategoryId?: string
   showMemos?: boolean
+  updatedAt?: number
 }
 
 export const loadStoredProjectState = (storageKey: string): StoredProjectState | null => {

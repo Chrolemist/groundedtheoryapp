@@ -1,7 +1,4 @@
-import { motion } from 'framer-motion'
 import { Tag, Trash2 } from 'lucide-react'
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import { cn } from '../lib/cn'
 import { type Code } from '../types'
 
@@ -12,33 +9,25 @@ export function CodeChip({
   code: Code
   onRemove?: (codeId: string) => void
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: code.id,
-  })
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const handleDragStart = (event: React.DragEvent<HTMLSpanElement>) => {
+    event.dataTransfer.setData('application/x-code-id', code.id)
+    event.dataTransfer.effectAllowed = 'move'
   }
 
   return (
-    <motion.span
-      ref={setNodeRef}
+    <span
+      draggable
+      onDragStart={handleDragStart}
       style={{
-        ...style,
         backgroundColor: code.colorHex ?? undefined,
         color: code.textHex ?? undefined,
         boxShadow: code.ringHex
           ? `inset 0 0 0 1px ${code.ringHex}`
           : undefined,
       }}
-      {...attributes}
-      {...listeners}
-      whileHover={{ y: -2 }}
       className={cn(
-        'inline-flex cursor-grab items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset shadow-sm transition',
+        'inline-flex cursor-grab items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset shadow-sm transition-colors',
         code.colorClass,
-        isDragging && 'opacity-60',
       )}
     >
       <Tag className="h-3 w-3" />
@@ -56,6 +45,6 @@ export function CodeChip({
           <Trash2 className="h-3 w-3" />
         </button>
       )}
-    </motion.span>
+    </span>
   )
 }

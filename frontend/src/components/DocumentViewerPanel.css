@@ -21,6 +21,11 @@
   white-space: pre-wrap;
 }
 
+.document-content .ProseMirror {
+  outline: none;
+  border: none;
+}
+
 .document-content span[data-code-id] {
   white-space: pre-wrap;
 }
