@@ -56,7 +56,10 @@ export function useProjectState({
   )
   const projectUpdatedAtRef = useRef<number>(storedState?.updatedAt ?? 0)
   const hasLocalProjectUpdateRef = useRef(false)
-  const didInitRef = useRef(false)
+  const markLocalChange = useCallback(() => {
+    if (isApplyingRemoteRef.current) return
+    hasLocalProjectUpdateRef.current = true
+  }, [isApplyingRemoteRef])
 
   const documentState = useDocumentState({
     storedState,
@@ -101,6 +104,40 @@ export function useProjectState({
     applyCodeStylesToEditor,
   } = documentState
 
+  const shouldMarkDocumentChange = () => {
+    if (typeof document === 'undefined') return true
+    const active = document.activeElement
+    if (!active) return true
+    if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return true
+    if (active instanceof HTMLElement && active.isContentEditable) return true
+    if (active instanceof HTMLElement && active.closest('.document-content')) return true
+    if (active instanceof HTMLElement && active.closest('.ProseMirror')) return true
+    return false
+  }
+
+  const updateDocumentWithDirty = useCallback(
+    (documentId: string, patch: Partial<DocumentItem>) => {
+      if (shouldMarkDocumentChange()) {
+        markLocalChange()
+      }
+      updateDocument(documentId, patch)
+    },
+    [markLocalChange, updateDocument],
+  )
+
+  const addNewDocumentWithDirty = useCallback(() => {
+    markLocalChange()
+    addNewDocument()
+  }, [addNewDocument, markLocalChange])
+
+  const removeDocumentWithDirty = useCallback(
+    (documentId: string) => {
+      markLocalChange()
+      removeDocumentState(documentId)
+    },
+    [markLocalChange, removeDocumentState],
+  )
+
   const {
     codes,
     setCodes,
@@ -142,6 +179,122 @@ export function useProjectState({
     theoryEditorRef,
     setTheoryEditorRef,
   } = codingState
+
+  const addNewCodeWithDirty = useCallback(() => {
+    markLocalChange()
+    addNewCode()
+  }, [addNewCode, markLocalChange])
+
+  const updateCodeWithDirty = useCallback(
+    (codeId: string, patch: Partial<Code>) => {
+      markLocalChange()
+      updateCode(codeId, patch)
+    },
+    [markLocalChange, updateCode],
+  )
+
+  const removeCodeWithDirty = useCallback(
+    (codeId: string) => {
+      markLocalChange()
+      removeCode(codeId)
+    },
+    [markLocalChange, removeCode],
+  )
+
+  const updateCategoryWithDirty = useCallback(
+    (categoryId: string, patch: Partial<Category>) => {
+      markLocalChange()
+      updateCategory(categoryId, patch)
+    },
+    [markLocalChange, updateCategory],
+  )
+
+  const handleAddCategoryWithDirty = useCallback(() => {
+    markLocalChange()
+    handleAddCategory()
+  }, [handleAddCategory, markLocalChange])
+
+  const removeCategoryWithDirty = useCallback(
+    (categoryId: string) => {
+      markLocalChange()
+      removeCategory(categoryId)
+    },
+    [markLocalChange, removeCategory],
+  )
+
+  const removeCodeFromCategoryWithDirty = useCallback(
+    (categoryId: string, codeId: string) => {
+      markLocalChange()
+      removeCodeFromCategory(categoryId, codeId)
+    },
+    [markLocalChange, removeCodeFromCategory],
+  )
+
+  const handleAddGlobalMemoWithDirty = useCallback(() => {
+    markLocalChange()
+    handleAddGlobalMemo()
+  }, [handleAddGlobalMemo, markLocalChange])
+
+  const handleAddCodeMemoWithDirty = useCallback(
+    (codeId: string, codeLabel?: string) => {
+      markLocalChange()
+      handleAddCodeMemo(codeId, codeLabel)
+    },
+    [handleAddCodeMemo, markLocalChange],
+  )
+
+  const handleAddCategoryMemoWithDirty = useCallback(
+    (categoryId: string, categoryName?: string) => {
+      markLocalChange()
+      handleAddCategoryMemo(categoryId, categoryName)
+    },
+    [handleAddCategoryMemo, markLocalChange],
+  )
+
+  const updateMemoWithDirty = useCallback(
+    (memoId: string, patch: Partial<Memo>) => {
+      markLocalChange()
+      updateMemo(memoId, patch)
+    },
+    [markLocalChange, updateMemo],
+  )
+
+  const removeMemoWithDirty = useCallback(
+    (memoId: string) => {
+      markLocalChange()
+      removeMemo(memoId)
+    },
+    [markLocalChange, removeMemo],
+  )
+
+  const handleCreateCoreCategoryWithDirty = useCallback(() => {
+    markLocalChange()
+    handleCreateCoreCategory()
+  }, [handleCreateCoreCategory, markLocalChange])
+
+  const moveCodeToCategoryWithDirty = useCallback(
+    (codeId: string, targetId: string) => {
+      markLocalChange()
+      moveCodeToCategory(codeId, targetId)
+    },
+    [markLocalChange, moveCodeToCategory],
+  )
+
+  const setTheoryHtmlWithDirty = useCallback(
+    (html: string) => {
+      markLocalChange()
+      setTheoryHtml(html)
+    },
+    [markLocalChange, setTheoryHtml],
+  )
+
+  const setCoreCategoryIdWithDirty = useCallback(
+    (id: string) => {
+      markLocalChange()
+      setCoreCategoryId(id)
+    },
+    [markLocalChange, setCoreCategoryId],
+  )
 
   const createSnapshot = (): ProjectSnapshot => {
     const payload: ProjectSnapshot = {
@@ -200,11 +353,12 @@ export function useProjectState({
     codeById,
     selectionRangeRef,
     selectionDocumentIdRef,
-    updateDocument,
+    updateDocument: updateDocumentWithDirty,
     pushHistory,
     documentEditorInstanceRef,
     documentEditorInstancesRef,
     activeDocumentId,
+    onLocalChange: markLocalChange,
   })
   useEffect(() => {
     removeHighlightsByCodeIdRef.current = removeHighlightsByCodeId
@@ -247,24 +401,6 @@ export function useProjectState({
     storedHasData,
   ])
 
-  useEffect(() => {
-    if (isApplyingRemoteRef.current) return
-    if (!didInitRef.current) {
-      didInitRef.current = true
-      return
-    }
-    const nextUpdatedAt = Date.now()
-    if (nextUpdatedAt === projectUpdatedAtRef.current) return
-    projectUpdatedAtRef.current = nextUpdatedAt
-    hasLocalProjectUpdateRef.current = true
-  }, [
-    codes,
-    categories,
-    memos,
-    documents,
-    theoryHtml,
-    coreCategoryId,
-  ])
 
   const { ydoc } = useYjsSync({
     documents,
@@ -285,7 +421,7 @@ export function useProjectState({
   })
 
   const handleRemoveDocument = (documentId: string) => {
-    removeDocumentState(documentId)
+    removeDocumentWithDirty(documentId)
     documentEditorInstancesRef.current.delete(documentId)
     if (ydoc) {
       const fragment = ydoc.getXmlFragment(documentId)
@@ -371,11 +507,11 @@ export function useProjectState({
     memos,
     setMemos,
     coreCategoryId,
-    setCoreCategoryId,
+    setCoreCategoryId: setCoreCategoryIdWithDirty,
     coreCategoryDraft,
     setCoreCategoryDraft,
     theoryHtml,
-    setTheoryHtml,
+    setTheoryHtml: setTheoryHtmlWithDirty,
     showCodeLabels,
     setShowCodeLabels,
     showMemos,
@@ -394,24 +530,24 @@ export function useProjectState({
     isTheoryEmpty,
     getReadableTextColor,
     applyRemoteProject,
-    updateDocument,
+    updateDocument: updateDocumentWithDirty,
     getDocumentById,
-    addNewDocument,
+    addNewDocument: addNewDocumentWithDirty,
     removeDocument: handleRemoveDocument,
-    addNewCode,
-    updateCode,
-    removeCode,
-    updateCategory,
-    handleAddCategory,
-    removeCategory,
-    removeCodeFromCategory,
-    handleAddGlobalMemo,
-    handleAddCodeMemo,
-    handleAddCategoryMemo,
-    updateMemo,
-    removeMemo,
-    handleCreateCoreCategory,
-    moveCodeToCategory,
+    addNewCode: addNewCodeWithDirty,
+    updateCode: updateCodeWithDirty,
+    removeCode: removeCodeWithDirty,
+    updateCategory: updateCategoryWithDirty,
+    handleAddCategory: handleAddCategoryWithDirty,
+    removeCategory: removeCategoryWithDirty,
+    removeCodeFromCategory: removeCodeFromCategoryWithDirty,
+    handleAddGlobalMemo: handleAddGlobalMemoWithDirty,
+    handleAddCodeMemo: handleAddCodeMemoWithDirty,
+    handleAddCategoryMemo: handleAddCategoryMemoWithDirty,
+    updateMemo: updateMemoWithDirty,
+    removeMemo: removeMemoWithDirty,
+    handleCreateCoreCategory: handleCreateCoreCategoryWithDirty,
+    moveCodeToCategory: moveCodeToCategoryWithDirty,
     applyEditorCommand,
     applyDocumentCommand,
     executeEditorCommand,

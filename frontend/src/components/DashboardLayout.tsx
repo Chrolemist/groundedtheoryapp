@@ -51,6 +51,7 @@ export function DashboardLayout() {
       (projectRaw: Record<string, unknown>) => {
         if (disableWs) return
         if (!apiBase) return
+        if (!hasRemoteState && !remoteLoadedRef.current) return
         const seq = saveSeqRef.current + 1
         saveSeqRef.current = seq
         setIsSaving(true)
@@ -79,7 +80,7 @@ export function DashboardLayout() {
             }
           })
       },
-      [apiBase, disableWs],
+      [apiBase, disableWs, hasRemoteState],
     ),
   })
 

@@ -163,8 +163,12 @@ export function useProjectCollaborationSync({
     if (dataPayload === lastSyncedDataRef.current) {
       return
     }
+    if (!hasLocalProjectUpdateRef.current) {
+      lastSyncedDataRef.current = dataPayload
+      return
+    }
     lastSyncedDataRef.current = dataPayload
-    hasLocalProjectUpdateRef.current = true
+    hasLocalProjectUpdateRef.current = false
     const nextUpdatedAt = Date.now()
     projectUpdatedAtRef.current = nextUpdatedAt
 

@@ -13,6 +13,7 @@ type UseHighlightingArgs = {
   documentEditorInstanceRef?: MutableRefObject<Editor | null>
   documentEditorInstancesRef?: MutableRefObject<Map<string, Editor>>
   activeDocumentId?: string
+  onLocalChange?: () => void
 }
 
 // Selection tracking and highlight rendering for document codes.
@@ -25,6 +26,7 @@ export function useHighlighting({
   documentEditorInstanceRef,
   documentEditorInstancesRef,
   activeDocumentId,
+  onLocalChange,
 }: UseHighlightingArgs) {
   const placeCaretInContent = (content: HTMLElement, event?: MouseEvent<HTMLElement>) => {
     const selection = window.getSelection()
@@ -205,6 +207,7 @@ export function useHighlighting({
           return tr.docChanged
         })
         .run()
+      onLocalChange?.()
       selectionRangeRef.current = null
       selectionDocumentIdRef.current = null
       return
@@ -338,6 +341,7 @@ export function useHighlighting({
         text: container.innerText,
       })
     }
+    onLocalChange?.()
   }
 
   const removeHighlightSpan = (element: HTMLElement) => {
@@ -359,6 +363,7 @@ export function useHighlighting({
         text: documentContent.innerText,
       })
     }
+    onLocalChange?.()
     return true
   }
 
@@ -405,6 +410,9 @@ export function useHighlighting({
           })
         }
       }
+    }
+    if (changed) {
+      onLocalChange?.()
     }
     return changed
   }
