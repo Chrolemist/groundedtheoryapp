@@ -59,7 +59,7 @@ export function ProjectPickerModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-      <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
+      <div className="flex w-full max-w-xl min-h-[420px] flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-xl">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Projects</h2>
@@ -112,7 +112,7 @@ export function ProjectPickerModal({
           </div>
         )}
 
-        <div className="mt-4 max-h-64 space-y-2 overflow-y-auto">
+        <div className="mt-4 flex-1 space-y-2 overflow-y-auto">
           {sortedProjects.map((project) => (
             <div
               key={project.id}
