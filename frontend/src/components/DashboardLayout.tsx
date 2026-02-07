@@ -28,7 +28,6 @@ export function DashboardLayout() {
     if (window.location.port === '5173') return 'http://localhost:8000'
     return window.location.origin
   }, [])
-  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
 
   const {
     websocketOnline,
