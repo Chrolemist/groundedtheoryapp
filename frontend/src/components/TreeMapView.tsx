@@ -69,11 +69,13 @@ export function TreeMapView({
   theoryHtml,
   onExcerptNavigate,
 }: TreeMapViewProps) {
+  const sectionRef = useRef<HTMLElement | null>(null)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const [scale, setScale] = useState(0.9)
   const [offset, setOffset] = useState({ x: 40, y: 40 })
   const [isPanning, setIsPanning] = useState(false)
   const [panAnchor, setPanAnchor] = useState({ x: 0, y: 0 })
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [selectedDocId, setSelectedDocId] = useState('__all__')
   const [showLogic, setShowLogic] = useState(() => {
     if (typeof window === 'undefined') return true
@@ -136,6 +138,17 @@ export function TreeMapView({
     }
     window.localStorage.setItem('gt-theory-map-layout', JSON.stringify(payload))
   }, [layoutOrientation, manualPositions, showLogic, useManualLayout])
+
+  useEffect(() => {
+    const updateFullscreen = () => {
+      setIsFullscreen(document.fullscreenElement === sectionRef.current)
+    }
+    document.addEventListener('fullscreenchange', updateFullscreen)
+    updateFullscreen()
+    return () => {
+      document.removeEventListener('fullscreenchange', updateFullscreen)
+    }
+  }, [])
 
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
 
@@ -501,9 +514,13 @@ export function TreeMapView({
   return (
     <section
       id="theory-map-view"
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      ref={sectionRef}
+      className={cn(
+        'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm',
+        isFullscreen && 'flex h-full flex-col',
+      )}
     >
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-slate-900">Theory Map</p>
           <p className="text-xs text-slate-500">
@@ -511,6 +528,20 @@ export function TreeMapView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <button
+            type="button"
+            onClick={async () => {
+              if (!sectionRef.current) return
+              if (document.fullscreenElement) {
+                await document.exitFullscreen()
+                return
+              }
+              await sectionRef.current.requestFullscreen()
+            }}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+          >
+            {isFullscreen ? 'Avsluta helskärm' : 'Helskärm'}
+          </button>
           <button
             type="button"
             onClick={() => setUseManualLayout((current) => !current)}
@@ -573,7 +604,10 @@ export function TreeMapView({
 
       <div
         ref={wrapperRef}
-        className="relative mt-4 h-[620px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50"
+        className={cn(
+          'relative mt-4 h-[620px] overflow-hidden rounded-xl border border-slate-200 bg-slate-50',
+          isFullscreen && 'h-[calc(100vh-160px)]',
+        )}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
