@@ -474,6 +474,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                 await manager.broadcast_except(
                     {"type": "cursor:clear", "userId": user_id}, websocket
                 )
+            elif message_type == "selection:update" and user_id:
+                payload = {
+                    "type": "selection:update",
+                    "userId": user_id,
+                    "selection": data.get("selection"),
+                }
+                await manager.broadcast_except(payload, websocket)
+            elif message_type == "selection:clear" and user_id:
+                await manager.broadcast_except(
+                    {"type": "selection:clear", "userId": user_id}, websocket
+                )
             elif message_type == "yjs:update" and user_id:
                 update = data.get("update")
                 if update:
@@ -518,6 +529,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
         if user_id:
             await manager.broadcast({"type": "cursor:clear", "userId": user_id})
+            await manager.broadcast({"type": "selection:clear", "userId": user_id})
 
 
 @app.get("/project/state")
