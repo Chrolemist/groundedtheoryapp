@@ -3,6 +3,7 @@ import type { Editor } from '@tiptap/react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 import { hydrateRemoteProject } from '../lib/projectHydration'
+import { useProjectAutosave } from './useProjectAutosave'
 
 type UseProjectCollaborationSyncArgs = {
   sendJson?: (payload: Record<string, unknown>) => void
@@ -62,21 +63,8 @@ export function useProjectCollaborationSync({
   persistProject,
   enableProjectSync = true,
 }: UseProjectCollaborationSyncArgs) {
-  const persistTimerRef = useRef<number | null>(null)
-  const latestProjectRef = useRef<Record<string, unknown> | null>(null)
-  const lastSyncedDataRef = useRef<string | null>(null)
-  const idlePersistDelayMs = 1200
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const broadcastRef = useRef<BroadcastChannel | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (persistTimerRef.current) {
-        window.clearTimeout(persistTimerRef.current)
-        persistTimerRef.current = null
-      }
-    }
-  }, [])
 
   const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
     const incomingUpdatedAt =
@@ -140,69 +128,18 @@ export function useProjectCollaborationSync({
     }
   }, [applyRemoteProject, disableWs])
 
-  useEffect(() => {
-    if (isApplyingRemoteRef.current) return
-    const isEmptyProject =
-      documents.length === 0 &&
-      codes.length === 0 &&
-      categories.length === 0 &&
-      memos.length === 0 &&
-      !coreCategoryId &&
-      !theoryHtml
-    if (isEmptyProject && !hasLocalProjectUpdateRef.current) return
-
-    const dataSnapshot = {
-      documents,
-      codes,
-      categories,
-      memos,
-      coreCategoryId,
-      theoryHtml,
-    }
-    const dataPayload = JSON.stringify(dataSnapshot)
-    if (dataPayload === lastSyncedDataRef.current) {
-      return
-    }
-    if (!hasLocalProjectUpdateRef.current) {
-      lastSyncedDataRef.current = dataPayload
-      return
-    }
-    lastSyncedDataRef.current = dataPayload
-    hasLocalProjectUpdateRef.current = false
-    const nextUpdatedAt = Date.now()
-    projectUpdatedAtRef.current = nextUpdatedAt
-
-    const projectRaw = {
-      ...dataSnapshot,
-      updated_at: nextUpdatedAt,
-    }
-
-    if (enableProjectSync && hasRemoteState && sendJson) {
-      sendJson({
-        type: 'project:update',
-        project_raw: projectRaw,
-      })
-    }
-
-    if (disableWs && broadcastRef.current) {
+  const handleBroadcastProjectUpdate = useCallback(
+    (projectRaw: Record<string, unknown>) => {
+      if (!disableWs || !broadcastRef.current) return
       broadcastRef.current.postMessage({
         type: 'project:update',
         project_raw: projectRaw,
       })
-    }
+    },
+    [disableWs],
+  )
 
-    if (persistProject) {
-      latestProjectRef.current = projectRaw
-      if (persistTimerRef.current) {
-        window.clearTimeout(persistTimerRef.current)
-      }
-      persistTimerRef.current = window.setTimeout(() => {
-        if (latestProjectRef.current) {
-          persistProject(latestProjectRef.current)
-        }
-      }, idlePersistDelayMs)
-    }
-  }, [
+  useProjectAutosave({
     documents,
     codes,
     categories,
@@ -211,13 +148,13 @@ export function useProjectCollaborationSync({
     theoryHtml,
     projectUpdatedAtRef,
     hasLocalProjectUpdateRef,
-    sendJson,
-    hasRemoteState,
-    enableProjectSync,
-    disableWs,
     isApplyingRemoteRef,
+    hasRemoteState,
+    sendJson,
     persistProject,
-  ])
+    enableProjectSync,
+    onBroadcastProjectUpdate: handleBroadcastProjectUpdate,
+  })
 
   useEffect(() => {
     const handleSelectionChange = () => {

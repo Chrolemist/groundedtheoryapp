@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
 import { DocumentViewerPanel } from './DocumentViewerPanel'
@@ -9,6 +9,8 @@ import { useCollaboration } from '../hooks/useCollaboration'
 import { loadStoredProjectState } from '../lib/projectStorage'
 import { useProjectState } from '../hooks/useProjectState'
 import { useProjectIO } from '../hooks/useProjectIO'
+import { useProjectPersistence } from '../hooks/useProjectPersistence'
+import { useProjectRemoteLoad } from '../hooks/useProjectRemoteLoad'
 
 export function DashboardLayout() {
   const storageKey = 'grounded-theory-app-state'
@@ -18,10 +20,6 @@ export function DashboardLayout() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const remoteLoadedRef = useRef(false)
   const tour = useOnboardingTour()
-  const saveSeqRef = useRef(0)
-  const [isSaving, setIsSaving] = useState(false)
-  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
 
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -42,46 +40,19 @@ export function DashboardLayout() {
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
+  const { persistProject, isSaving, lastSavedAt, saveError } = useProjectPersistence({
+    apiBase,
+    disableWs,
+    hasRemoteState,
+    remoteLoadedRef,
+  })
+
   const project = useProjectState({
     storageKey,
     storedState,
     sendJson,
     hasRemoteState,
-    persistProject: useCallback(
-      (projectRaw: Record<string, unknown>) => {
-        if (disableWs) return
-        if (!apiBase) return
-        if (!hasRemoteState && !remoteLoadedRef.current) return
-        const seq = saveSeqRef.current + 1
-        saveSeqRef.current = seq
-        setIsSaving(true)
-        setSaveError(null)
-        fetch(`${apiBase}/project/state`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ project_raw: projectRaw }),
-        })
-          .then((response) => {
-            if (!response.ok) {
-              throw new Error(`Save failed: ${response.status}`)
-            }
-            if (saveSeqRef.current !== seq) return
-            setLastSavedAt(Date.now())
-          })
-          .catch((error) => {
-            if (saveSeqRef.current !== seq) return
-            const message = error instanceof Error ? error.message : 'Save failed'
-            setSaveError(message)
-            console.error('[Project Save]', message)
-          })
-          .finally(() => {
-            if (saveSeqRef.current === seq) {
-              setIsSaving(false)
-            }
-          })
-      },
-      [apiBase, disableWs, hasRemoteState],
-    ),
+    persistProject,
   })
 
   const { handleSaveProject, handleLoadProject, exportReport } = useProjectIO({
@@ -117,36 +88,13 @@ export function DashboardLayout() {
     projectUpdateRef.current = project.applyRemoteProject
   }, [project.applyRemoteProject])
 
-  useEffect(() => {
-    if (disableWs) return
-    if (!apiBase) return
-    if (hasRemoteState) return
-    if (remoteLoadedRef.current) return
-    const controller = new AbortController()
-    const loadRemote = async () => {
-      try {
-        const response = await fetch(`${apiBase}/project/state`, {
-          signal: controller.signal,
-        })
-        if (!response.ok) return
-        const data = (await response.json()) as {
-          project_raw?: Record<string, unknown>
-          project?: Record<string, unknown>
-        }
-        const projectRaw = data.project_raw ?? data.project
-        if (projectRaw) {
-          remoteLoadedRef.current = true
-          project.applyRemoteProject(projectRaw)
-        }
-      } catch {
-        return
-      }
-    }
-    loadRemote()
-    return () => {
-      controller.abort()
-    }
-  }, [apiBase, disableWs, hasRemoteState])
+  useProjectRemoteLoad({
+    apiBase,
+    disableWs,
+    hasRemoteState,
+    remoteLoadedRef,
+    applyRemoteProject: project.applyRemoteProject,
+  })
 
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))
