@@ -48,3 +48,6 @@ coverage/
 
 # Misc
 *.sqlite
+
+# Firebase service account keys
+/frontend/groundedtheory-*.json

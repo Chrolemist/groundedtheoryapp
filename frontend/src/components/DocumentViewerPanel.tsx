@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import type { Doc } from 'yjs'
 import type { Editor } from '@tiptap/react'
 import { type Category, type Code, type Memo } from '../types'
@@ -77,7 +77,9 @@ export function DocumentViewerPanel({
   onHighlightClick,
   onEditorRef,
   }: DocumentViewerPanelProps) {
+  const debugDisableEditors = false
   const hasDocuments = documents.length > 0
+  const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
   const [activeTab, setActiveTab] = useState<'document' | 'tree' | 'overview'>(
     'document',
   )
@@ -92,14 +94,26 @@ export function DocumentViewerPanel({
   const [projectNameDraft, setProjectNameDraft] = useState(projectName)
   const canRenameProject = Boolean(onProjectNameChange)
   const displayProjectName = projectName.trim() || 'Untitled project'
+  const [deferEditorMount, setDeferEditorMount] = useState(false)
+  const deferTimerRef = useRef<number | null>(null)
   const mapFocusRef = useRef<HTMLElement | null>(null)
   const skipNextClearRef = useRef(false)
   const focusedTargetRef = useRef<TreeMapExcerptTarget | null>(null)
+  const navigateInFlightRef = useRef(false)
 
   useEffect(() => {
     if (isEditingProjectName) return
     setProjectNameDraft(projectName)
   }, [isEditingProjectName, projectName])
+
+  useEffect(() => {
+    return () => {
+      if (deferTimerRef.current) {
+        window.clearTimeout(deferTimerRef.current)
+        deferTimerRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     const clearFocus = () => {
@@ -199,16 +213,30 @@ export function DocumentViewerPanel({
   }, [activeDocumentId, activeTab, documentViewMode])
 
   const handleExcerptNavigate = (target: TreeMapExcerptTarget) => {
-    skipNextClearRef.current = true
-    focusedTargetRef.current = target
-    setActiveTab('document')
-    if (documentViewMode === 'all') {
-      onDocumentViewModeChange('single')
-      onActiveDocumentChange(target.docId)
-    } else if (activeDocumentId !== target.docId) {
-      onActiveDocumentChange(target.docId)
-    }
+    const enableExcerptFocus = false
+    if (navigateInFlightRef.current) return
+    navigateInFlightRef.current = true
+    setDeferEditorMount(true)
+    window.setTimeout(() => {
+      skipNextClearRef.current = true
+      focusedTargetRef.current = target
+      setActiveTab('document')
+      if (documentViewMode === 'all') {
+        onDocumentViewModeChange('single')
+        onActiveDocumentChange(target.docId)
+      } else if (activeDocumentId !== target.docId) {
+        onActiveDocumentChange(target.docId)
+      }
+      if (deferTimerRef.current) {
+        window.clearTimeout(deferTimerRef.current)
+      }
+      deferTimerRef.current = window.setTimeout(() => {
+        setDeferEditorMount(false)
+        navigateInFlightRef.current = false
+      }, 200)
+    }, 0)
 
+    if (!enableExcerptFocus) return
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         const highlight = findHighlightElement(target)
@@ -228,6 +256,53 @@ export function DocumentViewerPanel({
     if (docId && docId !== activeDocumentId) {
       onActiveDocumentChange(docId)
     }
+  }
+
+  const applyCodeStylesToHtml = useCallback((html: string) => {
+    if (!html) return html
+    const container = document.createElement('div')
+    container.innerHTML = html
+    container.querySelectorAll('[data-remove-code]').forEach((node) => node.remove())
+    container.querySelectorAll('span[data-code-id]').forEach((node) => {
+      if (!(node instanceof HTMLElement)) return
+      const codeId = node.getAttribute('data-code-id')
+      if (!codeId) return
+      const code = codeById.get(codeId)
+      if (!code) return
+      const nextBg = code.colorHex ?? '#E2E8F0'
+      const nextText = code.textHex ?? '#334155'
+      const nextRing = code.ringHex ?? 'rgba(148,163,184,0.4)'
+      node.style.backgroundColor = nextBg
+      node.style.color = nextText
+      node.style.display = 'inline-block'
+      node.style.boxShadow = `inset 0 0 0 1px ${nextRing}`
+      const label = node.querySelector('.code-label') as HTMLElement | null
+      if (label) {
+        label.style.color = nextText
+      }
+    })
+    return container.innerHTML
+  }, [codeById])
+
+  const renderReadOnly = (html: string, text: string) => {
+    if (html) {
+      const styledHtml = applyCodeStylesToHtml(html)
+      return (
+        <div
+          className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+          style={{ fontFamily: documentFontFamily, lineHeight: documentLineHeight }}
+          dangerouslySetInnerHTML={{ __html: styledHtml }}
+        />
+      )
+    }
+    return (
+      <div
+        className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+        style={{ fontFamily: documentFontFamily, lineHeight: documentLineHeight }}
+      >
+        {text}
+      </div>
+    )
   }
 
   return (
@@ -419,27 +494,35 @@ export function DocumentViewerPanel({
                       </button>
                     </div>
                   </div>
-                  <DocumentEditor
-                    documentId={doc.id}
-                    initialHtml={doc.html ?? ''}
-                    onUpdate={(html, text) => {
-                      onDocumentInput(doc.id, { html, text })
-                    }}
-                    onEditorReady={onEditorReady}
-                    onMouseDown={onHighlightMouseDown}
-                    onMouseUp={handleEditorMouseUp}
-                    onClick={onHighlightClick}
-                    editorRef={onEditorRef}
-                    ydoc={ydoc}
-                    fontFamily={documentFontFamily}
-                    fontFamilyValue={documentFontFamilyDisplay}
-                    lineHeight={documentLineHeight}
-                    setFontFamily={(value) => {
-                      onDocumentFontFamilyChange(value)
-                      onDocumentFontFamilyDisplayChange(value)
-                    }}
-                    setLineHeight={onDocumentLineHeightChange}
-                  />
+                  {debugDisableEditors ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                      Editor disabled (debug).
+                    </div>
+                  ) : deferEditorMount ? (
+                    renderReadOnly(doc.html ?? '', doc.text ?? '')
+                  ) : (
+                    <DocumentEditor
+                      documentId={doc.id}
+                      initialHtml={doc.html ?? ''}
+                      onUpdate={(html, text) => {
+                        onDocumentInput(doc.id, { html, text })
+                      }}
+                      onEditorReady={onEditorReady}
+                      onMouseDown={onHighlightMouseDown}
+                      onMouseUp={handleEditorMouseUp}
+                      onClick={onHighlightClick}
+                      editorRef={onEditorRef}
+                      ydoc={ydoc}
+                      fontFamily={documentFontFamily}
+                      fontFamilyValue={documentFontFamilyDisplay}
+                      lineHeight={documentLineHeight}
+                      setFontFamily={(value) => {
+                        onDocumentFontFamilyChange(value)
+                        onDocumentFontFamilyDisplayChange(value)
+                      }}
+                      setLineHeight={onDocumentLineHeightChange}
+                    />
+                  )}
                   {index < documents.length - 1 && (
                     <div className="border-b border-dashed border-slate-200" />
                   )}
@@ -456,30 +539,41 @@ export function DocumentViewerPanel({
               >
                 ×
               </button>
-              <DocumentEditor
-                key={activeDocumentId}
-                documentId={activeDocumentId}
-                initialHtml={
-                  documents.find((doc) => doc.id === activeDocumentId)?.html ?? ''
-                }
-                onUpdate={(html, text) => {
-                  onDocumentInput(activeDocumentId, { html, text })
-                }}
-                onEditorReady={onEditorReady}
-                onMouseDown={onHighlightMouseDown}
-                onMouseUp={handleEditorMouseUp}
-                onClick={onHighlightClick}
-                editorRef={onEditorRef}
-                ydoc={ydoc}
-                fontFamily={documentFontFamily}
-                fontFamilyValue={documentFontFamilyDisplay}
-                lineHeight={documentLineHeight}
-                setFontFamily={(value) => {
-                  onDocumentFontFamilyChange(value)
-                  onDocumentFontFamilyDisplayChange(value)
-                }}
-                setLineHeight={onDocumentLineHeightChange}
-              />
+              {debugDisableEditors ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                  Editor disabled (debug).
+                </div>
+              ) : deferEditorMount ? (
+                renderReadOnly(
+                  documents.find((doc) => doc.id === activeDocumentId)?.html ?? '',
+                  documents.find((doc) => doc.id === activeDocumentId)?.text ?? '',
+                )
+              ) : (
+                <DocumentEditor
+                  key={activeDocumentId}
+                  documentId={activeDocumentId}
+                  initialHtml={
+                    documents.find((doc) => doc.id === activeDocumentId)?.html ?? ''
+                  }
+                  onUpdate={(html, text) => {
+                    onDocumentInput(activeDocumentId, { html, text })
+                  }}
+                  onEditorReady={onEditorReady}
+                  onMouseDown={onHighlightMouseDown}
+                  onMouseUp={handleEditorMouseUp}
+                  onClick={onHighlightClick}
+                  editorRef={onEditorRef}
+                  ydoc={ydoc}
+                  fontFamily={documentFontFamily}
+                  fontFamilyValue={documentFontFamilyDisplay}
+                  lineHeight={documentLineHeight}
+                  setFontFamily={(value) => {
+                    onDocumentFontFamilyChange(value)
+                    onDocumentFontFamilyDisplayChange(value)
+                  }}
+                  setLineHeight={onDocumentLineHeightChange}
+                />
+              )}
             </div>
           )}
           </div>

@@ -14,6 +14,7 @@ import pandas as pd
 import firebase_admin
 from firebase_admin import credentials, firestore
 from docx import Document
+from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
@@ -23,10 +24,17 @@ from pydantic import BaseModel, Field
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path, override=False)
 BUILD_TAG = os.getenv("BUILD_TAG", "local-dev")
 logger.info("Build tag: %s", BUILD_TAG)
 MAX_PROJECT_BYTES = int(os.getenv("MAX_PROJECT_BYTES", "900000"))
 MAX_PROJECT_TOTAL_BYTES = int(os.getenv("MAX_PROJECT_TOTAL_BYTES", "900000000"))
+logger.info(
+    "Firestore config: project_id=%s collection=%s",
+    os.getenv("FIREBASE_PROJECT_ID"),
+    os.getenv("FIRESTORE_COLLECTION", "projects"),
+)
 
 
 class DocumentItem(BaseModel):

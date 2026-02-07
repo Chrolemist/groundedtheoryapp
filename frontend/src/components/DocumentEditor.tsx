@@ -39,16 +39,17 @@ export function DocumentEditor({
   setFontFamily,
   setLineHeight,
 }: DocumentEditorProps) {
+  const extensions = [
+    StarterKit.configure({ history: false }),
+    Underline,
+    CodeHighlight,
+    Collaboration.configure({
+      document: ydoc,
+      field: documentId,
+    }),
+  ]
   const editor = useEditor({
-    extensions: [
-      StarterKit.configure({ history: false }),
-      Underline,
-      CodeHighlight,
-      Collaboration.configure({
-        document: ydoc,
-        field: documentId,
-      }),
-    ],
+    extensions,
     content: '',
     onUpdate: ({ editor }) => {
       onUpdate(editor.getHTML(), editor.getText())
