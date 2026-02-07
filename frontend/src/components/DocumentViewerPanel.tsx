@@ -293,7 +293,7 @@ export function DocumentViewerPanel({
           {documentViewMode === 'all' ? (
             <div className="space-y-10">
               {documents.map((doc, index) => (
-                <div key={doc.id} className="space-y-3" data-doc-id={doc.id}>
+                <div key={doc.id} className="relative space-y-3" data-doc-id={doc.id}>
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                       {doc.title}
@@ -328,7 +328,7 @@ export function DocumentViewerPanel({
               ))}
             </div>
           ) : (
-            <div className="space-y-4" data-doc-id={activeDocumentId}>
+            <div className="relative space-y-4" data-doc-id={activeDocumentId}>
               <DocumentEditor
                 documentId={activeDocumentId}
                 initialHtml={
