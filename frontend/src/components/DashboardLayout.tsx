@@ -44,7 +44,6 @@ export function DashboardLayout() {
 
   const { persistProject, isSaving, lastSavedAt, saveError, saveWarning } = useProjectPersistence({
     apiBase,
-    disableWs,
     hasRemoteState,
     remoteLoadedRef,
     projectIdRef: activeProjectIdRef,

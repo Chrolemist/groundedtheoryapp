@@ -2,7 +2,6 @@ import { useCallback, useRef, useState, type MutableRefObject } from 'react'
 
 type UseProjectPersistenceArgs = {
   apiBase: string
-  disableWs: boolean
   hasRemoteState: boolean
   remoteLoadedRef: MutableRefObject<boolean>
   projectIdRef: MutableRefObject<string | null>
@@ -18,7 +17,6 @@ type UseProjectPersistenceResult = {
 
 export function useProjectPersistence({
   apiBase,
-  disableWs,
   hasRemoteState,
   remoteLoadedRef,
   projectIdRef,
@@ -50,7 +48,6 @@ export function useProjectPersistence({
 
   const persistProject = useCallback(
     (projectRaw: Record<string, unknown>) => {
-      if (disableWs) return
       if (!apiBase) return
       const projectId = projectIdRef.current
       if (!projectId) return
@@ -93,7 +90,7 @@ export function useProjectPersistence({
           }
         })
     },
-    [apiBase, disableWs, hasRemoteState, remoteLoadedRef, projectIdRef, updateWarning],
+    [apiBase, hasRemoteState, remoteLoadedRef, projectIdRef, updateWarning],
   )
 
   return { persistProject, isSaving, lastSavedAt, saveError, saveWarning }
