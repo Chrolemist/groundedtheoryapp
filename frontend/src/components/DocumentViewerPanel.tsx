@@ -202,7 +202,10 @@ export function DocumentViewerPanel({
     skipNextClearRef.current = true
     focusedTargetRef.current = target
     setActiveTab('document')
-    if (documentViewMode === 'single' && activeDocumentId !== target.docId) {
+    if (documentViewMode === 'all') {
+      onDocumentViewModeChange('single')
+      onActiveDocumentChange(target.docId)
+    } else if (activeDocumentId !== target.docId) {
       onActiveDocumentChange(target.docId)
     }
 
