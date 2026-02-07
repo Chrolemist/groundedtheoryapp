@@ -191,13 +191,19 @@ class ConnectionManager:
 
     async def broadcast(self, message: Dict) -> None:
         for connection in list(self.active_connections):
-            await connection.send_json(message)
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
 
     async def broadcast_except(self, message: Dict, skip: WebSocket) -> None:
         for connection in list(self.active_connections):
             if connection == skip:
                 continue
-            await connection.send_json(message)
+            try:
+                await connection.send_json(message)
+            except Exception:
+                self.disconnect(connection)
 
 
 app = FastAPI()
@@ -540,23 +546,27 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
     global in_memory_project_raw
     global last_saved_project_hash
 
-    project_raw = payload.get("project_raw") or payload.get("project") or payload
-    if not isinstance(project_raw, dict):
-        return {"status": "invalid"}
+    try:
+        project_raw = payload.get("project_raw") or payload.get("project") or payload
+        if not isinstance(project_raw, dict):
+            return {"status": "invalid"}
 
-    in_memory_project_raw = project_raw
-    in_memory_project = normalize_project_state(project_raw)
-    save_project_to_firestore(in_memory_project_raw)
-    if not last_saved_project_hash:
-        last_saved_project_hash = compute_project_hash(in_memory_project_raw)
-    await manager.broadcast(
-        {
-            "type": "project:update",
-            "project": in_memory_project.model_dump(),
-            "project_raw": in_memory_project_raw,
-        }
-    )
-    return {"status": "ok"}
+        in_memory_project_raw = project_raw
+        in_memory_project = normalize_project_state(project_raw)
+        save_project_to_firestore(in_memory_project_raw)
+        if not last_saved_project_hash:
+            last_saved_project_hash = compute_project_hash(in_memory_project_raw)
+        await manager.broadcast(
+            {
+                "type": "project:update",
+                "project": in_memory_project.model_dump(),
+                "project_raw": in_memory_project_raw,
+            }
+        )
+        return {"status": "ok"}
+    except Exception as exc:
+        logger.exception("Failed to save project state")
+        return {"status": "error"}
 
 
 @app.post("/project/load")
