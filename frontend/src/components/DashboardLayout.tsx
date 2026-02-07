@@ -22,6 +22,7 @@ export function DashboardLayout() {
   const activeProjectIdRef = useRef<string | null>(null)
   const tour = useOnboardingTour()
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -204,6 +205,34 @@ export function DashboardLayout() {
     sendJson?.({ type: 'presence:rename', name: nextName })
   }
 
+  const handleAdminLogin = async () => {
+    if (!apiBase) {
+      window.alert('Backend not available.')
+      return
+    }
+    const attempt = window.prompt('Admin password')
+    if (!attempt) return
+    try {
+      const response = await fetch(`${apiBase}/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: attempt }),
+      })
+      const data = (await response.json()) as { ok?: boolean; message?: string }
+      if (data.ok) {
+        setIsAdmin(true)
+        return
+      }
+      window.alert(data.message ?? 'Incorrect password')
+    } catch {
+      window.alert('Failed to verify admin password')
+    }
+  }
+
+  const handleAdminLogout = () => {
+    setIsAdmin(false)
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <ProjectPickerModal
@@ -212,6 +241,7 @@ export function DashboardLayout() {
         activeProjectId={catalog.activeProjectId}
         isLoading={catalog.isLoadingProjects}
         error={catalog.projectError}
+        canDeleteProjects={isAdmin}
         onClose={() => setIsProjectModalOpen(false)}
         onRefresh={() => void catalog.refreshProjects()}
         onSelect={(projectId: string) => void handleSelectProject(projectId)}
@@ -254,6 +284,9 @@ export function DashboardLayout() {
         onToggleMemos={() => project.setShowMemos((current) => !current)}
         showMemos={project.showMemos}
         onTour={tour.restart}
+        isAdmin={isAdmin}
+        onAdminLogin={handleAdminLogin}
+        onAdminLogout={handleAdminLogout}
       />
 
       {/* Main workspace: documents on the left, coding panels on the right. */}

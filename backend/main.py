@@ -77,6 +77,10 @@ class ProjectState(BaseModel):
     theory_description: str = ''
 
 
+class AdminLoginPayload(BaseModel):
+    password: str
+
+
 class ConnectionManager:
     def __init__(self) -> None:
         self.active_connections: List[WebSocket] = []
@@ -657,6 +661,16 @@ async def list_projects() -> Dict[str, List[Dict[str, Optional[str]]]]:
     except Exception as exc:
         logger.warning(f"Failed to list projects: {exc}")
         return {"projects": []}
+
+
+@app.post("/admin/login")
+async def admin_login(payload: AdminLoginPayload) -> Dict[str, object]:
+    expected = (os.getenv("ADMIN_PASSWORD") or "").strip()
+    if not expected:
+        return {"ok": False, "message": "Admin password not configured"}
+    if payload.password == expected:
+        return {"ok": True}
+    return {"ok": False, "message": "Invalid password"}
 
 
 @app.get("/projects/storage")

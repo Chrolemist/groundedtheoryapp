@@ -27,6 +27,9 @@ type MenuBarProps = {
   onToggleMemos: () => void
   showMemos: boolean
   onTour: () => void
+  isAdmin: boolean
+  onAdminLogin: () => void
+  onAdminLogout: () => void
 }
 
 type MenuItemProps = {
@@ -77,6 +80,9 @@ export function MenuBar({
   onToggleMemos,
   showMemos,
   onTour,
+  isAdmin,
+  onAdminLogin,
+  onAdminLogout,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -309,6 +315,17 @@ export function MenuBar({
               label="Restart tour"
               onClick={() => {
                 onTour()
+                closeMenu()
+              }}
+            />
+            <MenuItem
+              label={isAdmin ? 'Admin logout' : 'Admin login'}
+              onClick={() => {
+                if (isAdmin) {
+                  onAdminLogout()
+                } else {
+                  onAdminLogin()
+                }
                 closeMenu()
               }}
             />

@@ -36,6 +36,9 @@ type DashboardHeaderProps = {
   onToggleMemos: () => void
   showMemos: boolean
   onTour: () => void
+  isAdmin: boolean
+  onAdminLogin: () => void
+  onAdminLogout: () => void
 }
 
 // Top navigation with app actions and collaborator presence.
@@ -73,6 +76,9 @@ export function DashboardHeader({
   onToggleMemos,
   showMemos,
   onTour,
+  isAdmin,
+  onAdminLogin,
+  onAdminLogout,
 }: DashboardHeaderProps) {
   const formatSavedTime = (value: number) =>
     new Date(value).toLocaleTimeString('sv-SE', {
@@ -178,6 +184,9 @@ export function DashboardHeader({
             onToggleMemos={onToggleMemos}
             showMemos={showMemos}
             onTour={onTour}
+            isAdmin={isAdmin}
+            onAdminLogin={onAdminLogin}
+            onAdminLogout={onAdminLogout}
           />
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             {presenceUsers.map((user) => (

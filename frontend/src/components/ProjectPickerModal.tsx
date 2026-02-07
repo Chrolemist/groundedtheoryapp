@@ -14,6 +14,7 @@ type ProjectPickerModalProps = {
   activeProjectId: string | null
   isLoading: boolean
   error: string | null
+  canDeleteProjects: boolean
   onClose: () => void
   onRefresh: () => void
   onSelect: (projectId: string) => void
@@ -41,6 +42,7 @@ export function ProjectPickerModal({
   activeProjectId,
   isLoading,
   error,
+  canDeleteProjects,
   onClose,
   onRefresh,
   onSelect,
@@ -107,13 +109,15 @@ export function ProjectPickerModal({
             >
               Refresh
             </button>
-            <button
-              type="button"
-              onClick={onPurge}
-              className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600"
-            >
-              Delete all
-            </button>
+            {canDeleteProjects ? (
+              <button
+                type="button"
+                onClick={onPurge}
+                className="rounded-lg border border-rose-200 px-2 py-1 text-xs font-semibold text-rose-600"
+              >
+                Delete all
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -149,18 +153,20 @@ export function ProjectPickerModal({
                   {formatTimestamp(project.updated_at || project.created_at)}
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={() => onDelete(project.id)}
-                className={cn(
-                  'rounded-lg border px-2 py-1 text-xs font-semibold transition',
-                  project.id === activeProjectId
-                    ? 'border-white/30 text-white hover:bg-white/10'
-                    : 'border-rose-200 text-rose-600 hover:bg-rose-50',
-                )}
-              >
-                Delete
-              </button>
+              {canDeleteProjects ? (
+                <button
+                  type="button"
+                  onClick={() => onDelete(project.id)}
+                  className={cn(
+                    'rounded-lg border px-2 py-1 text-xs font-semibold transition',
+                    project.id === activeProjectId
+                      ? 'border-white/30 text-white hover:bg-white/10'
+                      : 'border-rose-200 text-rose-600 hover:bg-rose-50',
+                  )}
+                >
+                  Delete
+                </button>
+              ) : null}
             </div>
           ))}
           {!sortedProjects.length && !isLoading && (
