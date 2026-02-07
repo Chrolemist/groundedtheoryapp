@@ -179,7 +179,7 @@ export function DashboardLayout() {
           onExportWord={() => void exportReport('word')}
           onAddDocument={project.addNewDocument}
           onDeleteDocument={() => project.removeDocument(project.activeDocumentId)}
-          canDeleteDocument={project.documents.length > 1}
+          canDeleteDocument={project.documents.length > 0}
           deleteDocumentLabel={project.getDocumentById(project.activeDocumentId)?.title ?? 'Untitled document'}
           onRenameUser={handleRenameUser}
           onUndo={project.handleUndo}
@@ -210,6 +210,11 @@ export function DashboardLayout() {
             documentViewMode={project.documentViewMode}
             onDocumentViewModeChange={project.setDocumentViewMode}
             onActiveDocumentChange={project.setActiveDocumentId}
+            onRemoveDocument={(documentId, title) => {
+              if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
+              project.removeDocument(documentId)
+            }}
+            onAddDocument={project.addNewDocument}
             documentTitle={project.getDocumentById(project.activeDocumentId)?.title ?? ''}
             onDocumentTitleChange={(title) =>
               project.updateDocument(project.activeDocumentId, { title })

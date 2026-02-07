@@ -22,6 +22,7 @@ type DocumentViewerPanelProps = {
   documentViewMode: DocumentViewMode
   onDocumentViewModeChange: (value: DocumentViewMode) => void
   onActiveDocumentChange: (documentId: string) => void
+  onRemoveDocument: (documentId: string, documentTitle: string) => void
   documentTitle: string
   onDocumentTitleChange: (title: string) => void
   documentFontFamily: string
@@ -31,6 +32,7 @@ type DocumentViewerPanelProps = {
   documentLineHeight: string
   onDocumentLineHeightChange: (value: string) => void
   showCodeLabels: boolean
+  onAddDocument: () => void
   onDocumentInput: (documentId: string, patch: { html: string; text: string }) => void
   onEditorReady: (documentId: string, editor: Editor | null) => void
   onHighlightMouseDown: (event: MouseEvent<HTMLElement>) => void
@@ -52,6 +54,7 @@ export function DocumentViewerPanel({
   documentViewMode,
   onDocumentViewModeChange,
   onActiveDocumentChange,
+  onRemoveDocument,
   documentTitle,
   onDocumentTitleChange,
   documentFontFamily,
@@ -61,6 +64,7 @@ export function DocumentViewerPanel({
   documentLineHeight,
   onDocumentLineHeightChange,
   showCodeLabels,
+  onAddDocument,
   onDocumentInput,
   onEditorReady,
   onHighlightMouseDown,
@@ -302,16 +306,17 @@ export function DocumentViewerPanel({
       </div>
 
       {activeTab === 'document' ? (
-        <div
-          id="document-viewer"
-          className={cn(
-            'relative rounded-2xl bg-white p-8 shadow-sm',
-            !showCodeLabels && 'hide-code-labels',
-          )}
-        >
+        <>
+          <div
+            id="document-viewer"
+            className={cn(
+              'relative rounded-2xl bg-white p-8 shadow-sm',
+              !showCodeLabels && 'hide-code-labels',
+            )}
+          >
           {!hasDocuments ? (
             <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
-              No documents yet. Create a new document to start writing.
+              <p>No documents yet. Create a new document to start writing.</p>
             </div>
           ) : documentViewMode === 'all' ? (
             <div className="space-y-10">
@@ -321,7 +326,17 @@ export function DocumentViewerPanel({
                     <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
                       {doc.title}
                     </p>
-                    <span className="text-xs text-slate-400">Document {index + 1}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">Document {index + 1}</span>
+                      <button
+                        type="button"
+                        onClick={() => onRemoveDocument(doc.id, doc.title)}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
+                        title="Delete document"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                   <DocumentEditor
                     documentId={doc.id}
@@ -351,7 +366,15 @@ export function DocumentViewerPanel({
               ))}
             </div>
           ) : (
-            <div className="relative space-y-4" data-doc-id={activeDocumentId}>
+            <div className="relative" data-doc-id={activeDocumentId}>
+              <button
+                type="button"
+                onClick={() => onRemoveDocument(activeDocumentId, documentTitle || 'Untitled document')}
+                className="absolute right-0 top-0 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
+                title="Delete document"
+              >
+                ×
+              </button>
               <DocumentEditor
                 key={activeDocumentId}
                 documentId={activeDocumentId}
@@ -378,7 +401,17 @@ export function DocumentViewerPanel({
               />
             </div>
           )}
-        </div>
+          </div>
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={onAddDocument}
+              className="mt-6 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+            >
+              Create document
+            </button>
+          </div>
+        </>
       ) : activeTab === 'tree' ? (
         <TreeMapView
           documents={documents}

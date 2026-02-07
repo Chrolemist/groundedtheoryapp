@@ -26,7 +26,7 @@ export function useDocumentState({
     storedState?.activeDocumentId ?? (storedState?.documents?.[0]?.id ?? ''),
   )
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>(
-    () => storedState?.documentViewMode ?? 'single',
+    () => storedState?.documentViewMode ?? 'all',
   )
   const documentEditorRef = useRef<HTMLDivElement | null>(null)
   const documentEditorInstanceRef = useRef<Editor | null>(null)
