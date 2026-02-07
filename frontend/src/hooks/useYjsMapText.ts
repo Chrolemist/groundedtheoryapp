@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import type * as Y from 'yjs'
+import * as Y from 'yjs'
 
 type UseYjsMapTextArgs = {
   ydoc: Y.Doc | null
