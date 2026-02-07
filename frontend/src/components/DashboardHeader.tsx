@@ -10,6 +10,7 @@ type DashboardHeaderProps = {
   saveWarning?: string | null
   projectSizeBytes?: number | null
   projectSizeLimitBytes?: number
+  projectSizeLabel?: string
   activeProjectName?: string
   presenceUsers: PresenceUser[]
   localUser: PresenceUser | null
@@ -17,6 +18,8 @@ type DashboardHeaderProps = {
   onExportWord: () => void
   onNewProject: () => void
   onOpenProject: () => void
+  onCloseProject: () => void
+  canCloseProject: boolean
   onAddDocument: () => void
   onDeleteDocument: () => void
   canDeleteDocument: boolean
@@ -44,6 +47,7 @@ export function DashboardHeader({
   saveWarning,
   projectSizeBytes,
   projectSizeLimitBytes,
+  projectSizeLabel,
   activeProjectName,
   presenceUsers,
   localUser,
@@ -51,6 +55,8 @@ export function DashboardHeader({
   onExportWord,
   onNewProject,
   onOpenProject,
+  onCloseProject,
+  canCloseProject,
   onAddDocument,
   onDeleteDocument,
   canDeleteDocument,
@@ -152,6 +158,8 @@ export function DashboardHeader({
           <MenuBar
             onOpenProject={onOpenProject}
             onNewProject={onNewProject}
+            onCloseProject={onCloseProject}
+            canCloseProject={canCloseProject}
             onExportExcel={onExportExcel}
             onExportWord={onExportWord}
             onAddDocument={onAddDocument}
@@ -195,7 +203,7 @@ export function DashboardHeader({
         {sizeLabel && sizePercent !== null && (
           <div className="flex flex-col items-end gap-1 text-xs text-slate-600 lg:ml-auto">
             <span className="rounded-full bg-slate-100 px-2 py-1">
-              Lagring: {sizeLabel} ({sizePercent.toFixed(0)}%)
+              {projectSizeLabel ?? 'Lagring'}: {sizeLabel} ({sizePercent.toFixed(0)}%)
             </span>
             <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
               <div

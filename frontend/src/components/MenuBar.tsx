@@ -7,6 +7,8 @@ type MenuKey = 'file' | 'edit' | 'view' | 'help'
 type MenuBarProps = {
   onOpenProject: () => void
   onNewProject: () => void
+  onCloseProject: () => void
+  canCloseProject: boolean
   onExportExcel: () => void
   onExportWord: () => void
   onAddDocument: () => void
@@ -55,6 +57,8 @@ const MenuItem = ({ label, onClick, shortcut, destructive }: MenuItemProps) => {
 export function MenuBar({
   onOpenProject,
   onNewProject,
+  onCloseProject,
+  canCloseProject,
   onExportExcel,
   onExportWord,
   onAddDocument,
@@ -126,6 +130,15 @@ export function MenuBar({
                 onNewProject()
                 closeMenu()
               }}
+            />
+            <MenuItem
+              label="Close project"
+              onClick={() => {
+                if (!canCloseProject) return
+                onCloseProject()
+                closeMenu()
+              }}
+              destructive
             />
             <div className="my-2 border-t border-slate-100" />
             <MenuItem

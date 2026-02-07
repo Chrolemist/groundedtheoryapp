@@ -22,11 +22,15 @@ type UseProjectCatalogResult = {
   activeProjectName: string
   isLoadingProjects: boolean
   projectError: string | null
+  totalProjectBytes: number | null
+  totalProjectLimitBytes: number | null
+  refreshStorage: () => Promise<void>
   refreshProjects: () => Promise<void>
   loadProject: (projectId: string) => Promise<void>
   createProject: (name?: string) => Promise<void>
   renameProject: (projectId: string, name: string) => Promise<void>
   deleteProject: (projectId: string) => Promise<boolean>
+  closeProject: () => void
 }
 
 const defaultProjectPayload = () => ({
@@ -51,9 +55,12 @@ export function useProjectCatalog({
   const [activeProjectName, setActiveProjectName] = useState('')
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectError, setProjectError] = useState<string | null>(null)
+  const [totalProjectBytes, setTotalProjectBytes] = useState<number | null>(null)
+  const [totalProjectLimitBytes, setTotalProjectLimitBytes] = useState<number | null>(null)
   const didInitRef = useRef(false)
   const suppressAutoLoadRef = useRef(false)
   const suppressAutoCreateRef = useRef(false)
+  const autoLoadAttemptRef = useRef<string | null>(null)
 
   const refreshProjects = useCallback(async () => {
     if (!apiBase) return
@@ -72,6 +79,27 @@ export function useProjectCatalog({
       setProjectError(message)
     } finally {
       setIsLoadingProjects(false)
+    }
+  }, [apiBase])
+
+  const refreshStorage = useCallback(async () => {
+    if (!apiBase) return
+    try {
+      const response = await fetch(`${apiBase}/projects/storage`)
+      if (!response.ok) {
+        throw new Error(`Failed to load storage: ${response.status}`)
+      }
+      const data = (await response.json()) as {
+        total_bytes?: number
+        total_limit_bytes?: number
+      }
+      setTotalProjectBytes(typeof data.total_bytes === 'number' ? data.total_bytes : null)
+      setTotalProjectLimitBytes(
+        typeof data.total_limit_bytes === 'number' ? data.total_limit_bytes : null,
+      )
+    } catch {
+      setTotalProjectBytes(null)
+      setTotalProjectLimitBytes(null)
     }
   }, [apiBase])
 
@@ -97,6 +125,7 @@ export function useProjectCatalog({
       const nextName = data.name ?? ''
       setActiveProjectName(nextName)
       onActiveProjectChange?.(projectId, nextName)
+      autoLoadAttemptRef.current = null
       suppressAutoLoadRef.current = false
       suppressAutoCreateRef.current = false
       try {
@@ -134,6 +163,7 @@ export function useProjectCatalog({
         const nextName = data.name ?? name ?? 'New project'
         setActiveProjectName(nextName)
         onActiveProjectChange?.(data.project_id, nextName)
+        autoLoadAttemptRef.current = null
         suppressAutoLoadRef.current = false
         suppressAutoCreateRef.current = false
         try {
@@ -145,12 +175,13 @@ export function useProjectCatalog({
           { id: data.project_id!, name: data.name ?? name ?? 'New project' },
           ...current,
         ])
+        void refreshStorage()
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to create project'
       setProjectError(message)
     }
-  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, storageKey])
+  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, refreshStorage, storageKey])
 
   const renameProject = useCallback(async (projectId: string, name: string) => {
     if (!apiBase) return
@@ -205,13 +236,26 @@ export function useProjectCatalog({
       } catch {
         // Ignore storage failures.
       }
+      void refreshStorage()
       return wasActive
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to delete project'
       setProjectError(message)
       return false
     }
-  }, [activeProjectId, apiBase, storageKey])
+  }, [activeProjectId, apiBase, refreshStorage, storageKey])
+
+  const closeProject = useCallback(() => {
+    setActiveProjectId(null)
+    setActiveProjectName('')
+    suppressAutoLoadRef.current = true
+    suppressAutoCreateRef.current = true
+    try {
+      localStorage.removeItem(storageKey)
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [storageKey])
 
   useEffect(() => {
     if (didInitRef.current) return
@@ -241,6 +285,8 @@ export function useProjectCatalog({
       } catch {
         // Ignore storage failures.
       }
+      if (autoLoadAttemptRef.current === fallbackId) return
+      autoLoadAttemptRef.current = fallbackId
       void loadProject(fallbackId)
     }
   }, [activeProjectId, projects, loadProject, storageKey])
@@ -251,10 +297,14 @@ export function useProjectCatalog({
     activeProjectName,
     isLoadingProjects,
     projectError,
+    totalProjectBytes,
+    totalProjectLimitBytes,
+    refreshStorage,
     refreshProjects,
     loadProject,
     createProject,
     renameProject,
     deleteProject,
+    closeProject,
   }
 }

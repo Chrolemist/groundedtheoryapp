@@ -651,6 +651,35 @@ async def list_projects() -> Dict[str, List[Dict[str, Optional[str]]]]:
         return {"projects": []}
 
 
+@app.get("/projects/storage")
+async def get_projects_storage() -> Dict[str, int]:
+    client = get_firestore_client()
+    if not client:
+        return {
+            "total_bytes": 0,
+            "total_limit_bytes": MAX_PROJECT_TOTAL_BYTES,
+            "project_limit_bytes": MAX_PROJECT_BYTES,
+        }
+    collection = os.getenv("FIRESTORE_COLLECTION", "projects")
+    total_bytes = 0
+    try:
+        snapshots = client.collection(collection).stream()
+        for snapshot in snapshots:
+            data = snapshot.to_dict() or {}
+            project_raw = data.get("project")
+            if isinstance(project_raw, dict):
+                size_bytes = estimate_project_bytes(project_raw)
+                if isinstance(size_bytes, int):
+                    total_bytes += size_bytes
+    except Exception as exc:
+        logger.warning(f"Failed to compute project storage: {exc}")
+    return {
+        "total_bytes": total_bytes,
+        "total_limit_bytes": MAX_PROJECT_TOTAL_BYTES,
+        "project_limit_bytes": MAX_PROJECT_BYTES,
+    }
+
+
 @app.post("/projects")
 async def create_project(payload: Dict = Body(...)) -> Dict[str, Optional[Dict]]:
     client = get_firestore_client()

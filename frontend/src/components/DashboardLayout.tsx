@@ -75,6 +75,14 @@ export function DashboardLayout() {
     },
   })
 
+  const { activeProjectId: catalogActiveProjectId, refreshStorage: refreshCatalogStorage } = catalog
+
+  useEffect(() => {
+    if (!catalogActiveProjectId) {
+      void refreshCatalogStorage()
+    }
+  }, [catalogActiveProjectId, refreshCatalogStorage])
+
   const { exportReport } = useProjectIO({
     documents: project.documents,
     codes: project.codes,
@@ -143,6 +151,29 @@ export function DashboardLayout() {
     }
   }
 
+  const handleCloseProject = () => {
+    catalog.closeProject()
+    activeProjectIdRef.current = null
+    remoteLoadedRef.current = false
+    project.setDocuments([])
+    project.setCodes([])
+    project.setCategories([])
+    project.setMemos([])
+    project.setCoreCategoryId('')
+    project.setTheoryHtml('')
+    project.setActiveDocumentId('')
+    project.setDocumentViewMode('all')
+    document.title = 'GT · Grounded Theory'
+  }
+
+  const headerSizeBytes = catalogActiveProjectId
+    ? project.projectSizeBytes
+    : catalog.totalProjectBytes
+  const headerSizeLimit = catalogActiveProjectId
+    ? project.projectSizeLimitBytes
+    : catalog.totalProjectLimitBytes
+  const headerSizeLabel = catalogActiveProjectId ? 'Lagring' : 'Total lagring'
+
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))
   }, [presenceUsers])
@@ -175,13 +206,16 @@ export function DashboardLayout() {
         lastSavedAt={lastSavedAt}
         saveError={saveError}
         saveWarning={saveWarning}
-        projectSizeBytes={project.projectSizeBytes}
-        projectSizeLimitBytes={project.projectSizeLimitBytes}
+        projectSizeBytes={headerSizeBytes}
+        projectSizeLimitBytes={headerSizeLimit ?? undefined}
+        projectSizeLabel={headerSizeLabel}
         activeProjectName={catalog.activeProjectName}
         presenceUsers={presenceUsers}
         localUser={localUser}
         onNewProject={openProjectModal}
         onOpenProject={openProjectModal}
+        onCloseProject={handleCloseProject}
+        canCloseProject={Boolean(catalogActiveProjectId)}
         onExportExcel={() => void exportReport('excel')}
         onExportWord={() => void exportReport('word')}
         onAddDocument={project.addNewDocument}
@@ -204,7 +238,7 @@ export function DashboardLayout() {
 
       {/* Main workspace: documents on the left, coding panels on the right. */}
       <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
-        {catalog.activeProjectId ? (
+        {catalogActiveProjectId ? (
           <>
             <DocumentViewerPanel
               documents={project.documents}
