@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem, type DocumentViewMode } from '../components/DashboardLayout.types'
 import { saveStoredProjectState } from '../lib/projectStorage'
@@ -40,6 +40,7 @@ export function useProjectState({
   persistProject,
 }: UseProjectStateArgs) {
   const disableLocalStoragePersist = true
+  const maxProjectBytes = Number(import.meta.env.VITE_MAX_PROJECT_BYTES) || 900000
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
   const isApplyingRemoteRef = useRef(false)
@@ -401,6 +402,22 @@ export function useProjectState({
     storedHasData,
   ])
 
+  const projectSizeBytes = useMemo(() => {
+    try {
+      const payload = JSON.stringify({
+        documents,
+        codes,
+        categories,
+        memos,
+        coreCategoryId,
+        theoryHtml,
+      })
+      return new TextEncoder().encode(payload).length
+    } catch {
+      return null
+    }
+  }, [documents, codes, categories, memos, coreCategoryId, theoryHtml])
+
 
   const { ydoc } = useYjsSync({
     documents,
@@ -560,5 +577,7 @@ export function useProjectState({
     handleUndo,
     handleRedo,
     ydoc,
+    projectSizeBytes,
+    projectSizeLimitBytes: maxProjectBytes,
   }
 }

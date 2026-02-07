@@ -8,6 +8,9 @@ type DashboardHeaderProps = {
   isSaving: boolean
   lastSavedAt: number | null
   saveError: string | null
+  saveWarning?: string | null
+  projectSizeBytes?: number | null
+  projectSizeLimitBytes?: number
   presenceUsers: PresenceUser[]
   localUser: PresenceUser | null
   fileInputRef: MutableRefObject<HTMLInputElement | null>
@@ -39,6 +42,9 @@ export function DashboardHeader({
   isSaving,
   lastSavedAt,
   saveError,
+  saveWarning,
+  projectSizeBytes,
+  projectSizeLimitBytes,
   presenceUsers,
   localUser,
   fileInputRef,
@@ -77,6 +83,30 @@ export function DashboardHeader({
         ? `Sparad ${formatSavedTime(lastSavedAt)}`
         : 'Ej sparad'
 
+  const formatBytes = (value: number) => {
+    if (value >= 1024 * 1024) {
+      return `${(value / (1024 * 1024)).toFixed(2)} MB`
+    }
+    return `${(value / 1024).toFixed(1)} KB`
+  }
+
+  const sizePercent =
+    typeof projectSizeBytes === 'number' && projectSizeLimitBytes
+      ? Math.min(100, Math.max(0, (projectSizeBytes / projectSizeLimitBytes) * 100))
+      : null
+  const sizeLabel =
+    typeof projectSizeBytes === 'number' && projectSizeLimitBytes
+      ? `${formatBytes(projectSizeBytes)} / ${formatBytes(projectSizeLimitBytes)}`
+      : null
+  const sizeTone =
+    sizePercent === null
+      ? 'bg-slate-600'
+      : sizePercent >= 95
+        ? 'bg-rose-500'
+        : sizePercent >= 80
+          ? 'bg-amber-500'
+          : 'bg-emerald-500'
+
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
@@ -87,7 +117,7 @@ export function DashboardHeader({
             </div>
             <div>
               <p className="text-lg font-semibold">Grounded Theory</p>
-              <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span
                   className={cn(
                     'h-2 w-2 rounded-full',
@@ -109,6 +139,11 @@ export function DashboardHeader({
                     )}
                   />
                   <span className="min-w-[120px] tabular-nums">{saveLabel}</span>
+                  {saveWarning && (
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                      {saveWarning}
+                    </span>
+                  )}
               </div>
             </div>
           </div>
@@ -168,6 +203,19 @@ export function DashboardHeader({
             }}
           />
         </div>
+        {sizeLabel && sizePercent !== null && (
+          <div className="flex flex-col items-end gap-1 text-xs text-slate-600 lg:ml-auto">
+            <span className="rounded-full bg-slate-100 px-2 py-1">
+              Lagring: {sizeLabel} ({sizePercent.toFixed(0)}%)
+            </span>
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
+              <div
+                className={`h-full rounded-full transition-[width] duration-300 ${sizeTone}`}
+                style={{ width: `${sizePercent}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </header>
   )

@@ -25,6 +25,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 BUILD_TAG = os.getenv("BUILD_TAG", "local-dev")
 logger.info("Build tag: %s", BUILD_TAG)
+MAX_PROJECT_BYTES = int(os.getenv("MAX_PROJECT_BYTES", "900000"))
+MAX_PROJECT_TOTAL_BYTES = int(os.getenv("MAX_PROJECT_TOTAL_BYTES", "900000000"))
 
 
 class DocumentItem(BaseModel):
@@ -273,6 +275,38 @@ def compute_project_hash(project_raw: Dict) -> Optional[str]:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def estimate_project_bytes(project_raw: Dict) -> Optional[int]:
+    try:
+        payload = json.dumps(project_raw, sort_keys=True, separators=(",", ":"))
+    except Exception:
+        return None
+    return len(payload.encode("utf-8"))
+
+
+def validate_project_limits(project_raw: Dict) -> Optional[Dict[str, str]]:
+    size_bytes = estimate_project_bytes(project_raw)
+    if size_bytes is None:
+        return {
+            "reason": "project_invalid",
+            "message": "Project payload could not be serialized.",
+        }
+    if MAX_PROJECT_BYTES > 0 and size_bytes > MAX_PROJECT_BYTES:
+        return {
+            "reason": "project_too_large",
+            "message": (
+                f"Project size {size_bytes} bytes exceeds limit {MAX_PROJECT_BYTES} bytes."
+            ),
+        }
+    if MAX_PROJECT_TOTAL_BYTES > 0 and size_bytes > MAX_PROJECT_TOTAL_BYTES:
+        return {
+            "reason": "project_total_limit_reached",
+            "message": (
+                f"Project total size {size_bytes} bytes exceeds limit {MAX_PROJECT_TOTAL_BYTES} bytes."
+            ),
+        }
+    return None
+
+
 def save_project_to_firestore(project_raw: Dict) -> None:
     global last_saved_project_hash
     doc_ref = get_firestore_doc_ref()
@@ -506,6 +540,16 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             elif message_type == "project:update" and user_id:
                 project_payload = data.get("project", {})
                 project_raw = data.get("project_raw") or project_payload
+                if isinstance(project_raw, dict):
+                    limit_error = validate_project_limits(project_raw)
+                    if limit_error:
+                        await websocket.send_json(
+                            {
+                                "type": "project:save:error",
+                                **limit_error,
+                            }
+                        )
+                        continue
                 in_memory_project_raw = project_raw
                 in_memory_project = normalize_project_state(project_raw)
                 save_project_to_firestore(in_memory_project_raw)
@@ -568,6 +612,13 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
         if not isinstance(project_raw, dict):
             return {"status": "invalid"}
 
+        limit_error = validate_project_limits(project_raw)
+        if limit_error:
+            return {
+                "status": "error",
+                **limit_error,
+            }
+
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
         save_project_to_firestore(in_memory_project_raw)
@@ -596,6 +647,12 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
     global last_saved_project_hash
     in_memory_project = project_state
     in_memory_project_raw = project_state.model_dump()
+    limit_error = validate_project_limits(in_memory_project_raw)
+    if limit_error:
+        return {
+            "status": "error",
+            **limit_error,
+        }
     save_project_to_firestore(project_state.model_dump())
     last_saved_project_hash = compute_project_hash(in_memory_project_raw)
     await manager.broadcast(in_memory_project.model_dump())

@@ -40,7 +40,7 @@ export function DashboardLayout() {
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
-  const { persistProject, isSaving, lastSavedAt, saveError } = useProjectPersistence({
+  const { persistProject, isSaving, lastSavedAt, saveError, saveWarning } = useProjectPersistence({
     apiBase,
     disableWs,
     hasRemoteState,
@@ -120,6 +120,9 @@ export function DashboardLayout() {
           isSaving={isSaving}
           lastSavedAt={lastSavedAt}
           saveError={saveError}
+          saveWarning={saveWarning}
+          projectSizeBytes={project.projectSizeBytes}
+          projectSizeLimitBytes={project.projectSizeLimitBytes}
           presenceUsers={presenceUsers}
           localUser={localUser}
           fileInputRef={fileInputRef}
