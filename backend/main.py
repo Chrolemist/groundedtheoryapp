@@ -755,7 +755,7 @@ async def create_project(payload: Dict = Body(...)) -> Dict[str, object]:
 
 
 @app.get("/projects/{project_id}")
-async def get_project(project_id: str) -> Dict[str, Optional[Dict]]:
+async def get_project(project_id: str) -> Dict[str, object]:
     doc_ref = get_project_doc_ref(project_id)
     if not doc_ref:
         return {"status": "error", "message": "Firestore not available"}

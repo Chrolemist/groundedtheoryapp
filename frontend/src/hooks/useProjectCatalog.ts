@@ -13,7 +13,6 @@ type UseProjectCatalogArgs = {
   applyRemoteProject: (project: Record<string, unknown>) => void
   autoCreateIfEmpty?: boolean
   onActiveProjectChange?: (projectId: string, name: string) => void
-  storageKey?: string
 }
 
 type UseProjectCatalogResult = {
@@ -49,7 +48,6 @@ export function useProjectCatalog({
   applyRemoteProject,
   autoCreateIfEmpty = false,
   onActiveProjectChange,
-  storageKey = 'gt-last-project-id',
 }: UseProjectCatalogArgs): UseProjectCatalogResult {
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
@@ -59,9 +57,7 @@ export function useProjectCatalog({
   const [totalProjectBytes, setTotalProjectBytes] = useState<number | null>(null)
   const [totalProjectLimitBytes, setTotalProjectLimitBytes] = useState<number | null>(null)
   const didInitRef = useRef(false)
-  const suppressAutoLoadRef = useRef(false)
   const suppressAutoCreateRef = useRef(false)
-  const autoLoadAttemptRef = useRef<string | null>(null)
 
   const refreshProjects = useCallback(async () => {
     if (!apiBase) return
@@ -126,19 +122,12 @@ export function useProjectCatalog({
       const nextName = data.name ?? ''
       setActiveProjectName(nextName)
       onActiveProjectChange?.(projectId, nextName)
-      autoLoadAttemptRef.current = null
-      suppressAutoLoadRef.current = false
       suppressAutoCreateRef.current = false
-      try {
-        localStorage.setItem(storageKey, projectId)
-      } catch {
-        // Ignore storage failures.
-      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load project'
       setProjectError(message)
     }
-  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, storageKey])
+  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange])
 
   const createProject = useCallback(async (name?: string) => {
     if (!apiBase) return
@@ -164,14 +153,7 @@ export function useProjectCatalog({
         const nextName = data.name ?? name ?? 'New project'
         setActiveProjectName(nextName)
         onActiveProjectChange?.(data.project_id, nextName)
-        autoLoadAttemptRef.current = null
-        suppressAutoLoadRef.current = false
         suppressAutoCreateRef.current = false
-        try {
-          localStorage.setItem(storageKey, data.project_id)
-        } catch {
-          // Ignore storage failures.
-        }
         setProjects((current) => [
           { id: data.project_id!, name: data.name ?? name ?? 'New project' },
           ...current,
@@ -182,7 +164,7 @@ export function useProjectCatalog({
       const message = error instanceof Error ? error.message : 'Failed to create project'
       setProjectError(message)
     }
-  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, refreshStorage, storageKey])
+  }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, refreshStorage])
 
   const renameProject = useCallback(async (projectId: string, name: string) => {
     if (!apiBase) return
@@ -226,16 +208,7 @@ export function useProjectCatalog({
       if (wasActive) {
         setActiveProjectId(null)
         setActiveProjectName('')
-        suppressAutoLoadRef.current = true
         suppressAutoCreateRef.current = true
-      }
-      try {
-        const storedId = localStorage.getItem(storageKey)
-        if (storedId === projectId) {
-          localStorage.removeItem(storageKey)
-        }
-      } catch {
-        // Ignore storage failures.
       }
       void refreshStorage()
       return wasActive
@@ -244,19 +217,13 @@ export function useProjectCatalog({
       setProjectError(message)
       return false
     }
-  }, [activeProjectId, apiBase, refreshStorage, storageKey])
+  }, [activeProjectId, apiBase, refreshStorage])
 
   const closeProject = useCallback(() => {
     setActiveProjectId(null)
     setActiveProjectName('')
-    suppressAutoLoadRef.current = true
     suppressAutoCreateRef.current = true
-    try {
-      localStorage.removeItem(storageKey)
-    } catch {
-      // Ignore storage failures.
-    }
-  }, [storageKey])
+  }, [])
 
   const purgeProjects = useCallback(async () => {
     if (!apiBase) return 0
@@ -271,13 +238,7 @@ export function useProjectCatalog({
       setProjects([])
       setActiveProjectId(null)
       setActiveProjectName('')
-      suppressAutoLoadRef.current = true
       suppressAutoCreateRef.current = true
-      try {
-        localStorage.removeItem(storageKey)
-      } catch {
-        // Ignore storage failures.
-      }
       await refreshStorage()
       return deleted
     } catch (error) {
@@ -285,7 +246,7 @@ export function useProjectCatalog({
       setProjectError(message)
       return 0
     }
-  }, [apiBase, refreshStorage, storageKey])
+  }, [apiBase, refreshStorage])
 
   useEffect(() => {
     if (didInitRef.current) return
@@ -302,24 +263,6 @@ export function useProjectCatalog({
     if (activeProjectId) return
     void createProject('New project')
   }, [autoCreateIfEmpty, projects.length, activeProjectId, createProject])
-
-  useEffect(() => {
-    if (!activeProjectId && projects.length > 0) {
-      if (suppressAutoLoadRef.current) return
-      let fallbackId = projects[0].id
-      try {
-        const storedId = localStorage.getItem(storageKey)
-        if (storedId && projects.some((project) => project.id === storedId)) {
-          fallbackId = storedId
-        }
-      } catch {
-        // Ignore storage failures.
-      }
-      if (autoLoadAttemptRef.current === fallbackId) return
-      autoLoadAttemptRef.current = fallbackId
-      void loadProject(fallbackId)
-    }
-  }, [activeProjectId, projects, loadProject, storageKey])
 
   return {
     projects,
