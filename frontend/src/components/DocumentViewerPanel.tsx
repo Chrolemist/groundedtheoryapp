@@ -68,6 +68,7 @@ export function DocumentViewerPanel({
   onHighlightClick,
   onEditorRef,
   }: DocumentViewerPanelProps) {
+  const hasDocuments = documents.length > 0
   const [activeTab, setActiveTab] = useState<'document' | 'tree' | 'overview'>(
     'document',
   )
@@ -252,8 +253,15 @@ export function DocumentViewerPanel({
           <select
             id="document-view-mode"
             name="document-view-mode"
-            value={documentViewMode === 'all' ? '__all__' : activeDocumentId}
+            value={
+              hasDocuments
+                ? documentViewMode === 'all'
+                  ? '__all__'
+                  : activeDocumentId
+                : '__none__'
+            }
             onChange={(event) => {
+              if (!hasDocuments) return
               const nextValue = event.target.value
               if (nextValue === '__all__') {
                 onDocumentViewModeChange('all')
@@ -263,21 +271,32 @@ export function DocumentViewerPanel({
               onActiveDocumentChange(nextValue)
             }}
             className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+            disabled={!hasDocuments}
           >
-            <option value="__all__">All documents</option>
-            {documents.map((doc) => (
-              <option key={doc.id} value={doc.id}>
-                {doc.title}
-              </option>
-            ))}
+            {hasDocuments ? (
+              <>
+                <option value="__all__">All documents</option>
+                {documents.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.title}
+                  </option>
+                ))}
+              </>
+            ) : (
+              <option value="__none__">No documents</option>
+            )}
           </select>
           <input
             id="document-title"
             name="document-title"
-            value={documentTitle}
-            onChange={(event) => onDocumentTitleChange(event.target.value)}
+            value={hasDocuments ? documentTitle : ''}
+            onChange={(event) => {
+              if (!hasDocuments) return
+              onDocumentTitleChange(event.target.value)
+            }}
             className="min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
             placeholder="Document title"
+            disabled={!hasDocuments}
           />
         </div>
       </div>
@@ -290,7 +309,11 @@ export function DocumentViewerPanel({
             !showCodeLabels && 'hide-code-labels',
           )}
         >
-          {documentViewMode === 'all' ? (
+          {!hasDocuments ? (
+            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+              No documents yet. Create a new document to start writing.
+            </div>
+          ) : documentViewMode === 'all' ? (
             <div className="space-y-10">
               {documents.map((doc, index) => (
                 <div key={doc.id} className="relative space-y-3" data-doc-id={doc.id}>
@@ -330,6 +353,7 @@ export function DocumentViewerPanel({
           ) : (
             <div className="relative space-y-4" data-doc-id={activeDocumentId}>
               <DocumentEditor
+                key={activeDocumentId}
                 documentId={activeDocumentId}
                 initialHtml={
                   documents.find((doc) => doc.id === activeDocumentId)?.html ?? ''

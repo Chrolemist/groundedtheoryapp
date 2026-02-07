@@ -20,19 +20,10 @@ export function useDocumentState({
   isApplyingRemoteRef,
 }: UseDocumentStateArgs) {
   const [documents, setDocuments] = useState<DocumentItem[]>(() =>
-    storedState?.documents?.length
-      ? storedState.documents
-      : [
-          {
-            id: 'doc-1',
-            title: 'Document 1',
-            text: '',
-            html: '',
-          },
-        ],
+    storedState?.documents?.length ? storedState.documents : [],
   )
   const [activeDocumentId, setActiveDocumentId] = useState(() =>
-    storedState?.activeDocumentId ?? (storedState?.documents?.[0]?.id ?? 'doc-1'),
+    storedState?.activeDocumentId ?? (storedState?.documents?.[0]?.id ?? ''),
   )
   const [documentViewMode, setDocumentViewMode] = useState<DocumentViewMode>(
     () => storedState?.documentViewMode ?? 'single',
@@ -77,10 +68,9 @@ export function useDocumentState({
   const removeDocument = (documentId: string) => {
     pushHistoryRef.current()
     setDocuments((current) => {
-      if (current.length <= 1) return current
       const remaining = current.filter((doc) => doc.id !== documentId)
-      if (documentId === activeDocumentId && remaining.length) {
-        setActiveDocumentId(remaining[0].id)
+      if (documentId === activeDocumentId) {
+        setActiveDocumentId(remaining[0]?.id ?? '')
       }
       return remaining
     })
