@@ -438,7 +438,8 @@ export function TreeMapView({
   }, [])
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) return
+    const target = event.target as HTMLElement | null
+    if (target?.closest('[data-node-id]')) return
     setIsPanning(true)
     setPanAnchor({ x: event.clientX - offset.x, y: event.clientY - offset.y })
   }

@@ -102,11 +102,6 @@ export function DocumentViewerPanel({
   const navigateInFlightRef = useRef(false)
 
   useEffect(() => {
-    if (isEditingProjectName) return
-    setProjectNameDraft(projectName)
-  }, [isEditingProjectName, projectName])
-
-  useEffect(() => {
     return () => {
       if (deferTimerRef.current) {
         window.clearTimeout(deferTimerRef.current)
