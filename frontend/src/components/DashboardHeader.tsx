@@ -96,19 +96,19 @@ export function DashboardHeader({
                 />
                 <span>{websocketOnline ? 'Online' : 'Offline'} WebSocket</span>
                 <span className="mx-1 text-slate-300">•</span>
-                <span
-                  className={cn(
-                    'h-2 w-2 rounded-full',
-                    isSaving
-                      ? 'bg-amber-500'
-                      : saveError
-                        ? 'bg-rose-500'
-                        : lastSavedAt
-                          ? 'bg-emerald-500'
-                          : 'bg-slate-300',
-                  )}
-                />
-                <span>{saveLabel}</span>
+                  <span
+                    className={cn(
+                      'h-2 w-2 rounded-full',
+                      isSaving
+                        ? 'bg-amber-500'
+                        : saveError
+                          ? 'bg-rose-500'
+                          : lastSavedAt
+                            ? 'bg-emerald-500'
+                            : 'bg-slate-300',
+                    )}
+                  />
+                  <span className="min-w-[120px] tabular-nums">{saveLabel}</span>
               </div>
             </div>
           </div>

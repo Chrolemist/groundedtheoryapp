@@ -169,6 +169,23 @@ export function useProjectCollaborationSync({
         return
       }
 
+      const getCaretRect = (input: Selection) => {
+        const range = input.getRangeAt(0).cloneRange()
+        if (input.focusNode) {
+          try {
+            range.setStart(input.focusNode, input.focusOffset)
+            range.setEnd(input.focusNode, input.focusOffset)
+          } catch {
+            range.collapse(true)
+          }
+        } else {
+          range.collapse(true)
+        }
+        const rect = range.getClientRects()[0] ?? range.getBoundingClientRect()
+        if (!rect || !Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return null
+        return rect
+      }
+
       const range = selection.getRangeAt(0)
       const containerNode = range.commonAncestorContainer
       const containerElement =
@@ -192,8 +209,8 @@ export function useProjectCollaborationSync({
         selectionDocumentIdRef.current = getSelectionDocumentId(nextRange)
       }
 
-      const rect = range.getClientRects()[0] ?? range.getBoundingClientRect()
-      if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+      const rect = getCaretRect(selection)
+      if (rect) {
         sendJson?.({
           type: 'cursor:update',
           cursor: {
