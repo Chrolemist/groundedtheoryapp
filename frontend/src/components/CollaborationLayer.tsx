@@ -1,4 +1,3 @@
-import { createPortal } from 'react-dom'
 import type { Editor } from '@tiptap/react'
 import { type CursorPresence, type PresenceUser } from './DashboardLayout.types'
 
@@ -23,23 +22,14 @@ export function CollaborationLayer({
     const user = presenceById.get(userId)
     if (!user) return null
 
-    const container = cursor.documentId
-      ? (document.querySelector(
-          `[data-doc-id="${cursor.documentId}"] .document-content`,
-        ) as HTMLElement | null)
-      : null
-
-    if (container && typeof cursor.docPos === 'number') {
+    if (typeof cursor.docPos === 'number') {
       const editor = documentEditorInstancesRef.current.get(cursor.documentId ?? '')
       if (editor) {
         try {
           const coords = editor.view.coordsAtPos(cursor.docPos)
-          const containerRect = container.getBoundingClientRect()
-          const left = coords.left - containerRect.left
-          const top = coords.top - containerRect.top
           const caretHeight = Math.max(2, coords.bottom - coords.top)
-          return createPortal(
-            <div key={userId} className="absolute" style={{ left, top }}>
+          return (
+            <div key={userId} className="absolute" style={{ left: coords.left, top: coords.top }}>
               <div
                 className="w-0.5"
                 style={{ backgroundColor: user.color, height: caretHeight }}
@@ -50,8 +40,7 @@ export function CollaborationLayer({
               >
                 {user.name}
               </div>
-            </div>,
-            container,
+            </div>
           )
         } catch {
           // Fall back to raw cursor coords below.
@@ -59,8 +48,17 @@ export function CollaborationLayer({
       }
     }
 
-    const marker = (
-      <div key={userId} className="absolute" style={{ left: cursor.x, top: cursor.y }}>
+    const container = cursor.documentId
+      ? (document.querySelector(
+          `[data-doc-id="${cursor.documentId}"] .document-content`,
+        ) as HTMLElement | null)
+      : null
+    const containerRect = container?.getBoundingClientRect()
+    const left = containerRect ? containerRect.left + cursor.x : cursor.x
+    const top = containerRect ? containerRect.top + cursor.y : cursor.y
+
+    return (
+      <div key={userId} className="absolute" style={{ left, top }}>
         <div className="h-5 w-0.5" style={{ backgroundColor: user.color }} />
         <div
           className="-mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
@@ -70,12 +68,6 @@ export function CollaborationLayer({
         </div>
       </div>
     )
-
-    if (container) {
-      return createPortal(marker, container)
-    }
-
-    return marker
   }
 
   return (
