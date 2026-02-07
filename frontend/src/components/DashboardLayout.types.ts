@@ -17,5 +17,6 @@ export type CursorPresence = {
   x: number
   y: number
   documentId?: string
+  docPos?: number
   updatedAt: number
 }

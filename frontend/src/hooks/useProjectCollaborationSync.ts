@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type MutableRefObject, type Dispatch, type SetStateAction } from 'react'
+import type { Editor } from '@tiptap/react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 import { hydrateRemoteProject } from '../lib/projectHydration'
@@ -10,6 +11,7 @@ type UseProjectCollaborationSyncArgs = {
   selectionRangeRef: MutableRefObject<Range | null>
   selectionDocumentIdRef: MutableRefObject<string | null>
   getSelectionDocumentId: (range: Range) => string | null
+  documentEditorInstancesRef: MutableRefObject<Map<string, Editor>>
   documentFontFamily: string
   setDocumentFontFamilyDisplay: Dispatch<SetStateAction<string>>
   documents: DocumentItem[]
@@ -38,6 +40,7 @@ export function useProjectCollaborationSync({
   selectionRangeRef,
   selectionDocumentIdRef,
   getSelectionDocumentId,
+  documentEditorInstancesRef,
   documentFontFamily,
   setDocumentFontFamilyDisplay,
   documents,
@@ -205,6 +208,9 @@ export function useProjectCollaborationSync({
       }
 
       const rect = getCaretRect(selection)
+      const docId = docContainer.getAttribute('data-doc-id') ?? undefined
+      const editor = docId ? documentEditorInstancesRef.current.get(docId) : undefined
+      const docPos = editor?.state?.selection?.to
       if (rect) {
         const containerRect = docContainer.getBoundingClientRect()
         const relativeX = rect.left - containerRect.left
@@ -214,7 +220,8 @@ export function useProjectCollaborationSync({
           cursor: {
             x: relativeX,
             y: relativeY,
-            documentId: docContainer.getAttribute('data-doc-id') ?? undefined,
+            documentId: docId,
+            docPos: typeof docPos === 'number' ? docPos : undefined,
             updatedAt: Date.now(),
           },
         })

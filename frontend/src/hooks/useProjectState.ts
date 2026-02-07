@@ -325,6 +325,7 @@ export function useProjectState({
     selectionRangeRef,
     selectionDocumentIdRef,
     getSelectionDocumentId,
+    documentEditorInstancesRef,
     documentFontFamily,
     setDocumentFontFamilyDisplay,
     documents,

@@ -274,6 +274,7 @@ export function DashboardLayout() {
           remoteCursors={remoteCursors}
           presenceById={presenceById}
           localUser={localUser}
+          documentEditorInstancesRef={project.documentEditorInstancesRef}
         />
       </div>
   )
