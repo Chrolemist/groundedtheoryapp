@@ -123,6 +123,7 @@ export function TreeMapView({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
   const dragMovedRef = useRef(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
+  const panPointerIdRef = useRef<number | null>(null)
   const isFiltered = selectedDocId !== '__all__'
 
   useEffect(() => {
@@ -440,8 +441,11 @@ export function TreeMapView({
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null
     if (target?.closest('[data-node-id]')) return
+    if (panPointerIdRef.current !== null) return
     setIsPanning(true)
     setPanAnchor({ x: event.clientX - offset.x, y: event.clientY - offset.y })
+    panPointerIdRef.current = event.pointerId
+    event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
@@ -469,6 +473,10 @@ export function TreeMapView({
   const handlePointerUp = () => {
     setIsPanning(false)
     setDraggingNodeId(null)
+    if (panPointerIdRef.current !== null && wrapperRef.current) {
+      wrapperRef.current.releasePointerCapture(panPointerIdRef.current)
+      panPointerIdRef.current = null
+    }
     window.setTimeout(() => {
       dragMovedRef.current = false
     }, 0)
@@ -569,6 +577,7 @@ export function TreeMapView({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onPointerLeave={handlePointerUp}
       >
         {isFiltered && !hasVisibleExcerpts ? (
