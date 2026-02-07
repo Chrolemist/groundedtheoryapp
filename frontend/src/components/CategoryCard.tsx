@@ -1,11 +1,14 @@
 import { useState } from 'react'
+import type { Doc } from 'yjs'
 import { ChevronDown, ChevronUp, FileText, Plus, Trash2 } from 'lucide-react'
 import { cn } from '../lib/cn'
 import { type Category, type Code, type Memo } from '../types'
 import { CodeChip } from './CodeChip'
 import { MemoList } from './MemoList'
+import { useYjsMapText } from '../hooks/useYjsMapText'
 
 export function CategoryCard({
+  ydoc,
   category,
   codes,
   memos,
@@ -18,6 +21,7 @@ export function CategoryCard({
   onRemoveMemo,
   onMoveCode,
 }: {
+  ydoc: Doc | null
   category: Category
   codes: Code[]
   memos: Memo[]
@@ -31,6 +35,34 @@ export function CategoryCard({
   onMoveCode: (codeId: string, targetId: string) => void
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const updatePrecondition = useYjsMapText({
+    ydoc,
+    mapName: 'categories',
+    itemId: category.id,
+    field: 'precondition',
+    onLocalUpdate: (value) => onUpdate(category.id, { precondition: value }),
+  })
+  const updateName = useYjsMapText({
+    ydoc,
+    mapName: 'categories',
+    itemId: category.id,
+    field: 'name',
+    onLocalUpdate: (value) => onUpdate(category.id, { name: value }),
+  })
+  const updateAction = useYjsMapText({
+    ydoc,
+    mapName: 'categories',
+    itemId: category.id,
+    field: 'action',
+    onLocalUpdate: (value) => onUpdate(category.id, { action: value }),
+  })
+  const updateConsequence = useYjsMapText({
+    ydoc,
+    mapName: 'categories',
+    itemId: category.id,
+    field: 'consequence',
+    onLocalUpdate: (value) => onUpdate(category.id, { consequence: value }),
+  })
 
   const handleDragOver = (event: React.DragEvent) => {
     if (!event.dataTransfer.types.includes('application/x-code-id')) return
@@ -65,7 +97,7 @@ export function CategoryCard({
           id={`category-name-${category.id}`}
           name={`category-name-${category.id}`}
           value={category.name}
-          onChange={(event) => onUpdate(category.id, { name: event.target.value })}
+          onChange={(event) => updateName(event.target.value)}
           className="min-w-[160px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900"
         />
         <div className="flex items-center gap-2">
@@ -129,8 +161,7 @@ export function CategoryCard({
               id={`category-precondition-${category.id}`}
               name={`category-precondition-${category.id}`}
               value={category.precondition}
-              onChange={(event) => onUpdate(category.id, { precondition: event.target.value })}
-              onBlur={(event) => onUpdate(category.id, { precondition: event.target.value })}
+              onChange={(event) => updatePrecondition(event.target.value)}
               placeholder="Vad orsakar detta?"
               rows={2}
               className="w-full rounded-lg border border-slate-200 bg-sky-50 px-3 py-2 text-sm text-slate-700"
@@ -147,8 +178,7 @@ export function CategoryCard({
               id={`category-action-${category.id}`}
               name={`category-action-${category.id}`}
               value={category.action}
-              onChange={(event) => onUpdate(category.id, { action: event.target.value })}
-              onBlur={(event) => onUpdate(category.id, { action: event.target.value })}
+              onChange={(event) => updateAction(event.target.value)}
               placeholder="Vad görs för att hantera det?"
               rows={2}
               className="w-full rounded-lg border border-slate-200 bg-amber-50 px-3 py-2 text-sm text-slate-700"
@@ -165,8 +195,7 @@ export function CategoryCard({
               id={`category-consequence-${category.id}`}
               name={`category-consequence-${category.id}`}
               value={category.consequence}
-              onChange={(event) => onUpdate(category.id, { consequence: event.target.value })}
-              onBlur={(event) => onUpdate(category.id, { consequence: event.target.value })}
+              onChange={(event) => updateConsequence(event.target.value)}
               placeholder="Vad blir resultatet?"
               rows={2}
               className="w-full rounded-lg border border-slate-200 bg-emerald-50 px-3 py-2 text-sm text-slate-700"
@@ -189,6 +218,7 @@ export function CategoryCard({
               </div>
               <MemoList
                 memos={categoryMemos}
+                ydoc={ydoc}
                 onUpdateMemo={onUpdateMemo}
                 onRemoveMemo={onRemoveMemo}
                 emptyText="Skriv en theoretical note om sambanden i denna kategori."

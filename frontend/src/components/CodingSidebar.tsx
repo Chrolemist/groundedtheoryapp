@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { BookOpen, Layers, Tag } from 'lucide-react'
 import { cn } from '../lib/cn'
+import type { Doc } from 'yjs'
 import { type Category, type Code, type Memo } from '../types'
 import { OpenCodingPanel } from './OpenCodingPanel'
 import { AxialCodingPanel } from './AxialCodingPanel'
@@ -19,6 +20,7 @@ type CodingSidebarProps = {
   memos: Memo[]
   isTheoryEmpty: boolean
   showMemos: boolean
+  ydoc: Doc | null
   onAddCode: () => void
   onApplyCode: (codeId: string) => void
   onUpdateCode: (codeId: string, patch: Partial<Code>) => void
@@ -58,6 +60,7 @@ export function CodingSidebar({
   memos,
   isTheoryEmpty,
   showMemos,
+  ydoc,
   onAddCode,
   onApplyCode,
   onUpdateCode,
@@ -133,6 +136,7 @@ export function CodingSidebar({
                 codes={codes}
                 memos={memos}
                 showMemos={showMemos}
+                ydoc={ydoc}
                 onAddCode={onAddCode}
                 onApplyCode={onApplyCode}
                 onUpdateCode={onUpdateCode}
@@ -158,6 +162,7 @@ export function CodingSidebar({
                 ungroupedCodes={ungroupedCodes}
                 memos={memos}
                 showMemos={showMemos}
+                ydoc={ydoc}
                 onAddCategory={onAddCategory}
                 onUpdateCategory={onUpdateCategory}
                 onRemoveCategory={onRemoveCategory}
@@ -201,6 +206,7 @@ export function CodingSidebar({
             >
               <MemosPanel
                 memos={memos}
+                ydoc={ydoc}
                 onAddGlobalMemo={onAddGlobalMemo}
                 onUpdateMemo={onUpdateMemo}
                 onRemoveMemo={onRemoveMemo}

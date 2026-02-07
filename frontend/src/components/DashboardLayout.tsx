@@ -252,6 +252,7 @@ export function DashboardLayout() {
             memos={project.memos}
             isTheoryEmpty={project.isTheoryEmpty}
             showMemos={project.showMemos}
+            ydoc={project.ydoc}
             onAddCode={project.addNewCode}
             onApplyCode={project.applyCodeToSelection}
             onUpdateCode={project.updateCode}

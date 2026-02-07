@@ -1,16 +1,18 @@
 import { Plus } from 'lucide-react'
+import type { Doc } from 'yjs'
 import { type Memo } from '../types'
 import { MemoList } from './MemoList'
 
 type MemosPanelProps = {
   memos: Memo[]
+  ydoc: Doc | null
   onAddGlobalMemo: () => void
   onUpdateMemo: (memoId: string, patch: Partial<Memo>) => void
   onRemoveMemo: (memoId: string) => void
 }
 
 // Global memos view for integrative notes.
-export function MemosPanel({ memos, onAddGlobalMemo, onUpdateMemo, onRemoveMemo }: MemosPanelProps) {
+export function MemosPanel({ memos, ydoc, onAddGlobalMemo, onUpdateMemo, onRemoveMemo }: MemosPanelProps) {
   const globalMemos = memos.filter((memo) => memo.type === 'global')
 
   return (
@@ -31,6 +33,7 @@ export function MemosPanel({ memos, onAddGlobalMemo, onUpdateMemo, onRemoveMemo 
       </div>
       <MemoList
         memos={globalMemos}
+        ydoc={ydoc}
         onUpdateMemo={onUpdateMemo}
         onRemoveMemo={onRemoveMemo}
         emptyText="Skapa en integrativ memo for helheten."

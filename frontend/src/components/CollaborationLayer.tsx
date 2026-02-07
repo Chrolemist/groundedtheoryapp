@@ -35,8 +35,15 @@ export function CollaborationLayer({
                 style={{ backgroundColor: user.color, height: caretHeight }}
               />
               <div
-                className="-mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
-                style={{ backgroundColor: user.color }}
+                className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+                style={{
+                  backgroundColor: user.color,
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  transform: 'translateY(-100%)',
+                  marginTop: -4,
+                }}
               >
                 {user.name}
               </div>
@@ -48,21 +55,35 @@ export function CollaborationLayer({
       }
     }
 
+    const field = cursor.fieldId ? document.getElementById(cursor.fieldId) : null
+    const fieldRect = field?.getBoundingClientRect()
     const container = cursor.documentId
       ? (document.querySelector(
           `[data-doc-id="${cursor.documentId}"] .document-content`,
         ) as HTMLElement | null)
       : null
-    const containerRect = container?.getBoundingClientRect()
-    const left = containerRect ? containerRect.left + cursor.x : cursor.x
-    const top = containerRect ? containerRect.top + cursor.y : cursor.y
+    const containerRect = cursor.absolute ? null : container?.getBoundingClientRect()
+    const baseRect = fieldRect ?? containerRect
+    const left = baseRect ? baseRect.left + cursor.x : cursor.x
+    const top = baseRect ? baseRect.top + cursor.y : cursor.y
+    const caretHeight = Math.max(2, cursor.height ?? 20)
 
     return (
       <div key={userId} className="absolute" style={{ left, top }}>
-        <div className="h-5 w-0.5" style={{ backgroundColor: user.color }} />
         <div
-          className="-mt-1 rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
-          style={{ backgroundColor: user.color }}
+          className="w-0.5"
+          style={{ backgroundColor: user.color, height: caretHeight }}
+        />
+        <div
+          className="rounded-full px-2 py-0.5 text-[10px] font-semibold text-white shadow"
+          style={{
+            backgroundColor: user.color,
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transform: 'translateY(-100%)',
+            marginTop: -4,
+          }}
         >
           {user.name}
         </div>

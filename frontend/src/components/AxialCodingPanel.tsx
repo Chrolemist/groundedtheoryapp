@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import type { Doc } from 'yjs'
 import { type Category, type Code, type Memo } from '../types'
 import { CodeChip } from './CodeChip'
 import { CategoryCard } from './CategoryCard'
@@ -9,6 +10,7 @@ type AxialCodingPanelProps = {
   ungroupedCodes: Code[]
   memos: Memo[]
   showMemos: boolean
+  ydoc: Doc | null
   onAddCategory: () => void
   onUpdateCategory: (categoryId: string, patch: Partial<Category>) => void
   onRemoveCategory: (categoryId: string) => void
@@ -28,6 +30,7 @@ export function AxialCodingPanel({
   ungroupedCodes,
   memos,
   showMemos,
+  ydoc,
   onAddCategory,
   onUpdateCategory,
   onRemoveCategory,
@@ -87,6 +90,7 @@ export function AxialCodingPanel({
         {categories.map((category) => (
           <CategoryCard
             key={category.id}
+            ydoc={ydoc}
             category={category}
             codes={codes}
             memos={memos}

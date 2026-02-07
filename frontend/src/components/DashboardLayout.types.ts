@@ -16,7 +16,10 @@ export type PresenceUser = {
 export type CursorPresence = {
   x: number
   y: number
+  fieldId?: string
   documentId?: string
   docPos?: number
+  height?: number
+  absolute?: boolean
   updatedAt: number
 }

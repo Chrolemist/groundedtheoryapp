@@ -276,12 +276,14 @@ export function useProjectState({
     memos,
     theoryHtml,
     coreCategoryId,
+    coreCategoryDraft,
     setDocuments,
     setCodes,
     setCategories,
     setMemos,
     setTheoryHtml,
     setCoreCategoryId,
+    setCoreCategoryDraft,
     isApplyingRemoteRef,
   })
 

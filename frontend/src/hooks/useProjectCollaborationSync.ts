@@ -216,6 +216,137 @@ export function useProjectCollaborationSync({
 
   useEffect(() => {
     const handleSelectionChange = () => {
+      const activeElement = document.activeElement
+      if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+        const getInputCaretRect = (input: HTMLInputElement | HTMLTextAreaElement) => {
+          const selectionStart = input.selectionStart
+          if (selectionStart === null || selectionStart === undefined) return null
+          const computed = window.getComputedStyle(input)
+          const lineHeight = parseFloat(computed.lineHeight)
+          const fontSize = parseFloat(computed.fontSize)
+          const resolvedLineHeight = Number.isFinite(lineHeight) && lineHeight > 0
+            ? lineHeight
+            : fontSize * 1.2
+
+          if (input instanceof HTMLInputElement) {
+            const canvas = document.createElement('canvas')
+            const ctx = canvas.getContext('2d')
+            const before = (input.value || '').slice(0, selectionStart)
+            const full = input.value || ''
+            const letterSpacing = parseFloat(computed.letterSpacing)
+            const spacing = Number.isFinite(letterSpacing) ? letterSpacing : 0
+            if (ctx) {
+              ctx.font = `${computed.fontStyle} ${computed.fontVariant} ${computed.fontWeight} ${computed.fontSize} / ${resolvedLineHeight}px ${computed.fontFamily}`
+              const beforeWidth = ctx.measureText(before).width + Math.max(0, before.length - 1) * spacing
+              const totalWidth = ctx.measureText(full).width + Math.max(0, full.length - 1) * spacing
+              const paddingLeft = parseFloat(computed.paddingLeft)
+              const paddingRight = parseFloat(computed.paddingRight)
+              const borderLeft = parseFloat(computed.borderLeftWidth)
+              const contentWidth = input.clientWidth - paddingLeft - paddingRight
+              let alignOffset = 0
+              if (computed.textAlign === 'center') {
+                alignOffset = (contentWidth - totalWidth) / 2
+              } else if (computed.textAlign === 'right' || computed.textAlign === 'end') {
+                alignOffset = contentWidth - totalWidth
+              }
+              const left = borderLeft + paddingLeft + alignOffset + beforeWidth - input.scrollLeft
+              const top = (input.clientHeight - resolvedLineHeight) / 2
+              return { x: left, y: top, height: resolvedLineHeight }
+            }
+          }
+
+          const mirror = document.createElement('div')
+          mirror.style.position = 'absolute'
+          mirror.style.visibility = 'hidden'
+          mirror.style.whiteSpace = input instanceof HTMLInputElement ? 'pre' : 'pre-wrap'
+          mirror.style.wordWrap = 'break-word'
+          mirror.style.wordBreak = 'break-word'
+          mirror.style.textAlign = computed.textAlign
+          mirror.style.textIndent = computed.textIndent
+          mirror.style.direction = computed.direction
+          mirror.style.tabSize = computed.tabSize
+          mirror.style.boxSizing = computed.boxSizing
+          mirror.style.width = `${input.clientWidth}px`
+          mirror.style.fontFamily = computed.fontFamily
+          mirror.style.fontSize = computed.fontSize
+          mirror.style.fontWeight = computed.fontWeight
+          mirror.style.fontStyle = computed.fontStyle
+          mirror.style.letterSpacing = computed.letterSpacing
+          mirror.style.textTransform = computed.textTransform
+          mirror.style.lineHeight = computed.lineHeight
+          mirror.style.padding = computed.padding
+          mirror.style.border = computed.border
+
+          const value = input.value || ''
+          const before = value.slice(0, selectionStart)
+          mirror.textContent = before
+          const marker = document.createElement('span')
+          marker.textContent = value.slice(selectionStart, selectionStart + 1) || '\u200b'
+          mirror.appendChild(marker)
+          document.body.appendChild(mirror)
+
+          const mirrorRect = mirror.getBoundingClientRect()
+          const markerRect = marker.getBoundingClientRect()
+          document.body.removeChild(mirror)
+
+          const left = (markerRect.left - mirrorRect.left) - input.scrollLeft
+          const top = (markerRect.top - mirrorRect.top) - input.scrollTop
+          const height = markerRect.height || resolvedLineHeight
+          return { x: left, y: top, height }
+        }
+
+        const caretRect = getInputCaretRect(activeElement)
+        if (caretRect) {
+          sendJson?.({
+            type: 'cursor:update',
+            cursor: {
+              x: caretRect.x,
+              y: caretRect.y,
+              fieldId: activeElement.id || undefined,
+              height: caretRect.height,
+              absolute: false,
+              updatedAt: Date.now(),
+            },
+          })
+          return
+        }
+      }
+
+      if (activeElement instanceof HTMLElement && activeElement.isContentEditable) {
+        const fieldId = activeElement.id
+        const selection = window.getSelection()
+        if (fieldId && selection && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0).cloneRange()
+          range.collapse(false)
+          const rects = range.getClientRects()
+          let rect = rects[0] ?? range.getBoundingClientRect()
+          if ((!rect || (!rect.width && !rect.height)) && range.startContainer instanceof HTMLElement) {
+            rect = range.startContainer.getBoundingClientRect()
+          }
+          if (rect && Number.isFinite(rect.left) && Number.isFinite(rect.top)) {
+            const fieldRect = activeElement.getBoundingClientRect()
+            const computed = window.getComputedStyle(activeElement)
+            const lineHeight = parseFloat(computed.lineHeight)
+            const fontSize = parseFloat(computed.fontSize)
+            const resolvedLineHeight = Number.isFinite(lineHeight) && lineHeight > 0
+              ? lineHeight
+              : fontSize * 1.2
+            sendJson?.({
+              type: 'cursor:update',
+              cursor: {
+                x: rect.left - fieldRect.left,
+                y: rect.top - fieldRect.top,
+                fieldId,
+                height: Math.max(2, Math.min(rect.height || resolvedLineHeight, resolvedLineHeight)),
+                absolute: false,
+                updatedAt: Date.now(),
+              },
+            })
+            return
+          }
+        }
+      }
+
       const selection = window.getSelection()
       if (!selection || selection.rangeCount === 0) {
         sendJson?.({ type: 'cursor:clear' })

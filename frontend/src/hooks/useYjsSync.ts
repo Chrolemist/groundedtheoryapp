@@ -18,12 +18,14 @@ type UseYjsSyncArgs = {
   memos: Memo[]
   theoryHtml: string
   coreCategoryId: string
+  coreCategoryDraft: string
   setDocuments: Dispatch<SetStateAction<{ id: string; title: string; text: string; html: string }[]>>
   setCodes: Dispatch<SetStateAction<Code[]>>
   setCategories: Dispatch<SetStateAction<Category[]>>
   setMemos: Dispatch<SetStateAction<Memo[]>>
   setTheoryHtml: Dispatch<SetStateAction<string>>
   setCoreCategoryId: Dispatch<SetStateAction<string>>
+  setCoreCategoryDraft: Dispatch<SetStateAction<string>>
   isApplyingRemoteRef: MutableRefObject<boolean>
 }
 
@@ -57,11 +59,11 @@ const fromBase64 = (value: string) => {
 
 const isEditingElement = (element: Element | null) => {
   if (!element) return false
-  if (element instanceof HTMLElement) {
-    if (element.isContentEditable) return true
-    const tag = element.tagName
-    if (tag === 'INPUT' || tag === 'TEXTAREA') return true
-  }
+  if (!(element instanceof HTMLElement)) return false
+  if (element.isContentEditable) return true
+  if (element.closest('.document-content')) return true
+  if (element.closest('.ProseMirror')) return true
+  if (element.closest('#theory-narrative')) return true
   return false
 }
 
@@ -88,12 +90,14 @@ export function useYjsSync({
   memos,
   theoryHtml,
   coreCategoryId,
+  coreCategoryDraft,
   setDocuments,
   setCodes,
   setCategories,
   setMemos,
   setTheoryHtml,
   setCoreCategoryId,
+  setCoreCategoryDraft,
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
   const [ydoc] = useState(() => new Y.Doc())
@@ -107,6 +111,7 @@ export function useYjsSync({
   const memosOrderRef = useRef<Y.Array<string> | null>(null)
   const theoryTextRef = useRef<Y.Text | null>(null)
   const coreCategoryTextRef = useRef<Y.Text | null>(null)
+  const coreCategoryDraftTextRef = useRef<Y.Text | null>(null)
   const pendingRefreshRef = useRef(false)
   const didHydrateRef = useRef(false)
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
@@ -264,7 +269,8 @@ export function useYjsSync({
     const memosMap = memosMapRef.current
     const theoryText = theoryTextRef.current
     const coreCategoryText = coreCategoryTextRef.current
-    if (!documentsMap || !categoriesMap || !codesMap || !memosMap || !theoryText || !coreCategoryText) return
+    const coreCategoryDraftText = coreCategoryDraftTextRef.current
+    if (!documentsMap || !categoriesMap || !codesMap || !memosMap || !theoryText || !coreCategoryText || !coreCategoryDraftText) return
     isApplyingRemoteRef.current = true
     setDocuments((current) => {
       const next = readDocumentsFromYjs(current)
@@ -360,8 +366,10 @@ export function useYjsSync({
     })
     const nextTheory = theoryText.toString()
     const nextCoreId = coreCategoryText.toString()
+    const nextCoreDraft = coreCategoryDraftText.toString()
     if (nextTheory !== theoryHtml) setTheoryHtml(nextTheory)
     if (nextCoreId !== coreCategoryId) setCoreCategoryId(nextCoreId)
+    if (nextCoreDraft !== coreCategoryDraft) setCoreCategoryDraft(nextCoreDraft)
     setTimeout(() => {
       isApplyingRemoteRef.current = false
     }, 0)
@@ -376,9 +384,11 @@ export function useYjsSync({
     setCodes,
     setCategories,
     setCoreCategoryId,
+    setCoreCategoryDraft,
     setMemos,
     setTheoryHtml,
     theoryHtml,
+    coreCategoryDraft,
   ])
 
   useEffect(() => {
@@ -441,6 +451,7 @@ export function useYjsSync({
     memosOrderRef.current = ydoc.getArray<string>('memosOrder')
     theoryTextRef.current = ydoc.getText('theoryHtml')
     coreCategoryTextRef.current = ydoc.getText('coreCategoryId')
+    coreCategoryDraftTextRef.current = ydoc.getText('coreCategoryDraft')
 
     ydoc.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin === REMOTE_ORIGIN || origin === BROADCAST_ORIGIN) {
@@ -646,7 +657,8 @@ export function useYjsSync({
   useEffect(() => {
     const theoryText = theoryTextRef.current
     const coreCategoryText = coreCategoryTextRef.current
-    if (!ydoc || !theoryText || !coreCategoryText) return
+    const coreCategoryDraftText = coreCategoryDraftTextRef.current
+    if (!ydoc || !theoryText || !coreCategoryText || !coreCategoryDraftText) return
     if (isApplyingRemoteRef.current) return
 
     ydoc.transact(() => {
@@ -658,8 +670,12 @@ export function useYjsSync({
         coreCategoryText.delete(0, coreCategoryText.length)
         coreCategoryText.insert(0, coreCategoryId)
       }
+      if (coreCategoryDraftText.toString() !== coreCategoryDraft) {
+        coreCategoryDraftText.delete(0, coreCategoryDraftText.length)
+        coreCategoryDraftText.insert(0, coreCategoryDraft)
+      }
     }, LOCAL_ORIGIN)
-  }, [theoryHtml, coreCategoryId, isApplyingRemoteRef, ydoc])
+  }, [theoryHtml, coreCategoryId, coreCategoryDraft, isApplyingRemoteRef, ydoc])
 
   return {
     ydoc,

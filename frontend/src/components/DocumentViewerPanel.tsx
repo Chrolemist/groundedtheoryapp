@@ -4,6 +4,7 @@ import type { Editor } from '@tiptap/react'
 import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem, type DocumentViewMode } from './DashboardLayout.types'
 import { DocumentEditor } from './DocumentEditor'
+import { useYjsMapText } from '../hooks/useYjsMapText'
 import { cn } from '../lib/cn'
 import { TreeMapView, type TreeMapExcerptTarget } from './TreeMapView'
 import { StatsOverviewPanel } from './StatsOverviewPanel'
@@ -76,6 +77,13 @@ export function DocumentViewerPanel({
   const [activeTab, setActiveTab] = useState<'document' | 'tree' | 'overview'>(
     'document',
   )
+  const updateDocumentTitle = useYjsMapText({
+    ydoc,
+    mapName: 'documents',
+    itemId: activeDocumentId,
+    field: 'title',
+    onLocalUpdate: onDocumentTitleChange,
+  })
   const mapFocusRef = useRef<HTMLElement | null>(null)
   const skipNextClearRef = useRef(false)
   const focusedTargetRef = useRef<TreeMapExcerptTarget | null>(null)
@@ -296,7 +304,7 @@ export function DocumentViewerPanel({
             value={hasDocuments ? documentTitle : ''}
             onChange={(event) => {
               if (!hasDocuments) return
-              onDocumentTitleChange(event.target.value)
+              updateDocumentTitle(event.target.value)
             }}
             className="min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
             placeholder="Document title"
