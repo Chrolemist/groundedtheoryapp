@@ -65,8 +65,8 @@ export function useProjectAutosave({
 
     const documentsSnapshot = documents.map((doc) => {
       const fallback = getDocumentContent?.(doc.id)
-      if (fallback && (!doc.html || !doc.text)) {
-        return { ...doc, html: doc.html || fallback.html, text: doc.text || fallback.text }
+      if (fallback && (fallback.html !== doc.html || fallback.text !== doc.text)) {
+        return { ...doc, html: fallback.html, text: fallback.text }
       }
       return doc
     })
