@@ -28,6 +28,7 @@ export function DashboardLayout() {
     if (window.location.port === '5173') return 'http://localhost:8000'
     return window.location.origin
   }, [])
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
 
   const {
     websocketOnline,
@@ -47,6 +48,7 @@ export function DashboardLayout() {
     hasRemoteState,
     persistProject: useCallback(
       (projectRaw: Record<string, unknown>) => {
+        if (disableWs) return
         if (!apiBase) return
         const seq = saveSeqRef.current + 1
         saveSeqRef.current = seq
@@ -76,7 +78,7 @@ export function DashboardLayout() {
             }
           })
       },
-      [apiBase],
+      [apiBase, disableWs],
     ),
   })
 
@@ -114,6 +116,7 @@ export function DashboardLayout() {
   }, [project.applyRemoteProject])
 
   useEffect(() => {
+    if (disableWs) return
     if (!apiBase) return
     if (hasRemoteState) return
     if (remoteLoadedRef.current) return
@@ -141,7 +144,7 @@ export function DashboardLayout() {
     return () => {
       controller.abort()
     }
-  }, [apiBase, hasRemoteState])
+  }, [apiBase, disableWs, hasRemoteState])
 
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))

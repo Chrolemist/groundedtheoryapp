@@ -171,17 +171,12 @@ export function useProjectCollaborationSync({
 
       const getCaretRect = (input: Selection) => {
         const range = input.getRangeAt(0).cloneRange()
-        if (input.focusNode) {
-          try {
-            range.setStart(input.focusNode, input.focusOffset)
-            range.setEnd(input.focusNode, input.focusOffset)
-          } catch {
-            range.collapse(true)
-          }
-        } else {
-          range.collapse(true)
+        range.collapse(false)
+        const rects = range.getClientRects()
+        let rect = rects[0] ?? range.getBoundingClientRect()
+        if ((!rect || (!rect.width && !rect.height)) && range.startContainer instanceof HTMLElement) {
+          rect = range.startContainer.getBoundingClientRect()
         }
-        const rect = range.getClientRects()[0] ?? range.getBoundingClientRect()
         if (!rect || !Number.isFinite(rect.left) || !Number.isFinite(rect.top)) return null
         return rect
       }
@@ -211,11 +206,14 @@ export function useProjectCollaborationSync({
 
       const rect = getCaretRect(selection)
       if (rect) {
+        const containerRect = docContainer.getBoundingClientRect()
+        const relativeX = rect.left - containerRect.left
+        const relativeY = rect.top - containerRect.top
         sendJson?.({
           type: 'cursor:update',
           cursor: {
-            x: rect.left,
-            y: rect.top,
+            x: relativeX,
+            y: relativeY,
             documentId: docContainer.getAttribute('data-doc-id') ?? undefined,
             updatedAt: Date.now(),
           },

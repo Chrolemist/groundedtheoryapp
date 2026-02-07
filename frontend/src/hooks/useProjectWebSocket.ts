@@ -114,12 +114,14 @@ const connectSharedSocket = (url: string) => {
 export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
 
   useEffect(() => {
     messageHandlerRef.current = options.onMessage
   }, [options.onMessage])
 
   useEffect(() => {
+    if (disableWs) return undefined
     const url = getWebSocketUrl()
     if (!url) return undefined
     const handleMessage = (payload: unknown) => {
@@ -164,9 +166,10 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         sharedRetryCount = 0
       }
     }
-  }, [])
+  }, [disableWs])
 
   const sendJson = useCallback((payload: unknown) => {
+    if (disableWs) return false
     if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return false
     try {
       sharedSocket.send(JSON.stringify(payload))
@@ -174,7 +177,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     } catch {
       return false
     }
-  }, [])
+  }, [disableWs])
 
   return { isOnline, sendJson }
 }
