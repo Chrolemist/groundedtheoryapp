@@ -289,12 +289,15 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
       if (type === 'presence:hello') {
         const user = data.user as PresenceUser | undefined
         if (!user) return
+        if (user.id === localUserRef.current?.id) return
+        let shouldReply = false
         setPresenceUsers((current) => {
           if (current.some((item) => item.id === user.id)) return current
+          shouldReply = true
           return [...current, user]
         })
-        // Reply with our own presence so the new tab sees us too.
-        if (localUserRef.current && broadcastRef.current) {
+        // Reply only when we actually add a new user to avoid hello loops.
+        if (shouldReply && localUserRef.current && broadcastRef.current) {
           broadcastRef.current.postMessage({
             type: 'presence:hello',
             user: localUserRef.current,

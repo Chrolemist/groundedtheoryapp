@@ -1,4 +1,4 @@
-import { useEffect, type MouseEvent, type MutableRefObject } from 'react'
+import { useCallback, useEffect, type MouseEvent, type MutableRefObject } from 'react'
 import type { Editor } from '@tiptap/react'
 import { TextSelection } from '@tiptap/pm/state'
 import { type Code } from '../types'
@@ -55,12 +55,12 @@ export function useHighlighting({
     placeCaretInContent(content, event)
   }
 
-  const getSelectionDocumentId = (range: Range) => {
+  const getSelectionDocumentId = useCallback((range: Range) => {
     const node = range.commonAncestorContainer
     const element = node instanceof HTMLElement ? node : node.parentElement
     const container = element?.closest('[data-doc-id]')
     return container?.getAttribute('data-doc-id') ?? null
-  }
+  }, [])
 
   useEffect(() => {
     const handleSelectionChange = () => {
@@ -197,37 +197,11 @@ export function useHighlighting({
           const nodeType = state.schema.nodes.codeHighlight
           if (!nodeType) return false
 
-          const ranges: Array<{ from: number; to: number }> = []
-          state.doc.nodesBetween(resolvedFrom, resolvedTo, (node, pos) => {
-            if (!node.isTextblock) return
-            const blockFrom = Math.max(resolvedFrom, pos + 1)
-            const blockTo = Math.min(resolvedTo, pos + node.nodeSize - 1)
-            if (blockFrom < blockTo) {
-              ranges.push({ from: blockFrom, to: blockTo })
-            }
-          })
-
-          if (!ranges.length) return false
-
-          for (let index = ranges.length - 1; index >= 0; index -= 1) {
-            const { from: rangeFrom, to: rangeTo } = ranges[index]
-            const mappedFrom = tr.mapping.map(rangeFrom, -1)
-            const mappedTo = tr.mapping.map(rangeTo, 1)
-            if (mappedFrom >= mappedTo) continue
-            const slice = state.doc.slice(rangeFrom, rangeTo).content
-            const fallbackText = state.doc.textBetween(rangeFrom, rangeTo, '\n', '\n')
-            const nodeContent = nodeType.validContent(slice)
-              ? slice
-              : fallbackText
-                ? state.schema.text(fallbackText)
-                : null
-            if (!nodeContent) continue
-            const node = nodeType.create(attrs, nodeContent)
-            tr.replaceRangeWith(mappedFrom, mappedTo, node)
-          }
-
-          const mappedSelection = tr.mapping.map(resolvedTo, 1)
-          tr.setSelection(TextSelection.create(tr.doc, mappedSelection))
+          const text = state.doc.textBetween(resolvedFrom, resolvedTo, '\n', '\n')
+          if (!text) return false
+          const node = nodeType.create(attrs, state.schema.text(text))
+          tr.replaceRangeWith(resolvedFrom, resolvedTo, node)
+          tr.setSelection(TextSelection.create(tr.doc, resolvedFrom + node.nodeSize))
           return tr.docChanged
         })
         .run()

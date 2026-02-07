@@ -438,16 +438,19 @@ export function useProjectCollaborationSync({
       }
 
       if (fonts.size === 0) {
-        setDocumentFontFamilyDisplay(documentFontFamily)
+        setDocumentFontFamilyDisplay((current) =>
+          current === documentFontFamily ? current : documentFontFamily,
+        )
         return
       }
 
       if (fonts.size === 1) {
-        setDocumentFontFamilyDisplay(Array.from(fonts)[0])
+        const next = Array.from(fonts)[0]
+        setDocumentFontFamilyDisplay((current) => (current === next ? current : next))
         return
       }
 
-      setDocumentFontFamilyDisplay('__mixed__')
+      setDocumentFontFamilyDisplay((current) => (current === '__mixed__' ? current : '__mixed__'))
     }
 
     document.addEventListener('selectionchange', handleSelectionChange)
