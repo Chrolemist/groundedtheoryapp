@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
 import { type CursorPresence, type PresenceUser, type SelectionPresence } from './DashboardLayout.types'
 
@@ -17,6 +18,34 @@ export function CollaborationLayer({
   localUser,
   documentEditorInstancesRef,
 }: CollaborationLayerProps) {
+  const [, forceRender] = useState(0)
+  const rafRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const schedule = () => {
+      if (rafRef.current) return
+      rafRef.current = window.requestAnimationFrame(() => {
+        rafRef.current = null
+        forceRender((value) => value + 1)
+      })
+    }
+
+    const handleScroll = () => schedule()
+    const handleResize = () => schedule()
+
+    window.addEventListener('scroll', handleScroll, true)
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true)
+      window.removeEventListener('resize', handleResize)
+      if (rafRef.current) {
+        window.cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [])
+
   const overlays: Array<React.ReactNode> = []
 
   const renderCursor = (userId: string, cursor: CursorPresence) => {
