@@ -217,7 +217,7 @@ yjs_update_log: List[str] = []
 yjs_update_limit = 200
 
 firestore_client: Optional[firestore.Client] = None
-last_saved_project_hash: Optional[str] = None
+last_saved_project_hash: Dict[str, str] = {}
 
 
 def get_firestore_client() -> Optional[firestore.Client]:
@@ -260,6 +260,14 @@ def get_firestore_doc_ref():
     collection = os.getenv("FIRESTORE_COLLECTION", "projects")
     doc_id = os.getenv("FIRESTORE_DOC", "default")
     return client.collection(collection).document(doc_id)
+
+
+def get_project_doc_ref(project_id: str):
+    client = get_firestore_client()
+    if not client:
+        return None
+    collection = os.getenv("FIRESTORE_COLLECTION", "projects")
+    return client.collection(collection).document(project_id)
 
 
 def compute_project_hash(project_raw: Dict) -> Optional[str]:
@@ -307,29 +315,31 @@ def validate_project_limits(project_raw: Dict) -> Optional[Dict[str, str]]:
     return None
 
 
-def save_project_to_firestore(project_raw: Dict) -> None:
+def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = None) -> None:
     global last_saved_project_hash
-    doc_ref = get_firestore_doc_ref()
+    doc_ref = get_project_doc_ref(project_id) if project_id else get_firestore_doc_ref()
     if not doc_ref:
         return
     current_hash = compute_project_hash(project_raw)
-    if current_hash and current_hash == last_saved_project_hash:
+    hash_key = project_id or "default"
+    if current_hash and current_hash == last_saved_project_hash.get(hash_key):
         return
     try:
         doc_ref.set(
             {
                 "project": project_raw,
                 "updated_at": firestore.SERVER_TIMESTAMP,
-            }
+            },
+            merge=True,
         )
         if current_hash:
-            last_saved_project_hash = current_hash
+            last_saved_project_hash[hash_key] = current_hash
     except Exception as exc:
         logger.warning(f"Failed to save project to Firestore: {exc}")
 
 
-def load_project_from_firestore() -> Optional[Dict]:
-    doc_ref = get_firestore_doc_ref()
+def load_project_from_firestore(project_id: Optional[str] = None) -> Optional[Dict]:
+    doc_ref = get_project_doc_ref(project_id) if project_id else get_firestore_doc_ref()
     if not doc_ref:
         return None
     try:
@@ -341,6 +351,23 @@ def load_project_from_firestore() -> Optional[Dict]:
     except Exception as exc:
         logger.warning(f"Failed to load project from Firestore: {exc}")
         return None
+
+
+def serialize_project_summary(snapshot) -> Dict[str, Optional[str]]:
+    data = snapshot.to_dict() or {}
+    name = data.get("name") or "Untitled project"
+    updated_at = data.get("updated_at")
+    created_at = data.get("created_at")
+    def to_iso(value):
+        if hasattr(value, "isoformat"):
+            return value.isoformat()
+        return None
+    return {
+        "id": snapshot.id,
+        "name": name,
+        "updated_at": to_iso(updated_at),
+        "created_at": to_iso(created_at),
+    }
 
 allowed_origins = [origin.strip() for origin in os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",") if origin.strip()]
 
@@ -362,7 +389,9 @@ async def load_persisted_project() -> None:
     if project_raw:
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
-        last_saved_project_hash = compute_project_hash(project_raw)
+        project_hash = compute_project_hash(project_raw)
+        if project_hash:
+            last_saved_project_hash["default"] = project_hash
         logger.info("Loaded project from Firestore")
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -590,15 +619,169 @@ async def get_project_state() -> Dict[str, Optional[Dict]]:
     if project_raw:
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
-        last_saved_project_hash = compute_project_hash(project_raw)
+        project_hash = compute_project_hash(project_raw)
+        if project_hash:
+            last_saved_project_hash["default"] = project_hash
     elif not in_memory_project_raw and in_memory_project.documents:
         in_memory_project_raw = in_memory_project.model_dump()
-        last_saved_project_hash = compute_project_hash(in_memory_project_raw)
+        project_hash = compute_project_hash(in_memory_project_raw)
+        if project_hash:
+            last_saved_project_hash["default"] = project_hash
 
     return {
         "project_raw": in_memory_project_raw or None,
         "project": in_memory_project.model_dump(),
     }
+
+
+@app.get("/projects")
+async def list_projects() -> Dict[str, List[Dict[str, Optional[str]]]]:
+    client = get_firestore_client()
+    if not client:
+        return {"projects": []}
+    collection = os.getenv("FIRESTORE_COLLECTION", "projects")
+    try:
+        query = client.collection(collection).order_by(
+            "updated_at", direction=firestore.Query.DESCENDING
+        )
+        snapshots = query.stream()
+        return {"projects": [serialize_project_summary(doc) for doc in snapshots]}
+    except Exception as exc:
+        logger.warning(f"Failed to list projects: {exc}")
+        return {"projects": []}
+
+
+@app.post("/projects")
+async def create_project(payload: Dict = Body(...)) -> Dict[str, Optional[Dict]]:
+    client = get_firestore_client()
+    if not client:
+        return {"status": "error", "message": "Firestore not available"}
+    name = str(payload.get("name") or "New project").strip() or "New project"
+    project_raw = payload.get("project_raw")
+    if not isinstance(project_raw, dict):
+        project_raw = {
+            "documents": [],
+            "codes": [],
+            "categories": [],
+            "memos": [],
+            "coreCategoryId": "",
+            "theoryHtml": "",
+        }
+    limit_error = validate_project_limits(project_raw)
+    if limit_error:
+        return {
+            "status": "error",
+            **limit_error,
+        }
+    project_id = str(uuid4())
+    doc_ref = get_project_doc_ref(project_id)
+    if not doc_ref:
+        return {"status": "error", "message": "Firestore not available"}
+    doc_ref.set(
+        {
+            "name": name,
+            "project": project_raw,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "updated_at": firestore.SERVER_TIMESTAMP,
+        }
+    )
+    return {
+        "project_id": project_id,
+        "project_raw": project_raw,
+        "name": name,
+    }
+
+
+@app.get("/projects/{project_id}")
+async def get_project(project_id: str) -> Dict[str, Optional[Dict]]:
+    doc_ref = get_project_doc_ref(project_id)
+    if not doc_ref:
+        return {"status": "error", "message": "Firestore not available"}
+    try:
+        snapshot = doc_ref.get()
+        if not snapshot.exists:
+            return {"status": "not_found"}
+        data = snapshot.to_dict() or {}
+        return {
+            "project_raw": data.get("project") or None,
+            "project": normalize_project_state(data.get("project") or {}).model_dump(),
+            "name": data.get("name") or "Untitled project",
+        }
+    except Exception as exc:
+        logger.warning(f"Failed to load project: {exc}")
+        return {"status": "error", "message": "Failed to load project"}
+
+
+@app.patch("/projects/{project_id}")
+async def rename_project(project_id: str, payload: Dict = Body(...)) -> Dict[str, str]:
+    doc_ref = get_project_doc_ref(project_id)
+    if not doc_ref:
+        return {"status": "error", "message": "Firestore not available"}
+    name = str(payload.get("name") or "").strip()
+    if not name:
+        return {"status": "invalid", "message": "Project name is required"}
+    try:
+        doc_ref.set(
+            {
+                "name": name,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            },
+            merge=True,
+        )
+        return {"status": "ok", "name": name}
+    except Exception as exc:
+        logger.warning(f"Failed to rename project: {exc}")
+        return {"status": "error", "message": "Failed to rename project"}
+
+
+@app.delete("/projects/{project_id}")
+async def delete_project(project_id: str) -> Dict[str, str]:
+    global last_saved_project_hash
+    doc_ref = get_project_doc_ref(project_id)
+    if not doc_ref:
+        return {"status": "error", "message": "Firestore not available"}
+    try:
+        doc_ref.delete()
+        last_saved_project_hash.pop(project_id, None)
+        return {"status": "ok"}
+    except Exception as exc:
+        logger.warning(f"Failed to delete project: {exc}")
+        return {"status": "error", "message": "Failed to delete project"}
+
+
+@app.post("/projects/{project_id}/state")
+async def set_project_state_for_project(project_id: str, payload: Dict = Body(...)) -> Dict[str, str]:
+    global in_memory_project
+    global in_memory_project_raw
+    global last_saved_project_hash
+
+    try:
+        project_raw = payload.get("project_raw") or payload.get("project") or payload
+        project_name = payload.get("name")
+        if not isinstance(project_raw, dict):
+            return {"status": "invalid"}
+
+        limit_error = validate_project_limits(project_raw)
+        if limit_error:
+            return {
+                "status": "error",
+                **limit_error,
+            }
+
+        in_memory_project_raw = project_raw
+        in_memory_project = normalize_project_state(project_raw)
+        save_project_to_firestore(in_memory_project_raw, project_id=project_id)
+        if project_name:
+            doc_ref = get_project_doc_ref(project_id)
+            if doc_ref:
+                doc_ref.set({"name": project_name}, merge=True)
+        project_hash = compute_project_hash(in_memory_project_raw)
+        if project_hash:
+            last_saved_project_hash[project_id] = project_hash
+        return {"status": "ok"}
+    except Exception:
+        logger.exception("Failed to save project state")
+        return {"status": "error"}
 
 
 @app.post("/project/state")
@@ -622,8 +805,9 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
         in_memory_project_raw = project_raw
         in_memory_project = normalize_project_state(project_raw)
         save_project_to_firestore(in_memory_project_raw)
-        if not last_saved_project_hash:
-            last_saved_project_hash = compute_project_hash(in_memory_project_raw)
+        project_hash = compute_project_hash(in_memory_project_raw)
+        if project_hash:
+            last_saved_project_hash["default"] = project_hash
         await manager.broadcast(
             {
                 "type": "project:update",
@@ -654,7 +838,9 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
             **limit_error,
         }
     save_project_to_firestore(project_state.model_dump())
-    last_saved_project_hash = compute_project_hash(in_memory_project_raw)
+    project_hash = compute_project_hash(in_memory_project_raw)
+    if project_hash:
+        last_saved_project_hash["default"] = project_hash
     await manager.broadcast(in_memory_project.model_dump())
 
     return {"status": "ok"}
@@ -670,25 +856,36 @@ async def save_project() -> Response:
 
 
 @app.get("/export/word")
-async def export_word() -> Response:
+async def export_word(project_id: Optional[str] = None) -> Response:
+    project_raw = load_project_from_firestore(project_id) if project_id else None
+    project = normalize_project_state(project_raw) if project_raw else in_memory_project
     document = Document()
     document.add_heading("Grounded Theory Analysrapport", level=1)
 
     document.add_heading("Teori (Selektiv kodning)", level=2)
+    def get_code_by_id_local(code_id: str) -> Optional[CodeItem]:
+        return next((code for code in project.codes if code.id == code_id), None)
+
+    def get_category_by_id_local(category_id: str) -> Optional[CategoryItem]:
+        return next((category for category in project.categories if category.id == category_id), None)
+
+    def get_document_by_id_local(document_id: str) -> Optional[DocumentItem]:
+        return next((doc for doc in project.documents if doc.id == document_id), None)
+
     core_category = (
-        get_category_by_id(in_memory_project.core_category_id)
-        if in_memory_project.core_category_id
+        get_category_by_id_local(project.core_category_id)
+        if project.core_category_id
         else None
     )
     document.add_paragraph(
         f"Kärnkategori: {core_category.name if core_category else 'Inte vald'}"
     )
     document.add_paragraph(
-        in_memory_project.theory_description or "Ingen teoribeskrivning angiven."
+        project.theory_description or "Ingen teoribeskrivning angiven."
     )
 
     document.add_heading("Kategorier (Axial kodning)", level=2)
-    for category in in_memory_project.categories:
+    for category in project.categories:
         document.add_paragraph(category.name)
         if category.precondition or category.action or category.consequence:
             if category.precondition:
@@ -698,21 +895,19 @@ async def export_word() -> Response:
             if category.consequence:
                 document.add_paragraph(f"Konsekvens: {category.consequence}")
         for code_id in category.contained_code_ids:
-            code = get_code_by_id(code_id)
+            code = get_code_by_id_local(code_id)
             if code:
                 document.add_paragraph(f"- {code.name}")
 
     document.add_heading("Evidens (Öppen kodning)", level=2)
-    for code in in_memory_project.codes:
+    for code in project.codes:
         document.add_paragraph(code.name)
-        related_highlights = [
-            highlight for highlight in in_memory_project.highlights if highlight.code_id == code.id
-        ]
+        related_highlights = [highlight for highlight in project.highlights if highlight.code_id == code.id]
         if not related_highlights:
             document.add_paragraph("Inga citat ännu.")
             continue
         for highlight in related_highlights:
-            document_item = get_document_by_id(highlight.document_id)
+            document_item = get_document_by_id_local(highlight.document_id)
             if not document_item:
                 continue
             quote = document_item.content[highlight.start_index : highlight.end_index]
@@ -733,18 +928,20 @@ async def export_word() -> Response:
 
 
 @app.get("/export/excel")
-async def export_excel() -> Response:
+async def export_excel(project_id: Optional[str] = None) -> Response:
+    project_raw = load_project_from_firestore(project_id) if project_id else None
+    project = normalize_project_state(project_raw) if project_raw else in_memory_project
     rows = []
-    code_by_id = {code.id: code for code in in_memory_project.codes}
-    category_by_id = {category.id: category for category in in_memory_project.categories}
+    code_by_id = {code.id: code for code in project.codes}
+    category_by_id = {category.id: category for category in project.categories}
     categories_by_code: Dict[str, List[str]] = {}
-    for category in in_memory_project.categories:
+    for category in project.categories:
         for code_id in category.contained_code_ids:
             categories_by_code.setdefault(code_id, []).append(category.name)
 
-    for highlight in in_memory_project.highlights:
+    for highlight in project.highlights:
         code = code_by_id.get(highlight.code_id)
-        document_item = get_document_by_id(highlight.document_id)
+        document_item = next((doc for doc in project.documents if doc.id == highlight.document_id), None)
         if not code or not document_item:
             continue
         quote = document_item.content[highlight.start_index : highlight.end_index]

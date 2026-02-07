@@ -9,6 +9,7 @@ type UseProjectIOArgs = {
   coreCategoryId: string
   theoryHtml: string
   activeDocumentId: string
+  projectId?: string | null
   documentViewMode: DocumentViewMode
   documentFontFamily: string
   documentLineHeight: string
@@ -52,6 +53,7 @@ export function useProjectIO({
   setTheoryHtml,
   setActiveDocumentId,
   setDocumentViewMode,
+  projectId,
   setDocumentFontFamily,
   setDocumentFontFamilyDisplay,
   setDocumentLineHeight,
@@ -189,6 +191,12 @@ export function useProjectIO({
     return window.location.origin
   }
 
+  const withProjectId = (url: string) => {
+    if (!projectId) return url
+    const sep = url.includes('?') ? '&' : '?'
+    return `${url}${sep}project_id=${encodeURIComponent(projectId)}`
+  }
+
   const handleSaveProject = () => {
     const payload = {
       version: 1,
@@ -323,19 +331,22 @@ export function useProjectIO({
   }
 
   const exportReport = async (format: 'word' | 'excel') => {
-    const payload = buildProjectState()
-    const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
-    const formData = new FormData()
-    formData.append('file', blob, 'project.json')
-
     const apiBase = getApiBase()
+    if (!apiBase) return
 
-    await fetch(`${apiBase}/project/load`, {
-      method: 'POST',
-      body: formData,
-    })
+    if (!projectId) {
+      const payload = buildProjectState()
+      const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' })
+      const formData = new FormData()
+      formData.append('file', blob, 'project.json')
 
-    const response = await fetch(`${apiBase}/export/${format}`)
+      await fetch(`${apiBase}/project/load`, {
+        method: 'POST',
+        body: formData,
+      })
+    }
+
+    const response = await fetch(withProjectId(`${apiBase}/export/${format}`))
     if (!response.ok) return
     const fileBlob = await response.blob()
     downloadBlob(

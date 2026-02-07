@@ -1,25 +1,27 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
 import { DocumentViewerPanel } from './DocumentViewerPanel'
 import { DashboardHeader } from './DashboardHeader'
 import { CollaborationLayer } from './CollaborationLayer'
 import { CodingSidebar } from './CodingSidebar'
+import { ProjectPickerModal } from './ProjectPickerModal'
 import { useCollaboration } from '../hooks/useCollaboration'
 import { loadStoredProjectState } from '../lib/projectStorage'
 import { useProjectState } from '../hooks/useProjectState'
 import { useProjectIO } from '../hooks/useProjectIO'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
-import { useProjectRemoteLoad } from '../hooks/useProjectRemoteLoad'
+import { useProjectCatalog } from '../hooks/useProjectCatalog'
 
 export function DashboardLayout() {
   const storageKey = 'grounded-theory-app-state'
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const remoteLoadedRef = useRef(false)
+  const activeProjectIdRef = useRef<string | null>(null)
   const tour = useOnboardingTour()
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
 
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -45,6 +47,7 @@ export function DashboardLayout() {
     disableWs,
     hasRemoteState,
     remoteLoadedRef,
+    projectIdRef: activeProjectIdRef,
   })
 
   const project = useProjectState({
@@ -55,7 +58,22 @@ export function DashboardLayout() {
     persistProject,
   })
 
-  const { handleSaveProject, handleLoadProject, exportReport } = useProjectIO({
+  useEffect(() => {
+    projectUpdateRef.current = project.applyRemoteProject
+  }, [project.applyRemoteProject])
+
+  const catalog = useProjectCatalog({
+    apiBase,
+    remoteLoadedRef,
+    applyRemoteProject: project.applyRemoteProject,
+    autoCreateIfEmpty: true,
+    onActiveProjectChange: (projectId, name) => {
+      activeProjectIdRef.current = projectId
+      document.title = name ? `Grounded Theory - ${name}` : 'Grounded Theory'
+    },
+  })
+
+  const { exportReport } = useProjectIO({
     documents: project.documents,
     codes: project.codes,
     categories: project.categories,
@@ -63,6 +81,7 @@ export function DashboardLayout() {
     coreCategoryId: project.coreCategoryId,
     theoryHtml: project.theoryHtml,
     activeDocumentId: project.activeDocumentId,
+    projectId: catalog.activeProjectId,
     documentViewMode: project.documentViewMode,
     documentFontFamily: project.documentFontFamily,
     documentLineHeight: project.documentLineHeight,
@@ -84,17 +103,43 @@ export function DashboardLayout() {
     getReadableTextColor: project.getReadableTextColor,
   })
 
-  useEffect(() => {
-    projectUpdateRef.current = project.applyRemoteProject
-  }, [project.applyRemoteProject])
+  const openProjectModal = () => {
+    setIsProjectModalOpen(true)
+    void catalog.refreshProjects()
+  }
 
-  useProjectRemoteLoad({
-    apiBase,
-    disableWs,
-    hasRemoteState,
-    remoteLoadedRef,
-    applyRemoteProject: project.applyRemoteProject,
-  })
+  const handleCreateProject = async (name: string) => {
+    await catalog.createProject(name)
+    setIsProjectModalOpen(false)
+  }
+
+  const handleSelectProject = async (projectId: string) => {
+    await catalog.loadProject(projectId)
+    setIsProjectModalOpen(false)
+  }
+
+  const handleRenameProject = async (name: string) => {
+    if (!catalog.activeProjectId) return
+    await catalog.renameProject(catalog.activeProjectId, name)
+  }
+
+  const handleDeleteProject = async (projectId: string) => {
+    const ok = window.confirm('Delete this project permanently? This cannot be undone.')
+    if (!ok) return
+    const wasActive = await catalog.deleteProject(projectId)
+    if (wasActive) {
+      activeProjectIdRef.current = null
+      remoteLoadedRef.current = false
+      project.setDocuments([])
+      project.setCodes([])
+      project.setCategories([])
+      project.setMemos([])
+      project.setCoreCategoryId('')
+      project.setTheoryHtml('')
+      project.setActiveDocumentId('')
+      project.setDocumentViewMode('all')
+    }
+  }
 
   const presenceById = useMemo(() => {
     return new Map(presenceUsers.map((user) => [user.id, user]))
@@ -109,133 +154,165 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
-      <OnboardingTour
-          key={tour.runId}
-          run={tour.run}
-          runId={tour.runId}
-          onFinish={tour.stop}
-        />
-        <DashboardHeader
-          websocketOnline={websocketOnline}
-          isSaving={isSaving}
-          lastSavedAt={lastSavedAt}
-          saveError={saveError}
-          saveWarning={saveWarning}
-          projectSizeBytes={project.projectSizeBytes}
-          projectSizeLimitBytes={project.projectSizeLimitBytes}
-          presenceUsers={presenceUsers}
-          localUser={localUser}
-          fileInputRef={fileInputRef}
-          onFileSelected={(file) => void handleLoadProject(file)}
-          onSaveProject={handleSaveProject}
-          onExportExcel={() => void exportReport('excel')}
-          onExportWord={() => void exportReport('word')}
-          onAddDocument={project.addNewDocument}
-          onDeleteDocument={() => project.removeDocument(project.activeDocumentId)}
-          canDeleteDocument={project.documents.length > 0}
-          deleteDocumentLabel={project.getDocumentById(project.activeDocumentId)?.title ?? 'Untitled document'}
-          onRenameUser={handleRenameUser}
-          onUndo={project.handleUndo}
-          onRedo={project.handleRedo}
-          onCut={() => project.executeEditorCommand('cut')}
-          onCopy={() => project.executeEditorCommand('copy')}
-          onPaste={project.pasteFromClipboard}
-          onSelectAll={() => project.executeEditorCommand('selectAll')}
-          onToggleCodeLabels={() => project.setShowCodeLabels((current) => !current)}
-          showCodeLabels={project.showCodeLabels}
-          onToggleMemos={() => project.setShowMemos((current) => !current)}
-          showMemos={project.showMemos}
-          onTour={tour.restart}
-        />
+      <ProjectPickerModal
+        open={isProjectModalOpen}
+        projects={catalog.projects}
+        activeProjectId={catalog.activeProjectId}
+        isLoading={catalog.isLoadingProjects}
+        error={catalog.projectError}
+        onClose={() => setIsProjectModalOpen(false)}
+        onRefresh={() => void catalog.refreshProjects()}
+        onSelect={(projectId: string) => void handleSelectProject(projectId)}
+        onCreate={(name: string) => void handleCreateProject(name)}
+        onDelete={(projectId: string) => void handleDeleteProject(projectId)}
+      />
+      <OnboardingTour key={tour.runId} run={tour.run} runId={tour.runId} onFinish={tour.stop} />
+      <DashboardHeader
+        websocketOnline={websocketOnline}
+        isSaving={isSaving}
+        lastSavedAt={lastSavedAt}
+        saveError={saveError}
+        saveWarning={saveWarning}
+        projectSizeBytes={project.projectSizeBytes}
+        projectSizeLimitBytes={project.projectSizeLimitBytes}
+        activeProjectName={catalog.activeProjectName}
+        presenceUsers={presenceUsers}
+        localUser={localUser}
+        onNewProject={openProjectModal}
+        onOpenProject={openProjectModal}
+        onExportExcel={() => void exportReport('excel')}
+        onExportWord={() => void exportReport('word')}
+        onAddDocument={project.addNewDocument}
+        onDeleteDocument={() => project.removeDocument(project.activeDocumentId)}
+        canDeleteDocument={project.documents.length > 0}
+        deleteDocumentLabel={project.getDocumentById(project.activeDocumentId)?.title ?? 'Untitled document'}
+        onRenameUser={handleRenameUser}
+        onUndo={project.handleUndo}
+        onRedo={project.handleRedo}
+        onCut={() => project.executeEditorCommand('cut')}
+        onCopy={() => project.executeEditorCommand('copy')}
+        onPaste={project.pasteFromClipboard}
+        onSelectAll={() => project.executeEditorCommand('selectAll')}
+        onToggleCodeLabels={() => project.setShowCodeLabels((current) => !current)}
+        showCodeLabels={project.showCodeLabels}
+        onToggleMemos={() => project.setShowMemos((current) => !current)}
+        showMemos={project.showMemos}
+        onTour={tour.restart}
+      />
 
-        {/* Main workspace: documents on the left, coding panels on the right. */}
-        <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
-          <DocumentViewerPanel
-            documents={project.documents}
-            codes={project.codes}
-            categories={project.categories}
-            memos={project.memos}
-            coreCategoryId={project.coreCategoryId}
-            showMemos={project.showMemos}
-            theoryHtml={project.theoryHtml}
-            ydoc={project.ydoc}
-            activeDocumentId={project.activeDocumentId}
-            documentViewMode={project.documentViewMode}
-            onDocumentViewModeChange={project.setDocumentViewMode}
-            onActiveDocumentChange={project.setActiveDocumentId}
-            onRemoveDocument={(documentId, title) => {
-              if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
-              project.removeDocument(documentId)
-            }}
-            onAddDocument={project.addNewDocument}
-            documentTitle={project.getDocumentById(project.activeDocumentId)?.title ?? ''}
-            onDocumentTitleChange={(title) =>
-              project.updateDocument(project.activeDocumentId, { title })
-            }
-            documentFontFamily={project.documentFontFamily}
-            documentFontFamilyDisplay={project.documentFontFamilyDisplay}
-            onDocumentFontFamilyChange={project.setDocumentFontFamily}
-            onDocumentFontFamilyDisplayChange={project.setDocumentFontFamilyDisplay}
-            documentLineHeight={project.documentLineHeight}
-            onDocumentLineHeightChange={project.setDocumentLineHeight}
-            showCodeLabels={project.showCodeLabels}
-            onDocumentInput={(documentId, patch) => project.updateDocument(documentId, patch)}
-            onEditorReady={project.setDocumentEditorInstance}
-            onHighlightMouseDown={project.handleHighlightMouseDown}
-            onHighlightMouseUp={project.handleSelection}
-            onHighlightClick={(event) => {
-              const removeButton = project.getClosestRemoveButton(event.target)
-              if (!removeButton) return
-              const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
-              if (!highlight) return
-              const handled = project.removeHighlightSpan(highlight)
-              if (!handled) return
-              event.preventDefault()
-              event.stopPropagation()
-            }}
-            onEditorRef={project.setDocumentEditorRef}
-          />
+      {/* Main workspace: documents on the left, coding panels on the right. */}
+      <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
+        {catalog.activeProjectId ? (
+          <>
+            <DocumentViewerPanel
+              documents={project.documents}
+              codes={project.codes}
+              categories={project.categories}
+              memos={project.memos}
+              coreCategoryId={project.coreCategoryId}
+              showMemos={project.showMemos}
+              theoryHtml={project.theoryHtml}
+              projectName={catalog.activeProjectName}
+              onProjectNameChange={handleRenameProject}
+              ydoc={project.ydoc}
+              activeDocumentId={project.activeDocumentId}
+              documentViewMode={project.documentViewMode}
+              onDocumentViewModeChange={project.setDocumentViewMode}
+              onActiveDocumentChange={project.setActiveDocumentId}
+              onRemoveDocument={(documentId, title) => {
+                if (!window.confirm(`Delete "${title}"? This cannot be undone.`)) return
+                project.removeDocument(documentId)
+              }}
+              onAddDocument={project.addNewDocument}
+              documentTitle={project.getDocumentById(project.activeDocumentId)?.title ?? ''}
+              onDocumentTitleChange={(title) =>
+                project.updateDocument(project.activeDocumentId, { title })
+              }
+              documentFontFamily={project.documentFontFamily}
+              documentFontFamilyDisplay={project.documentFontFamilyDisplay}
+              onDocumentFontFamilyChange={project.setDocumentFontFamily}
+              onDocumentFontFamilyDisplayChange={project.setDocumentFontFamilyDisplay}
+              documentLineHeight={project.documentLineHeight}
+              onDocumentLineHeightChange={project.setDocumentLineHeight}
+              showCodeLabels={project.showCodeLabels}
+              onDocumentInput={(documentId, patch) => project.updateDocument(documentId, patch)}
+              onEditorReady={project.setDocumentEditorInstance}
+              onHighlightMouseDown={project.handleHighlightMouseDown}
+              onHighlightMouseUp={project.handleSelection}
+              onHighlightClick={(event) => {
+                const removeButton = project.getClosestRemoveButton(event.target)
+                if (!removeButton) return
+                const highlight = removeButton.closest('span[data-code-id]') as HTMLElement | null
+                if (!highlight) return
+                const handled = project.removeHighlightSpan(highlight)
+                if (!handled) return
+                event.preventDefault()
+                event.stopPropagation()
+              }}
+              onEditorRef={project.setDocumentEditorRef}
+            />
 
-          <CodingSidebar
-            codes={project.codes}
-            categories={project.categories}
-            ungroupedCodes={project.ungroupedCodes}
-            coreCategoryId={project.coreCategoryId}
-            coreCategoryDraft={project.coreCategoryDraft}
-            memos={project.memos}
-            isTheoryEmpty={project.isTheoryEmpty}
-            showMemos={project.showMemos}
-            ydoc={project.ydoc}
-            onAddCode={project.addNewCode}
-            onApplyCode={project.applyCodeToSelection}
-            onUpdateCode={project.updateCode}
-            onRemoveCode={project.removeCode}
-            getReadableTextColor={project.getReadableTextColor}
-            onAddCategory={project.handleAddCategory}
-            onUpdateCategory={project.updateCategory}
-            onRemoveCategory={project.removeCategory}
-            onRemoveCodeFromCategory={project.removeCodeFromCategory}
-            onCoreCategoryDraftChange={project.setCoreCategoryDraft}
-            onCreateCoreCategory={project.handleCreateCoreCategory}
-            onAddCodeMemo={project.handleAddCodeMemo}
-            onAddCategoryMemo={project.handleAddCategoryMemo}
-            onAddGlobalMemo={project.handleAddGlobalMemo}
-            onUpdateMemo={project.updateMemo}
-            onRemoveMemo={project.removeMemo}
-            onApplyEditorCommand={project.applyEditorCommand}
-            onTheoryInput={project.setTheoryHtml}
-            onTheoryEditorRef={project.setTheoryEditorRef}
-            onMoveCode={project.moveCodeToCategory}
-          />
-        </main>
+            <CodingSidebar
+              codes={project.codes}
+              categories={project.categories}
+              ungroupedCodes={project.ungroupedCodes}
+              coreCategoryId={project.coreCategoryId}
+              coreCategoryDraft={project.coreCategoryDraft}
+              memos={project.memos}
+              isTheoryEmpty={project.isTheoryEmpty}
+              showMemos={project.showMemos}
+              ydoc={project.ydoc}
+              onAddCode={project.addNewCode}
+              onApplyCode={project.applyCodeToSelection}
+              onUpdateCode={project.updateCode}
+              onRemoveCode={project.removeCode}
+              getReadableTextColor={project.getReadableTextColor}
+              onAddCategory={project.handleAddCategory}
+              onUpdateCategory={project.updateCategory}
+              onRemoveCategory={project.removeCategory}
+              onRemoveCodeFromCategory={project.removeCodeFromCategory}
+              onCoreCategoryDraftChange={project.setCoreCategoryDraft}
+              onCreateCoreCategory={project.handleCreateCoreCategory}
+              onAddCodeMemo={project.handleAddCodeMemo}
+              onAddCategoryMemo={project.handleAddCategoryMemo}
+              onAddGlobalMemo={project.handleAddGlobalMemo}
+              onUpdateMemo={project.updateMemo}
+              onRemoveMemo={project.removeMemo}
+              onApplyEditorCommand={project.applyEditorCommand}
+              onTheoryInput={project.setTheoryHtml}
+              onTheoryEditorRef={project.setTheoryEditorRef}
+              onMoveCode={project.moveCodeToCategory}
+            />
+          </>
+        ) : (
+          <div className="col-span-full flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+              No project open
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+              Choose a project to continue
+            </h2>
+            <p className="mt-2 max-w-md text-sm text-slate-500">
+              Open an existing project or create a new one to start coding documents.
+            </p>
+            <button
+              type="button"
+              onClick={openProjectModal}
+              className="mt-5 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              Open project
+            </button>
+          </div>
+        )}
+      </main>
 
-        <CollaborationLayer
-          remoteCursors={remoteCursors}
-          remoteSelections={remoteSelections}
-          presenceById={presenceById}
-          localUser={localUser}
-          documentEditorInstancesRef={project.documentEditorInstancesRef}
-        />
-      </div>
+      <CollaborationLayer
+        remoteCursors={remoteCursors}
+        remoteSelections={remoteSelections}
+        presenceById={presenceById}
+        localUser={localUser}
+        documentEditorInstancesRef={project.documentEditorInstancesRef}
+      />
+    </div>
   )
 }

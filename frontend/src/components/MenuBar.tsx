@@ -5,8 +5,8 @@ import { cn } from '../lib/cn'
 type MenuKey = 'file' | 'edit' | 'view' | 'help'
 
 type MenuBarProps = {
-  onLoadProject: () => void
-  onSaveProject: () => void
+  onOpenProject: () => void
+  onNewProject: () => void
   onExportExcel: () => void
   onExportWord: () => void
   onAddDocument: () => void
@@ -53,8 +53,8 @@ const MenuItem = ({ label, onClick, shortcut, destructive }: MenuItemProps) => {
 }
 
 export function MenuBar({
-  onLoadProject,
-  onSaveProject,
+  onOpenProject,
+  onNewProject,
   onExportExcel,
   onExportWord,
   onAddDocument,
@@ -114,16 +114,16 @@ export function MenuBar({
         {openMenu === 'file' ? (
           <div className="absolute left-0 top-full z-50 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
             <MenuItem
-              label="Load project"
+              label="Open project"
               onClick={() => {
-                onLoadProject()
+                onOpenProject()
                 closeMenu()
               }}
             />
             <MenuItem
-              label="Save project"
+              label="New project"
               onClick={() => {
-                onSaveProject()
+                onNewProject()
                 closeMenu()
               }}
             />

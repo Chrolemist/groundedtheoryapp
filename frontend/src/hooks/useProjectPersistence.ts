@@ -5,6 +5,7 @@ type UseProjectPersistenceArgs = {
   disableWs: boolean
   hasRemoteState: boolean
   remoteLoadedRef: MutableRefObject<boolean>
+  projectIdRef: MutableRefObject<string | null>
 }
 
 type UseProjectPersistenceResult = {
@@ -20,6 +21,7 @@ export function useProjectPersistence({
   disableWs,
   hasRemoteState,
   remoteLoadedRef,
+  projectIdRef,
 }: UseProjectPersistenceArgs): UseProjectPersistenceResult {
   const saveSeqRef = useRef(0)
   const [isSaving, setIsSaving] = useState(false)
@@ -50,13 +52,15 @@ export function useProjectPersistence({
     (projectRaw: Record<string, unknown>) => {
       if (disableWs) return
       if (!apiBase) return
+      const projectId = projectIdRef.current
+      if (!projectId) return
       if (!hasRemoteState && !remoteLoadedRef.current) return
       updateWarning(projectRaw)
       const seq = saveSeqRef.current + 1
       saveSeqRef.current = seq
       setIsSaving(true)
       setSaveError(null)
-      fetch(`${apiBase}/project/state`, {
+      fetch(`${apiBase}/projects/${projectId}/state`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ project_raw: projectRaw }),
@@ -89,7 +93,7 @@ export function useProjectPersistence({
           }
         })
     },
-    [apiBase, disableWs, hasRemoteState, remoteLoadedRef, updateWarning],
+    [apiBase, disableWs, hasRemoteState, remoteLoadedRef, projectIdRef, updateWarning],
   )
 
   return { persistProject, isSaving, lastSavedAt, saveError, saveWarning }

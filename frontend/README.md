@@ -43,6 +43,23 @@ export default defineConfig([
 ])
 ```
 
+## Firestore storage scaling plan
+
+Current design stores the entire project in a single Firestore document. This is simple, but
+Firestore documents have a hard ~1 MB limit. If we approach that limit, split the project into
+multiple documents while keeping total size (sum of all docs) under the 1 GiB free tier.
+
+Recommended split when needed:
+
+- `projects/{projectId}/meta`: small metadata (codes, categories, memos metadata, theory, settings)
+- `projects/{projectId}/documents/{docId}`: one document per UI document (title, text, html)
+- `projects/{projectId}/highlights/{docId}`: one document per UI document with highlight list
+
+Storage reporting:
+
+- Total usage = sum of sizes of all documents under `projects/{projectId}`.
+- Optional: show per-document sizes for troubleshooting.
+
 You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
 ```js

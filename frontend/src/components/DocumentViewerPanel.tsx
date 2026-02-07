@@ -18,6 +18,8 @@ type DocumentViewerPanelProps = {
   coreCategoryId: string
   showMemos: boolean
   theoryHtml: string
+  projectName: string
+  onProjectNameChange?: (name: string) => void
   ydoc: Doc
   activeDocumentId: string
   documentViewMode: DocumentViewMode
@@ -50,6 +52,8 @@ export function DocumentViewerPanel({
   coreCategoryId,
   showMemos,
   theoryHtml,
+  projectName,
+  onProjectNameChange,
   ydoc,
   activeDocumentId,
   documentViewMode,
@@ -84,9 +88,18 @@ export function DocumentViewerPanel({
     field: 'title',
     onLocalUpdate: onDocumentTitleChange,
   })
+  const [isEditingProjectName, setIsEditingProjectName] = useState(false)
+  const [projectNameDraft, setProjectNameDraft] = useState(projectName)
+  const canRenameProject = Boolean(onProjectNameChange)
+  const displayProjectName = projectName.trim() || 'Untitled project'
   const mapFocusRef = useRef<HTMLElement | null>(null)
   const skipNextClearRef = useRef(false)
   const focusedTargetRef = useRef<TreeMapExcerptTarget | null>(null)
+
+  useEffect(() => {
+    if (isEditingProjectName) return
+    setProjectNameDraft(projectName)
+  }, [isEditingProjectName, projectName])
 
   useEffect(() => {
     const clearFocus = () => {
@@ -219,7 +232,64 @@ export function DocumentViewerPanel({
       <div className="space-y-3">
         <div>
           <p className="text-sm font-medium text-slate-500">Document Viewer</p>
-          <h2 className="text-xl font-semibold text-slate-900">Interview Transcript</h2>
+          {isEditingProjectName ? (
+            <input
+              value={projectNameDraft}
+              onChange={(event) => setProjectNameDraft(event.target.value)}
+              onBlur={() => {
+                const trimmed = projectNameDraft.trim()
+                setIsEditingProjectName(false)
+                if (!onProjectNameChange) return
+                if (!trimmed) {
+                  setProjectNameDraft(projectName)
+                  return
+                }
+                if (trimmed !== projectName.trim()) {
+                  onProjectNameChange(trimmed)
+                }
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Escape') {
+                  event.preventDefault()
+                  setProjectNameDraft(projectName)
+                  setIsEditingProjectName(false)
+                  return
+                }
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  const trimmed = projectNameDraft.trim()
+                  setIsEditingProjectName(false)
+                  if (!onProjectNameChange) return
+                  if (!trimmed) {
+                    setProjectNameDraft(projectName)
+                    return
+                  }
+                  if (trimmed !== projectName.trim()) {
+                    onProjectNameChange(trimmed)
+                  }
+                }
+              }}
+              className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-1 text-xl font-semibold text-slate-900 shadow-sm"
+              placeholder="Project name"
+              autoFocus
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                if (!canRenameProject) return
+                setProjectNameDraft(projectName)
+                setIsEditingProjectName(true)
+              }}
+              className={cn(
+                'text-left text-xl font-semibold text-slate-900 transition',
+                canRenameProject ? 'hover:text-slate-700' : 'cursor-default',
+              )}
+              aria-label="Rename project"
+            >
+              {displayProjectName}
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button

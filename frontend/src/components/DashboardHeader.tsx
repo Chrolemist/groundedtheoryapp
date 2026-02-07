@@ -1,4 +1,3 @@
-import { type MutableRefObject } from 'react'
 import { MenuBar } from './MenuBar'
 import { type PresenceUser } from './DashboardLayout.types'
 import { cn } from '../lib/cn'
@@ -11,13 +10,13 @@ type DashboardHeaderProps = {
   saveWarning?: string | null
   projectSizeBytes?: number | null
   projectSizeLimitBytes?: number
+  activeProjectName?: string
   presenceUsers: PresenceUser[]
   localUser: PresenceUser | null
-  fileInputRef: MutableRefObject<HTMLInputElement | null>
-  onFileSelected: (file: File) => void
-  onSaveProject: () => void
   onExportExcel: () => void
   onExportWord: () => void
+  onNewProject: () => void
+  onOpenProject: () => void
   onAddDocument: () => void
   onDeleteDocument: () => void
   canDeleteDocument: boolean
@@ -45,13 +44,13 @@ export function DashboardHeader({
   saveWarning,
   projectSizeBytes,
   projectSizeLimitBytes,
+  activeProjectName,
   presenceUsers,
   localUser,
-  fileInputRef,
-  onFileSelected,
-  onSaveProject,
   onExportExcel,
   onExportWord,
+  onNewProject,
+  onOpenProject,
   onAddDocument,
   onDeleteDocument,
   canDeleteDocument,
@@ -117,6 +116,9 @@ export function DashboardHeader({
             </div>
             <div>
               <p className="text-lg font-semibold">Grounded Theory</p>
+              {activeProjectName ? (
+                <p className="text-xs font-medium text-slate-500">{activeProjectName}</p>
+              ) : null}
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                 <span
                   className={cn(
@@ -148,8 +150,8 @@ export function DashboardHeader({
             </div>
           </div>
           <MenuBar
-            onLoadProject={() => fileInputRef.current?.click()}
-            onSaveProject={onSaveProject}
+            onOpenProject={onOpenProject}
+            onNewProject={onNewProject}
             onExportExcel={onExportExcel}
             onExportWord={onExportWord}
             onAddDocument={onAddDocument}
@@ -189,19 +191,6 @@ export function DashboardHeader({
               <span className="text-xs text-slate-400">No collaborators yet</span>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json"
-            className="hidden"
-            onChange={(event) => {
-              const file = event.target.files?.[0]
-              if (file) {
-                onFileSelected(file)
-              }
-              event.target.value = ''
-            }}
-          />
         </div>
         {sizeLabel && sizePercent !== null && (
           <div className="flex flex-col items-end gap-1 text-xs text-slate-600 lg:ml-auto">
