@@ -63,6 +63,7 @@ export function useDocumentState({
     }
     setDocuments((current) => [...current, newDoc])
     setActiveDocumentId(newDoc.id)
+    setDocumentViewMode('single')
   }
 
   const removeDocument = (documentId: string) => {

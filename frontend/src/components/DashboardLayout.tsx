@@ -36,6 +36,7 @@ export function DashboardLayout() {
     presenceUsers,
     localUser,
     remoteCursors,
+    remoteSelections,
     hasRemoteState,
   } = useCollaboration({
     onProjectUpdate: (project) => projectUpdateRef.current(project),
@@ -278,6 +279,7 @@ export function DashboardLayout() {
 
         <CollaborationLayer
           remoteCursors={remoteCursors}
+          remoteSelections={remoteSelections}
           presenceById={presenceById}
           localUser={localUser}
           documentEditorInstancesRef={project.documentEditorInstancesRef}

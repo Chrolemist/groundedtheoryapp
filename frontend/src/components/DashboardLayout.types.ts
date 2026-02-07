@@ -23,3 +23,11 @@ export type CursorPresence = {
   absolute?: boolean
   updatedAt: number
 }
+
+export type SelectionPresence = {
+  documentId: string
+  from: number
+  to: number
+  rects?: Array<{ x: number; y: number; width: number; height: number }>
+  updatedAt: number
+}

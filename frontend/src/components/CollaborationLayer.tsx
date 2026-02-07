@@ -1,8 +1,9 @@
 import type { Editor } from '@tiptap/react'
-import { type CursorPresence, type PresenceUser } from './DashboardLayout.types'
+import { type CursorPresence, type PresenceUser, type SelectionPresence } from './DashboardLayout.types'
 
 type CollaborationLayerProps = {
   remoteCursors: Record<string, CursorPresence>
+  remoteSelections: Record<string, SelectionPresence>
   presenceById: Map<string, PresenceUser>
   localUser: PresenceUser | null
   documentEditorInstancesRef: React.MutableRefObject<Map<string, Editor>>
@@ -11,6 +12,7 @@ type CollaborationLayerProps = {
 // Floating collaboration cursors.
 export function CollaborationLayer({
   remoteCursors,
+  remoteSelections,
   presenceById,
   localUser,
   documentEditorInstancesRef,
@@ -91,8 +93,74 @@ export function CollaborationLayer({
     )
   }
 
+  const renderSelection = (userId: string, selection: SelectionPresence) => {
+    if (localUser?.id === userId) return null
+    const user = presenceById.get(userId)
+    if (!user) return null
+    const container = document.querySelector(
+      `[data-doc-id="${selection.documentId}"] .document-content`,
+    ) as HTMLElement | null
+    if (selection.rects?.length && container) {
+      const containerRect = container.getBoundingClientRect()
+      return selection.rects.map((rect, index) => (
+        <div
+          key={`${userId}-${selection.documentId}-${index}`}
+          className="absolute"
+          style={{
+            left: containerRect.left + rect.x,
+            top: containerRect.top + rect.y,
+            width: rect.width,
+            height: rect.height,
+            backgroundColor: user.color,
+            opacity: 0.15,
+            borderRadius: 3,
+          }}
+        />
+      ))
+    }
+
+    const from = Math.min(selection.from, selection.to)
+    const to = Math.max(selection.from, selection.to)
+    if (from === to) return null
+
+    const editor = documentEditorInstancesRef.current.get(selection.documentId)
+    if (!editor) return null
+    try {
+      const domFrom = editor.view.domAtPos(from)
+      const domTo = editor.view.domAtPos(to)
+      const range = document.createRange()
+      range.setStart(domFrom.node, domFrom.offset)
+      range.setEnd(domTo.node, domTo.offset)
+      const rects = Array.from(range.getClientRects())
+      return rects.map((rect, index) => (
+        <div
+          key={`${userId}-${selection.documentId}-${index}`}
+          className="absolute"
+          style={{
+            left: rect.left,
+            top: rect.top,
+            width: rect.width,
+            height: rect.height,
+            border: `1px solid ${user.color}`,
+            borderRadius: 4,
+          }}
+        />
+      ))
+    } catch {
+      return null
+    }
+  }
+
   return (
     <div className="pointer-events-none fixed inset-0 z-50">
+      {Object.entries(remoteSelections).map(([userId, selection]) => {
+        const selectionOverlays = renderSelection(userId, selection)
+        if (selectionOverlays) {
+          if (Array.isArray(selectionOverlays)) overlays.push(...selectionOverlays)
+          else overlays.push(selectionOverlays)
+        }
+        return null
+      })}
       {Object.entries(remoteCursors).map(([userId, cursor]) => {
         const overlay = renderCursor(userId, cursor)
         if (overlay) overlays.push(overlay)

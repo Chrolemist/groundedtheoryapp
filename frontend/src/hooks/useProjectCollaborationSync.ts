@@ -382,6 +382,7 @@ export function useProjectCollaborationSync({
       if (selection.isCollapsed) {
         selectionRangeRef.current = null
         selectionDocumentIdRef.current = null
+        sendJson?.({ type: 'selection:clear' })
       } else {
         const nextRange = selection.getRangeAt(0)
         selectionRangeRef.current = nextRange.cloneRange()
@@ -392,6 +393,23 @@ export function useProjectCollaborationSync({
       const docId = docContainer.getAttribute('data-doc-id') ?? undefined
       const editor = docId ? documentEditorInstancesRef.current.get(docId) : undefined
       const docPos = editor?.state?.selection?.to
+      let selectionFrom = editor?.state?.selection?.from
+      let selectionTo = editor?.state?.selection?.to
+      if (
+        editor &&
+        (typeof selectionFrom !== 'number' || typeof selectionTo !== 'number' || selectionFrom === selectionTo)
+      ) {
+        try {
+          const mappedFrom = editor.view.posAtDOM(range.startContainer, range.startOffset)
+          const mappedTo = editor.view.posAtDOM(range.endContainer, range.endOffset)
+          if (mappedFrom !== mappedTo) {
+            selectionFrom = Math.min(mappedFrom, mappedTo)
+            selectionTo = Math.max(mappedFrom, mappedTo)
+          }
+        } catch {
+          // Ignore DOM mapping failures.
+        }
+      }
       if (rect) {
         const containerRect = docContainer.getBoundingClientRect()
         const relativeX = rect.left - containerRect.left
@@ -406,6 +424,41 @@ export function useProjectCollaborationSync({
             updatedAt: Date.now(),
           },
         })
+      }
+
+      if (docId) {
+        const contentContainer = docContainer.querySelector('.document-content') as HTMLElement | null
+        const containerRect = (contentContainer ?? docContainer).getBoundingClientRect()
+        const rects = Array.from(selection.getRangeAt(0).getClientRects())
+          .map((rect) => ({
+            x: rect.left - containerRect.left,
+            y: rect.top - containerRect.top,
+            width: rect.width,
+            height: rect.height,
+          }))
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+
+        if (rects.length) {
+          if (window.localStorage.getItem('gt-debug-selection') === 'true') {
+            console.info('[Selection Send]', {
+              docId,
+              count: rects.length,
+              wsEnabled: import.meta.env.VITE_DISABLE_WS !== 'true',
+            })
+          }
+          sendJson?.({
+            type: 'selection:update',
+            selection: {
+              documentId: docId,
+              from: typeof selectionFrom === 'number' ? selectionFrom : 0,
+              to: typeof selectionTo === 'number' ? selectionTo : 0,
+              rects,
+              updatedAt: Date.now(),
+            },
+          })
+          return
+        }
+        sendJson?.({ type: 'selection:clear' })
       }
 
       const fonts = new Set<string>()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { type CursorPresence, type PresenceUser } from '../components/DashboardLayout.types'
+import { type CursorPresence, type PresenceUser, type SelectionPresence } from '../components/DashboardLayout.types'
 import { useProjectWebSocket } from './useProjectWebSocket.ts'
 
 type UseCollaborationArgs = {
@@ -78,6 +78,7 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const [localUser, setLocalUser] = useState<PresenceUser | null>(null)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, CursorPresence>>({})
+  const [remoteSelections, setRemoteSelections] = useState<Record<string, SelectionPresence>>({})
   const [hasRemoteState, setHasRemoteState] = useState(disableWs)
   const localUserRef = useRef<PresenceUser | null>(null)
   const broadcastRef = useRef<BroadcastChannel | null>(null)
@@ -175,6 +176,32 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         return
       }
 
+      if (type === 'selection:update') {
+        const userId = data.userId as string | undefined
+        const selection = data.selection as SelectionPresence | undefined
+        if (!userId || !selection) return
+        if (window.localStorage.getItem('gt-debug-selection') === 'true') {
+          console.info('[Selection Receive]', {
+            userId,
+            docId: selection.documentId,
+            count: selection.rects?.length ?? 0,
+          })
+        }
+        setRemoteSelections((current) => ({ ...current, [userId]: selection }))
+        return
+      }
+
+      if (type === 'selection:clear') {
+        const userId = data.userId as string | undefined
+        if (!userId) return
+        setRemoteSelections((current) => {
+          const next = { ...current }
+          delete next[userId]
+          return next
+        })
+        return
+      }
+
       if (type === 'project:update') {
         const senderId = data.sender_id as string | undefined
         if (senderId && senderId === localUserRef.current?.id) return
@@ -205,7 +232,11 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         }
       }
       const enriched =
-        type === 'cursor:update' || type === 'cursor:clear' || type === 'presence:rename'
+        type === 'cursor:update' ||
+        type === 'cursor:clear' ||
+        type === 'selection:update' ||
+        type === 'selection:clear' ||
+        type === 'presence:rename'
           ? { ...payload, userId }
           : payload
       channel.postMessage(enriched)
@@ -339,6 +370,38 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
           delete next[userId]
           return next
         })
+        setRemoteSelections((current) => {
+          const next = { ...current }
+          delete next[userId]
+          return next
+        })
+        return
+      }
+
+      if (type === 'selection:update') {
+        const userId = data.userId as string | undefined
+        const selection = data.selection as SelectionPresence | undefined
+        if (!userId || !selection) return
+        if (window.localStorage.getItem('gt-debug-selection') === 'true') {
+          console.info('[Selection Receive]', {
+            userId,
+            docId: selection.documentId,
+            count: selection.rects?.length ?? 0,
+          })
+        }
+        setRemoteSelections((current) => ({ ...current, [userId]: selection }))
+        return
+      }
+
+      if (type === 'selection:clear') {
+        const userId = data.userId as string | undefined
+        if (!userId) return
+        setRemoteSelections((current) => {
+          const next = { ...current }
+          delete next[userId]
+          return next
+        })
+        return
       }
     }
 
@@ -406,6 +469,15 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
         })
         return next
       })
+      setRemoteSelections((current) => {
+        const next: Record<string, SelectionPresence> = {}
+        Object.entries(current).forEach(([userId, selection]) => {
+          if (now - selection.updatedAt < 8000) {
+            next[userId] = selection
+          }
+        })
+        return next
+      })
     }, 3000)
 
     return () => {
@@ -419,6 +491,7 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
     presenceUsers,
     localUser,
     remoteCursors,
+    remoteSelections,
     hasRemoteState,
   }
 }
