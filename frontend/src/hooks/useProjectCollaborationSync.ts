@@ -154,6 +154,11 @@ export function useProjectCollaborationSync({
     persistProject,
     enableProjectSync,
     onBroadcastProjectUpdate: handleBroadcastProjectUpdate,
+    getDocumentContent: (documentId) => {
+      const editor = documentEditorInstancesRef.current.get(documentId)
+      if (!editor) return null
+      return { html: editor.getHTML(), text: editor.getText() }
+    },
   })
 
   useEffect(() => {

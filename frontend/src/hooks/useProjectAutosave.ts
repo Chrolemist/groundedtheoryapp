@@ -18,6 +18,7 @@ type UseProjectAutosaveArgs = {
   enableProjectSync?: boolean
   onBroadcastProjectUpdate?: (projectRaw: Record<string, unknown>) => void
   idlePersistDelayMs?: number
+  getDocumentContent?: (documentId: string) => { html: string; text: string } | null
 }
 
 export function useProjectAutosave({
@@ -36,6 +37,7 @@ export function useProjectAutosave({
   enableProjectSync = true,
   onBroadcastProjectUpdate,
   idlePersistDelayMs = 1200,
+  getDocumentContent,
 }: UseProjectAutosaveArgs) {
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
@@ -61,8 +63,15 @@ export function useProjectAutosave({
       !theoryHtml
     if (isEmptyProject && !hasLocalProjectUpdateRef.current) return
 
+    const documentsSnapshot = documents.map((doc) => {
+      const fallback = getDocumentContent?.(doc.id)
+      if (fallback && (!doc.html || !doc.text)) {
+        return { ...doc, html: doc.html || fallback.html, text: doc.text || fallback.text }
+      }
+      return doc
+    })
     const dataSnapshot = {
-      documents,
+      documents: documentsSnapshot,
       codes,
       categories,
       memos,
@@ -125,5 +134,6 @@ export function useProjectAutosave({
     enableProjectSync,
     onBroadcastProjectUpdate,
     idlePersistDelayMs,
+    getDocumentContent,
   ])
 }
