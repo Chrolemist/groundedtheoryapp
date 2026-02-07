@@ -69,7 +69,9 @@ export function DashboardLayout() {
     autoCreateIfEmpty: true,
     onActiveProjectChange: (projectId, name) => {
       activeProjectIdRef.current = projectId
-      document.title = name ? `Grounded Theory - ${name}` : 'Grounded Theory'
+      document.title = name
+        ? `GT · Grounded Theory - ${name}`
+        : 'GT · Grounded Theory'
     },
   })
 
