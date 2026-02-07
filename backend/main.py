@@ -710,7 +710,7 @@ async def purge_projects() -> Dict[str, int | str]:
 
 
 @app.post("/projects")
-async def create_project(payload: Dict = Body(...)) -> Dict[str, Optional[Dict]]:
+async def create_project(payload: Dict = Body(...)) -> Dict[str, object]:
     client = get_firestore_client()
     if not client:
         return {"status": "error", "message": "Firestore not available"}
@@ -735,19 +735,23 @@ async def create_project(payload: Dict = Body(...)) -> Dict[str, Optional[Dict]]
     doc_ref = get_project_doc_ref(project_id)
     if not doc_ref:
         return {"status": "error", "message": "Firestore not available"}
-    doc_ref.set(
-        {
+    try:
+        doc_ref.set(
+            {
+                "name": name,
+                "project": project_raw,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        return {
+            "project_id": project_id,
+            "project_raw": project_raw,
             "name": name,
-            "project": project_raw,
-            "created_at": firestore.SERVER_TIMESTAMP,
-            "updated_at": firestore.SERVER_TIMESTAMP,
         }
-    )
-    return {
-        "project_id": project_id,
-        "project_raw": project_raw,
-        "name": name,
-    }
+    except Exception as exc:
+        logger.warning(f"Failed to create project: {exc}")
+        return {"status": "error", "message": "Failed to create project"}
 
 
 @app.get("/projects/{project_id}")
