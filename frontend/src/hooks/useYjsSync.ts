@@ -31,6 +31,7 @@ type MemoMapValue = Y.Text
 
 const LOCAL_ORIGIN = 'local-yjs'
 const REMOTE_ORIGIN = 'remote-yjs'
+const BROADCAST_ORIGIN = 'broadcast-yjs'
 
 const toBase64 = (bytes: Uint8Array) => {
   let binary = ''
@@ -101,6 +102,7 @@ export function useYjsSync({
   const coreCategoryTextRef = useRef<Y.Text | null>(null)
   const pendingRefreshRef = useRef(false)
   const didHydrateRef = useRef(false)
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
 
   const { sendJson } = useProjectWebSocket({
     onMessage: (payload) => {
@@ -333,6 +335,26 @@ export function useYjsSync({
   ])
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return
+    const channel = new BroadcastChannel('gt-yjs')
+    broadcastChannelRef.current = channel
+
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data as { type?: string; update?: string } | undefined
+      if (!data || data.type !== 'yjs:update' || typeof data.update !== 'string') return
+      const decoded = fromBase64(data.update)
+      Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
+    }
+
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+      broadcastChannelRef.current = null
+    }
+  }, [ydoc])
+
+  useEffect(() => {
     const handleFocusOut = () => {
       window.setTimeout(() => {
         if (!pendingRefreshRef.current) return
@@ -358,7 +380,7 @@ export function useYjsSync({
     coreCategoryTextRef.current = ydoc.getText('coreCategoryId')
 
     ydoc.on('update', (update: Uint8Array, origin: unknown) => {
-      if (origin === REMOTE_ORIGIN) {
+      if (origin === REMOTE_ORIGIN || origin === BROADCAST_ORIGIN) {
         if (isEditingElement(document.activeElement)) {
           pendingRefreshRef.current = true
           return
@@ -367,6 +389,10 @@ export function useYjsSync({
         return
       }
       sendJson?.({ type: 'yjs:update', update: toBase64(update) })
+      broadcastChannelRef.current?.postMessage({
+        type: 'yjs:update',
+        update: toBase64(update),
+      })
     })
   }, [refreshFromYjs, sendJson, ydoc])
 

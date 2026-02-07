@@ -248,10 +248,16 @@ export function useProjectCollaborationSync({
     }
 
     document.addEventListener('selectionchange', handleSelectionChange)
+    document.addEventListener('input', handleSelectionChange)
+    document.addEventListener('keyup', handleSelectionChange)
+    document.addEventListener('pointerup', handleSelectionChange)
     handleSelectionChange()
 
     return () => {
       document.removeEventListener('selectionchange', handleSelectionChange)
+      document.removeEventListener('input', handleSelectionChange)
+      document.removeEventListener('keyup', handleSelectionChange)
+      document.removeEventListener('pointerup', handleSelectionChange)
     }
   }, [
     documentFontFamily,
