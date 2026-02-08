@@ -78,11 +78,12 @@ export function useProjectCollaborationSync({
       !theoryHtml
 
     const hydrated = hydrateRemoteProject(project, getReadableTextColor)
+    const hydratedMemos = hydrated.memos ?? []
     const incomingHasData =
       hydrated.documents.length > 0 ||
       hydrated.codes.length > 0 ||
       hydrated.categories.length > 0 ||
-      hydrated.memos.length > 0 ||
+      hydratedMemos.length > 0 ||
       Boolean(hydrated.coreCategoryId) ||
       Boolean(hydrated.theoryHtml)
 
@@ -100,7 +101,7 @@ export function useProjectCollaborationSync({
     setDocuments(hydrated.documents)
     if (hydrated.codes.length) setCodes(hydrated.codes)
     if (hydrated.categories.length) setCategories(hydrated.categories)
-    if (hydrated.memos) setMemos(hydrated.memos)
+    setMemos(hydratedMemos)
 
     if (typeof hydrated.coreCategoryId === 'string') {
       setCoreCategoryId(hydrated.coreCategoryId)
