@@ -196,6 +196,45 @@ export function useDocumentState({
     })
   }
 
+  const syncTipTapEditorsForCodes = (nextCodeMap: Map<string, Code>) => {
+    const updateEditor = (editor: Editor) => {
+      if (!editor || editor.isDestroyed) return
+      const { doc, schema } = editor.state
+      const nodeType = schema.nodes.codeHighlight
+      if (!nodeType) return
+      let tr = editor.state.tr
+      let hasChanges = false
+      doc.descendants((node, pos) => {
+        if (node.type !== nodeType) return
+        const codeId = node.attrs.codeId as string | null | undefined
+        if (!codeId) return
+        const code = nextCodeMap.get(codeId)
+        if (!code) return
+        const nextAttrs = {
+          ...node.attrs,
+          label: code.label,
+          colorHex: code.colorHex ?? '#E2E8F0',
+          textHex: code.textHex ?? '#334155',
+          ringHex: code.ringHex ?? 'rgba(148,163,184,0.4)',
+        }
+        if (
+          node.attrs.label !== nextAttrs.label ||
+          node.attrs.colorHex !== nextAttrs.colorHex ||
+          node.attrs.textHex !== nextAttrs.textHex ||
+          node.attrs.ringHex !== nextAttrs.ringHex
+        ) {
+          tr = tr.setNodeMarkup(pos, undefined, nextAttrs, node.marks)
+          hasChanges = true
+        }
+      })
+      if (hasChanges) {
+        editor.view.dispatch(tr)
+      }
+    }
+
+    documentEditorInstancesRef.current.forEach((editor) => updateEditor(editor))
+  }
+
   const applyCodeStylesToEditor = (nextCodeMap: Map<string, Code>) => {
     const editor = documentEditorRef.current
     if (!editor || isTipTapActive(editor)) return
@@ -295,6 +334,7 @@ export function useDocumentState({
     removeDocument,
     syncDocumentsForCodes,
     syncEditorForCodes,
+    syncTipTapEditorsForCodes,
     applyCodeStylesToContainer,
     applyCodeStylesToEditor,
   }

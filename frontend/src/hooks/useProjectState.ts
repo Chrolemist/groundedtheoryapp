@@ -74,6 +74,7 @@ export function useProjectState({
     setDocuments: documentState.setDocuments,
     syncDocumentsForCodes: documentState.syncDocumentsForCodes,
     syncEditorForCodes: documentState.syncEditorForCodes,
+    syncTipTapEditorsForCodes: documentState.syncTipTapEditorsForCodes,
     removeHighlightsByCodeId: (codeId) => removeHighlightsByCodeIdRef.current(codeId),
     clearYjsFragmentsForRemovedCode: (codeId) =>
       clearYjsFragmentsForRemovedCodeRef.current(codeId),

@@ -23,6 +23,7 @@ type UseCodingStateArgs = {
   setDocuments: Dispatch<SetStateAction<DocumentItem[]>>
   syncDocumentsForCodes: (current: DocumentItem[], nextCodeMap: Map<string, Code>) => DocumentItem[]
   syncEditorForCodes: (nextCodeMap: Map<string, Code>) => void
+  syncTipTapEditorsForCodes?: (nextCodeMap: Map<string, Code>) => void
   removeHighlightsByCodeId?: (codeId: string) => void
   clearYjsFragmentsForRemovedCode?: (codeId: string) => void
   isApplyingRemoteRef?: MutableRefObject<boolean>
@@ -35,6 +36,7 @@ export function useCodingState({
   setDocuments,
   syncDocumentsForCodes,
   syncEditorForCodes,
+  syncTipTapEditorsForCodes,
   removeHighlightsByCodeId,
   clearYjsFragmentsForRemovedCode,
   isApplyingRemoteRef,
@@ -167,6 +169,7 @@ export function useCodingState({
       const nextCodeMap = new Map(nextCodes.map((code) => [code.id, code]))
       setDocuments((docs) => syncDocumentsForCodes(docs, nextCodeMap))
       syncEditorForCodes(nextCodeMap)
+      syncTipTapEditorsForCodes?.(nextCodeMap)
       return nextCodes
     })
   }
