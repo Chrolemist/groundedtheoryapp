@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { type CursorPresence, type PresenceUser, type SelectionPresence } from '../components/DashboardLayout.types'
 import { useProjectWebSocket } from './useProjectWebSocket.ts'
+import { getTabIdentity } from '../lib/tabIdentity'
 
 type UseCollaborationArgs = {
   onProjectUpdate: (project: Record<string, unknown>) => void
@@ -91,13 +92,11 @@ export function useCollaboration({ onProjectUpdate }: UseCollaborationArgs) {
     if (typeof window === 'undefined') {
       return { id: 'local', name: 'Local', color: '#7C3AED' }
     }
-    const tabIdKey = 'gt-tab-id'
     const deviceIdKey = 'gt-device-id'
     const nameKey = 'gt-client-name'
-    const storedTabId = window.sessionStorage.getItem(tabIdKey)
+    const { tabId } = getTabIdentity()
     const storedDeviceId = window.localStorage.getItem(deviceIdKey)
     const storedName = window.localStorage.getItem(nameKey)
-    const tabId = disableWs ? crypto.randomUUID() : storedTabId ?? crypto.randomUUID()
     const deviceId = storedDeviceId ?? crypto.randomUUID()
     const id = `tab-${deviceId}-${tabId}`
     const colorKey = `${colorKeyPrefix}${tabId}`

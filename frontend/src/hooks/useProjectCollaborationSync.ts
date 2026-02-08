@@ -76,6 +76,19 @@ export function useProjectCollaborationSync({
       memos.length === 0 &&
       !coreCategoryId &&
       !theoryHtml
+
+    const hydrated = hydrateRemoteProject(project, getReadableTextColor)
+    const incomingHasData =
+      hydrated.documents.length > 0 ||
+      hydrated.codes.length > 0 ||
+      hydrated.categories.length > 0 ||
+      hydrated.memos.length > 0 ||
+      Boolean(hydrated.coreCategoryId) ||
+      Boolean(hydrated.theoryHtml)
+
+    if (!localEmpty && !incomingHasData) return
+    if (!localEmpty && incomingUpdatedAt === 0) return
+
     const shouldApply =
       localEmpty ||
       incomingUpdatedAt > projectUpdatedAtRef.current ||
@@ -83,8 +96,6 @@ export function useProjectCollaborationSync({
     if (!shouldApply) return
 
     isApplyingRemoteRef.current = true
-
-    const hydrated = hydrateRemoteProject(project, getReadableTextColor)
 
     setDocuments(hydrated.documents)
     if (hydrated.codes.length) setCodes(hydrated.codes)
