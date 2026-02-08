@@ -1,9 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { getTabIdentity } from '../lib/tabIdentity'
 
 const getClientId = () => {
   if (typeof window === 'undefined') return ''
-  return getTabIdentity().clientId
+  const storageKey = 'gt-client-id'
+  const stored = window.sessionStorage.getItem(storageKey)
+  if (stored) return stored
+  const next = crypto.randomUUID()
+  window.sessionStorage.setItem(storageKey, next)
+  return next
 }
 
 const getWebSocketUrl = () => {
