@@ -796,6 +796,52 @@ async def get_project(project_id: str) -> Dict[str, object]:
         return {"status": "error", "message": "Failed to load project"}
 
 
+@app.post("/projects/{project_id}/duplicate")
+async def duplicate_project(project_id: str, payload: Dict = Body(default={})) -> Dict[str, object]:
+    client = get_firestore_client()
+    if not client:
+        return {"status": "error", "message": "Firestore not available"}
+    source_ref = get_project_doc_ref(project_id)
+    if not source_ref:
+        return {"status": "error", "message": "Firestore not available"}
+    try:
+        snapshot = source_ref.get()
+        if not snapshot.exists:
+            return {"status": "not_found"}
+        data = snapshot.to_dict() or {}
+        project_raw = data.get("project")
+        if not isinstance(project_raw, dict):
+            project_raw = {}
+        limit_error = validate_project_limits(project_raw)
+        if limit_error:
+            return {
+                "status": "error",
+                **limit_error,
+            }
+        source_name = data.get("name") or "Untitled project"
+        name = str(payload.get("name") or f"Kopia av {source_name}").strip() or f"Kopia av {source_name}"
+        project_id = str(uuid4())
+        doc_ref = get_project_doc_ref(project_id)
+        if not doc_ref:
+            return {"status": "error", "message": "Firestore not available"}
+        doc_ref.set(
+            {
+                "name": name,
+                "project": project_raw,
+                "created_at": firestore.SERVER_TIMESTAMP,
+                "updated_at": firestore.SERVER_TIMESTAMP,
+            }
+        )
+        return {
+            "project_id": project_id,
+            "project_raw": project_raw,
+            "name": name,
+        }
+    except Exception as exc:
+        logger.warning(f"Failed to duplicate project: {exc}")
+        return {"status": "error", "message": "Failed to duplicate project"}
+
+
 @app.patch("/projects/{project_id}")
 async def rename_project(project_id: str, payload: Dict = Body(...)) -> Dict[str, str]:
     doc_ref = get_project_doc_ref(project_id)

@@ -27,6 +27,7 @@ type UseProjectCatalogResult = {
   refreshProjects: () => Promise<void>
   loadProject: (projectId: string) => Promise<void>
   createProject: (name?: string) => Promise<void>
+  duplicateProject: (projectId: string, name?: string) => Promise<void>
   renameProject: (projectId: string, name: string) => Promise<void>
   deleteProject: (projectId: string) => Promise<boolean>
   closeProject: () => void
@@ -166,6 +167,36 @@ export function useProjectCatalog({
     }
   }, [apiBase, applyRemoteProject, remoteLoadedRef, onActiveProjectChange, refreshStorage])
 
+  const duplicateProject = useCallback(async (projectId: string, name?: string) => {
+    if (!apiBase) return
+    setProjectError(null)
+    try {
+      const response = await fetch(`${apiBase}/projects/${projectId}/duplicate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name?.trim() || undefined }),
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to duplicate project: ${response.status}`)
+      }
+      const data = (await response.json()) as {
+        project_id?: string
+        project_raw?: Record<string, unknown>
+        name?: string
+      }
+      if (data.project_id) {
+        setProjects((current) => [
+          { id: data.project_id!, name: data.name ?? name ?? 'New project' },
+          ...current,
+        ])
+        void refreshStorage()
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to duplicate project'
+      setProjectError(message)
+    }
+  }, [apiBase, refreshStorage])
+
   const renameProject = useCallback(async (projectId: string, name: string) => {
     if (!apiBase) return
     const trimmed = name.trim()
@@ -276,6 +307,7 @@ export function useProjectCatalog({
     refreshProjects,
     loadProject,
     createProject,
+    duplicateProject,
     renameProject,
     deleteProject,
     closeProject,

@@ -19,6 +19,7 @@ type ProjectPickerModalProps = {
   onRefresh: () => void
   onSelect: (projectId: string) => void
   onCreate: (name: string) => void
+  onDuplicate: (projectId: string) => void
   onDelete: (projectId: string) => void
   onPurge: () => void
 }
@@ -47,6 +48,7 @@ export function ProjectPickerModal({
   onRefresh,
   onSelect,
   onCreate,
+  onDuplicate,
   onDelete,
   onPurge,
 }: ProjectPickerModalProps) {
@@ -152,6 +154,18 @@ export function ProjectPickerModal({
                 >
                   {formatTimestamp(project.updated_at || project.created_at)}
                 </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onDuplicate(project.id)}
+                className={cn(
+                  'rounded-lg border px-2 py-1 text-xs font-semibold transition',
+                  project.id === activeProjectId
+                    ? 'border-white/30 text-white hover:bg-white/10'
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                )}
+              >
+                Duplicera
               </button>
               {canDeleteProjects ? (
                 <button

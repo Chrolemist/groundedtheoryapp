@@ -127,6 +127,11 @@ export function DashboardLayout() {
     setIsProjectModalOpen(false)
   }
 
+  const handleDuplicateProject = async (projectId: string) => {
+    await catalog.duplicateProject(projectId)
+    await catalog.refreshProjects()
+  }
+
   const handlePurgeProjects = async () => {
     const ok = window.confirm(
       'Delete ALL projects permanently? This cannot be undone.',
@@ -246,6 +251,7 @@ export function DashboardLayout() {
         onRefresh={() => void catalog.refreshProjects()}
         onSelect={(projectId: string) => void handleSelectProject(projectId)}
         onCreate={(name: string) => void handleCreateProject(name)}
+        onDuplicate={(projectId: string) => void handleDuplicateProject(projectId)}
         onDelete={(projectId: string) => void handleDeleteProject(projectId)}
         onPurge={() => void handlePurgeProjects()}
       />
