@@ -449,7 +449,10 @@ export function DocumentViewerPanel({
               if (!hasDocuments) return
               updateDocumentTitle(event.target.value)
             }}
-            className="min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+            className={cn(
+              'min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm',
+              documentViewMode === 'all' && 'invisible pointer-events-none',
+            )}
             placeholder="Document title"
             disabled={!hasDocuments}
           />
