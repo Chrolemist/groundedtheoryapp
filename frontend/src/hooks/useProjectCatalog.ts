@@ -9,6 +9,7 @@ type ProjectSummary = {
 
 type UseProjectCatalogArgs = {
   apiBase: string
+  adminToken?: string | null
   remoteLoadedRef: MutableRefObject<boolean>
   applyRemoteProject: (project: Record<string, unknown>) => void
   autoCreateIfEmpty?: boolean
@@ -45,6 +46,7 @@ const defaultProjectPayload = () => ({
 
 export function useProjectCatalog({
   apiBase,
+  adminToken,
   remoteLoadedRef,
   applyRemoteProject,
   autoCreateIfEmpty = false,
@@ -228,9 +230,16 @@ export function useProjectCatalog({
 
   const deleteProject = useCallback(async (projectId: string) => {
     if (!apiBase) return false
+    if (!adminToken) {
+      setProjectError('Admin login required to delete projects')
+      return false
+    }
     setProjectError(null)
     try {
-      const response = await fetch(`${apiBase}/projects/${projectId}`, { method: 'DELETE' })
+      const response = await fetch(`${apiBase}/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
       if (!response.ok) {
         throw new Error(`Failed to delete project: ${response.status}`)
       }
@@ -248,7 +257,7 @@ export function useProjectCatalog({
       setProjectError(message)
       return false
     }
-  }, [activeProjectId, apiBase, refreshStorage])
+  }, [activeProjectId, adminToken, apiBase, refreshStorage])
 
   const closeProject = useCallback(() => {
     setActiveProjectId(null)
@@ -258,9 +267,16 @@ export function useProjectCatalog({
 
   const purgeProjects = useCallback(async () => {
     if (!apiBase) return 0
+    if (!adminToken) {
+      setProjectError('Admin login required to purge projects')
+      return 0
+    }
     setProjectError(null)
     try {
-      const response = await fetch(`${apiBase}/projects/purge`, { method: 'POST' })
+      const response = await fetch(`${apiBase}/projects/purge`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
       if (!response.ok) {
         throw new Error(`Failed to purge projects: ${response.status}`)
       }
@@ -277,7 +293,7 @@ export function useProjectCatalog({
       setProjectError(message)
       return 0
     }
-  }, [apiBase, refreshStorage])
+  }, [adminToken, apiBase, refreshStorage])
 
   useEffect(() => {
     if (didInitRef.current) return

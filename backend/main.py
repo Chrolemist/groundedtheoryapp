@@ -8,6 +8,7 @@ import logging
 import hashlib
 import random
 import time
+import secrets
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -16,7 +17,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from docx import Document
 from dotenv import load_dotenv
-from fastapi import Body, FastAPI, File, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -102,6 +103,8 @@ ADMIN_LOCKOUT_LABELS = {
 }
 ADMIN_ATTEMPT_LIMIT = 3
 admin_lockouts: Dict[str, Dict[str, float | int]] = {}
+ADMIN_TOKEN_TTL_SECONDS = int(os.getenv("ADMIN_TOKEN_TTL_SECONDS", "28800"))
+admin_tokens: Dict[str, float] = {}
 
 
 def get_client_ip(request: Request) -> str:
@@ -127,6 +130,42 @@ def format_lockout_wait(seconds: int, fallback_seconds: int) -> str:
         return f"{hours} hours"
     days = max(1, int((seconds + 86399) / 86400))
     return f"{days} days"
+
+
+def prune_admin_tokens(now: float) -> None:
+    expired = [token for token, expires_at in admin_tokens.items() if expires_at <= now]
+    for token in expired:
+        admin_tokens.pop(token, None)
+
+
+def issue_admin_token() -> str:
+    token = secrets.token_urlsafe(32)
+    admin_tokens[token] = time.time() + ADMIN_TOKEN_TTL_SECONDS
+    return token
+
+
+def validate_admin_token(token: str) -> bool:
+    if not token:
+        return False
+    now = time.time()
+    prune_admin_tokens(now)
+    expires_at = admin_tokens.get(token)
+    if not expires_at:
+        return False
+    if expires_at <= now:
+        admin_tokens.pop(token, None)
+        return False
+    return True
+
+
+def require_admin(request: Request) -> None:
+    auth_header = request.headers.get("authorization") or ""
+    parts = auth_header.split(" ", 1)
+    if len(parts) != 2 or parts[0].lower() != "bearer":
+        raise HTTPException(status_code=401, detail="Admin authorization required")
+    token = parts[1].strip()
+    if not validate_admin_token(token):
+        raise HTTPException(status_code=401, detail="Admin authorization required")
 
 
 class ConnectionManager:
@@ -738,7 +777,12 @@ async def admin_login(payload: AdminLoginPayload, request: Request) -> Dict[str,
         }
     if payload.password == expected:
         admin_lockouts.pop(client_key, None)
-        return {"ok": True}
+        token = issue_admin_token()
+        return {
+            "ok": True,
+            "token": token,
+            "expires_in_seconds": ADMIN_TOKEN_TTL_SECONDS,
+        }
     state["failures"] = int(state.get("failures", 0)) + 1
     if state["failures"] % ADMIN_ATTEMPT_LIMIT == 0:
         next_step = min(
@@ -786,7 +830,8 @@ async def get_projects_storage() -> Dict[str, int]:
 
 
 @app.post("/projects/purge")
-async def purge_projects() -> Dict[str, int | str]:
+async def purge_projects(request: Request) -> Dict[str, int | str]:
+    require_admin(request)
     global last_saved_project_hash
     client = get_firestore_client()
     if not client:
@@ -948,7 +993,8 @@ async def rename_project(project_id: str, payload: Dict = Body(...)) -> Dict[str
 
 
 @app.delete("/projects/{project_id}")
-async def delete_project(project_id: str) -> Dict[str, str]:
+async def delete_project(project_id: str, request: Request) -> Dict[str, str]:
+    require_admin(request)
     global last_saved_project_hash
     doc_ref = get_project_doc_ref(project_id)
     if not doc_ref:

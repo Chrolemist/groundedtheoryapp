@@ -24,6 +24,7 @@ export function DashboardLayout() {
   const tour = useOnboardingTour()
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [adminToken, setAdminToken] = useState<string | null>(null)
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null)
@@ -69,6 +70,7 @@ export function DashboardLayout() {
 
   const catalog = useProjectCatalog({
     apiBase,
+    adminToken,
     remoteLoadedRef,
     applyRemoteProject: project.applyRemoteProject,
     autoCreateIfEmpty: false,
@@ -244,9 +246,17 @@ export function DashboardLayout() {
         ok?: boolean
         message?: string
         retry_after_seconds?: number
+        token?: string
+        expires_in_seconds?: number
       }
       if (data.ok) {
+        if (!data.token) {
+          setAdminLoginError('Admin token missing from response')
+          setAdminRetryAfterSeconds(null)
+          return
+        }
         setIsAdmin(true)
+        setAdminToken(data.token)
         setIsAdminModalOpen(false)
         setAdminPassword('')
         setAdminLoginError(null)
@@ -270,6 +280,7 @@ export function DashboardLayout() {
 
   const handleAdminLogout = () => {
     setIsAdmin(false)
+    setAdminToken(null)
   }
 
   return (
