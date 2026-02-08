@@ -223,6 +223,10 @@ export function DashboardLayout() {
       window.alert('Backend not available.')
       return
     }
+    if (adminRetryAfterSeconds && adminRetryAfterSeconds > 0) {
+      setIsAdminModalOpen(true)
+      return
+    }
     setAdminLoginError(null)
     setAdminRetryAfterSeconds(null)
     setAdminPassword('')
@@ -234,6 +238,7 @@ export function DashboardLayout() {
       window.alert('Backend not available.')
       return
     }
+    if (adminRetryAfterSeconds && adminRetryAfterSeconds > 0) return
     if (!adminPassword.trim()) return
     try {
       setIsAdminLoggingIn(true)
@@ -277,6 +282,21 @@ export function DashboardLayout() {
       setIsAdminLoggingIn(false)
     }
   }
+
+  useEffect(() => {
+    if (adminRetryAfterSeconds === null) return
+    if (adminRetryAfterSeconds <= 0) {
+      setAdminRetryAfterSeconds(null)
+      setAdminLoginError(null)
+      return
+    }
+    const timer = window.setTimeout(() => {
+      setAdminRetryAfterSeconds((current) =>
+        typeof current === 'number' ? current - 1 : null,
+      )
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [adminRetryAfterSeconds])
 
   const handleAdminLogout = () => {
     setIsAdmin(false)

@@ -23,6 +23,7 @@ export function AdminLoginModal({
   onClose,
 }: AdminLoginModalProps) {
   const inputRef = useRef<HTMLInputElement | null>(null)
+  const isLocked = typeof retryAfterSeconds === 'number' && retryAfterSeconds > 0
 
   useEffect(() => {
     if (open) {
@@ -56,20 +57,26 @@ export function AdminLoginModal({
             onSubmit()
           }}
         >
-          <div className="space-y-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Password
-            </label>
-            <input
-              ref={inputRef}
-              type="password"
-              value={password}
-              onChange={(event) => onPasswordChange(event.target.value)}
-              placeholder="Admin password"
-              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
-              autoComplete="current-password"
-            />
-          </div>
+          {!isLocked ? (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Password
+              </label>
+              <input
+                ref={inputRef}
+                type="password"
+                value={password}
+                onChange={(event) => onPasswordChange(event.target.value)}
+                placeholder="Admin password"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                autoComplete="current-password"
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Login locked. Try again in {retryAfterSeconds}s.
+            </div>
+          )}
 
           {error ? (
             <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
@@ -84,16 +91,18 @@ export function AdminLoginModal({
 
           <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
             <span>3 failed attempts triggers a timed lockout.</span>
-            <button
-              type="submit"
-              className={cn(
-                'rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white',
-                isSubmitting ? 'cursor-wait opacity-70' : 'hover:bg-slate-800',
-              )}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Checking...' : 'Login'}
-            </button>
+            {!isLocked ? (
+              <button
+                type="submit"
+                className={cn(
+                  'rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white',
+                  isSubmitting ? 'cursor-wait opacity-70' : 'hover:bg-slate-800',
+                )}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Checking...' : 'Login'}
+              </button>
+            ) : null}
           </div>
         </form>
       </div>
