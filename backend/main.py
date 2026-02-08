@@ -7,6 +7,7 @@ import json
 import logging
 import hashlib
 import random
+import time
 from typing import Dict, List, Optional
 from uuid import uuid4
 
@@ -79,6 +80,53 @@ class ProjectState(BaseModel):
 
 class AdminLoginPayload(BaseModel):
     password: str
+
+
+ADMIN_LOCKOUT_SCHEDULE_SECONDS = [
+    60,
+    300,
+    3600,
+    86400,
+    604800,
+    2592000,
+    31536000,
+]
+ADMIN_LOCKOUT_LABELS = {
+    60: "1 minute",
+    300: "5 minutes",
+    3600: "1 hour",
+    86400: "24 hours",
+    604800: "1 week",
+    2592000: "1 month",
+    31536000: "1 year",
+}
+ADMIN_ATTEMPT_LIMIT = 3
+admin_lockouts: Dict[str, Dict[str, float | int]] = {}
+
+
+def get_client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    if request.client:
+        return request.client.host
+    return "unknown"
+
+
+def format_lockout_wait(seconds: int, fallback_seconds: int) -> str:
+    label = ADMIN_LOCKOUT_LABELS.get(fallback_seconds)
+    if label:
+        return label
+    if seconds < 60:
+        return f"{max(1, seconds)} seconds"
+    if seconds < 3600:
+        minutes = max(1, int((seconds + 59) / 60))
+        return f"{minutes} minutes"
+    if seconds < 86400:
+        hours = max(1, int((seconds + 3599) / 3600))
+        return f"{hours} hours"
+    days = max(1, int((seconds + 86399) / 86400))
+    return f"{days} days"
 
 
 class ConnectionManager:
@@ -664,12 +712,47 @@ async def list_projects() -> Dict[str, List[Dict[str, Optional[str]]]]:
 
 
 @app.post("/admin/login")
-async def admin_login(payload: AdminLoginPayload) -> Dict[str, object]:
+async def admin_login(payload: AdminLoginPayload, request: Request) -> Dict[str, object]:
     expected = (os.getenv("ADMIN_PASSWORD") or "").strip()
     if not expected:
         return {"ok": False, "message": "Admin password not configured"}
+    client_key = get_client_ip(request)
+    state = admin_lockouts.setdefault(
+        client_key,
+        {"failures": 0, "lockout_until": 0, "step": -1},
+    )
+    now = time.time()
+    lockout_until = float(state.get("lockout_until", 0))
+    if lockout_until > now:
+        remaining = int(lockout_until - now)
+        step_index = int(state.get("step", -1))
+        step_index = max(0, min(step_index, len(ADMIN_LOCKOUT_SCHEDULE_SECONDS) - 1))
+        step_duration = ADMIN_LOCKOUT_SCHEDULE_SECONDS[step_index]
+        return {
+            "ok": False,
+            "message": (
+                "Too many attempts. Try again in "
+                f"{format_lockout_wait(remaining, step_duration)}."
+            ),
+            "retry_after_seconds": remaining,
+        }
     if payload.password == expected:
+        admin_lockouts.pop(client_key, None)
         return {"ok": True}
+    state["failures"] = int(state.get("failures", 0)) + 1
+    if state["failures"] % ADMIN_ATTEMPT_LIMIT == 0:
+        next_step = min(
+            int(state.get("step", -1)) + 1,
+            len(ADMIN_LOCKOUT_SCHEDULE_SECONDS) - 1,
+        )
+        duration = ADMIN_LOCKOUT_SCHEDULE_SECONDS[next_step]
+        state["step"] = next_step
+        state["lockout_until"] = now + duration
+        return {
+            "ok": False,
+            "message": f"Too many attempts. Try again in {format_lockout_wait(duration, duration)}.",
+            "retry_after_seconds": int(duration),
+        }
     return {"ok": False, "message": "Invalid password"}
 
 

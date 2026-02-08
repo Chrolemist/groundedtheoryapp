@@ -6,6 +6,7 @@ import { DashboardHeader } from './DashboardHeader'
 import { CollaborationLayer } from './CollaborationLayer'
 import { CodingSidebar } from './CodingSidebar'
 import { ProjectPickerModal } from './ProjectPickerModal'
+import { AdminLoginModal } from './AdminLoginModal'
 import { useCollaboration } from '../hooks/useCollaboration'
 import { loadStoredProjectState } from '../lib/projectStorage'
 import { useProjectState } from '../hooks/useProjectState'
@@ -23,6 +24,11 @@ export function DashboardLayout() {
   const tour = useOnboardingTour()
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [adminLoginError, setAdminLoginError] = useState<string | null>(null)
+  const [adminRetryAfterSeconds, setAdminRetryAfterSeconds] = useState<number | null>(null)
+  const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false)
 
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -215,22 +221,50 @@ export function DashboardLayout() {
       window.alert('Backend not available.')
       return
     }
-    const attempt = window.prompt('Admin password')
-    if (!attempt) return
+    setAdminLoginError(null)
+    setAdminRetryAfterSeconds(null)
+    setAdminPassword('')
+    setIsAdminModalOpen(true)
+  }
+
+  const submitAdminLogin = async () => {
+    if (!apiBase) {
+      window.alert('Backend not available.')
+      return
+    }
+    if (!adminPassword.trim()) return
     try {
+      setIsAdminLoggingIn(true)
       const response = await fetch(`${apiBase}/admin/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: attempt }),
+        body: JSON.stringify({ password: adminPassword }),
       })
-      const data = (await response.json()) as { ok?: boolean; message?: string }
+      const data = (await response.json()) as {
+        ok?: boolean
+        message?: string
+        retry_after_seconds?: number
+      }
       if (data.ok) {
         setIsAdmin(true)
+        setIsAdminModalOpen(false)
+        setAdminPassword('')
+        setAdminLoginError(null)
+        setAdminRetryAfterSeconds(null)
         return
       }
-      window.alert(data.message ?? 'Incorrect password')
+      setAdminLoginError(data.message ?? 'Incorrect password')
+      if (typeof data.retry_after_seconds === 'number') {
+        setAdminRetryAfterSeconds(data.retry_after_seconds)
+      } else {
+        setAdminRetryAfterSeconds(null)
+      }
+      setAdminPassword('')
     } catch {
-      window.alert('Failed to verify admin password')
+      setAdminLoginError('Failed to verify admin password')
+      setAdminRetryAfterSeconds(null)
+    } finally {
+      setIsAdminLoggingIn(false)
     }
   }
 
@@ -240,6 +274,16 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
+      <AdminLoginModal
+        open={isAdminModalOpen}
+        password={adminPassword}
+        isSubmitting={isAdminLoggingIn}
+        error={adminLoginError}
+        retryAfterSeconds={adminRetryAfterSeconds}
+        onPasswordChange={setAdminPassword}
+        onSubmit={submitAdminLogin}
+        onClose={() => setIsAdminModalOpen(false)}
+      />
       <ProjectPickerModal
         open={isProjectModalOpen}
         projects={catalog.projects}
