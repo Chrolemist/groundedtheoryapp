@@ -208,7 +208,15 @@ class ConnectionManager:
             "Vesslan",
             "Grodan",
         ]
-        existing = {user["name"] for user in self.users.values()}
+        existing: set[str] = set()
+        for project_users in self.users.values():
+            if not isinstance(project_users, dict):
+                continue
+            for user in project_users.values():
+                if isinstance(user, dict):
+                    name = user.get("name")
+                    if isinstance(name, str) and name:
+                        existing.add(name)
         max_attempts = max(20, len(first_parts) * len(second_parts))
         for _ in range(max_attempts):
             base = f"{random.choice(first_parts)} {random.choice(second_parts)}"
@@ -662,7 +670,11 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             origin,
         )
     except Exception as e:
-        logger.error(f"WebSocket connection failed: {e}")
+        logger.exception("WebSocket connection failed")
+        try:
+            await websocket.close(code=1011)
+        except Exception:
+            pass
         return
 
     ensure_project_loaded(project_id)
