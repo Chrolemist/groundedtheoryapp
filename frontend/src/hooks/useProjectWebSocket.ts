@@ -40,6 +40,11 @@ let sharedReconnectTimer: number | null = null
 let sharedRetryCount = 0
 let sharedRefCount = 0
 
+const isDebugEnabled = () => {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem('gt-debug') === 'true'
+}
+
 const isSocketActive = (socket: WebSocket | null) => {
   if (!socket) return false
   return socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING
@@ -70,6 +75,10 @@ const scheduleSharedReconnect = (connect: () => void) => {
 const connectSharedSocket = (url: string) => {
   if (isSocketActive(sharedSocket)) return
 
+  if (isDebugEnabled()) {
+    console.log('[WS] connect', url)
+  }
+
   const socket = new WebSocket(url)
   sharedSocket = socket
   
@@ -77,6 +86,9 @@ const connectSharedSocket = (url: string) => {
   socket.onopen = () => {
     sharedRetryCount = 0
     notifyStatus(true)
+    if (isDebugEnabled()) {
+      console.log('[WS] open')
+    }
     
     clearSharedPing()
     sharedPingTimer = window.setInterval(() => {
@@ -88,6 +100,9 @@ const connectSharedSocket = (url: string) => {
 
   socket.onclose = () => {
     notifyStatus(false)
+    if (isDebugEnabled()) {
+      console.log('[WS] close')
+    }
     
     clearSharedPing()
     sharedRetryCount += 1
@@ -97,6 +112,9 @@ const connectSharedSocket = (url: string) => {
 
   socket.onerror = () => {
     notifyStatus(false)
+    if (isDebugEnabled()) {
+      console.log('[WS] error')
+    }
     
     clearSharedPing()
     sharedRetryCount += 1

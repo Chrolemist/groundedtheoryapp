@@ -131,6 +131,9 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
     projectId,
     onMessage: (payload) => {
       if (!payload || typeof payload !== 'object') return
+      if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
+        console.log('[WS] message', payload)
+      }
       const data = payload as Record<string, unknown>
       const type = data.type as string | undefined
 
@@ -141,6 +144,13 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
           localUserRef.current = user
         }
         const users = data.users as PresenceUser[] | undefined
+        if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
+          console.log('[Presence] hello', {
+            projectId,
+            user,
+            usersCount: Array.isArray(users) ? users.length : 0,
+          })
+        }
         if (users && users.length > 0) {
           setPresenceUsers(users)
         } else if (user) {
@@ -156,6 +166,12 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
 
       if (type === 'presence:update') {
         const users = data.users as PresenceUser[] | undefined
+        if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
+          console.log('[Presence] update', {
+            projectId,
+            usersCount: Array.isArray(users) ? users.length : 0,
+          })
+        }
         if (users && users.length > 0) {
           setPresenceUsers(users)
         } else if (localUserRef.current) {
