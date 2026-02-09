@@ -131,7 +131,6 @@ export function DocumentEditor({
     // We only *enforce* leader election when presence is ready.
     if (seedReady && !canSeedInitialContent) return
     if (!hasReceivedSync) return
-    if (hasRemoteUpdates) return
     if (didSeedRef.current) return
 
     const currentText = editor.getText().trim()
