@@ -633,10 +633,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         user = await manager.connect(websocket, client_id, project_id)
         user_agent = websocket.headers.get("user-agent")
         origin = websocket.headers.get("origin")
+        user_id = user.get("id", "unknown") if isinstance(user, dict) else "unknown"
+        user_name = user.get("name", "unknown") if isinstance(user, dict) else "unknown"
+        if isinstance(user, dict):
+            if not user.get("name"):
+                user["name"] = user_name
+            if not user.get("color"):
+                user["color"] = "#7C3AED"
         logger.info(
             "WebSocket accepted. User: %s (%s) client_id=%s remote=%s ua=%s origin=%s",
-            user["id"],
-            user["name"],
+            user_id,
+            user_name,
             client_id,
             websocket.client,
             user_agent,
