@@ -42,6 +42,8 @@ type DocumentViewerPanelProps = {
   onHighlightMouseUp: () => void
   onHighlightClick: (event: MouseEvent<HTMLElement>) => void
   onEditorRef: (node: HTMLDivElement | null) => void
+  canSeedInitialContent: boolean
+  seedReady: boolean
 }
 
 export function DocumentViewerPanel({
@@ -76,7 +78,9 @@ export function DocumentViewerPanel({
   onHighlightMouseUp,
   onHighlightClick,
   onEditorRef,
-  }: DocumentViewerPanelProps) {
+  canSeedInitialContent,
+  seedReady,
+}: DocumentViewerPanelProps) {
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
@@ -514,6 +518,8 @@ export function DocumentViewerPanel({
                       fontFamily={documentFontFamily}
                       fontFamilyValue={documentFontFamilyDisplay}
                       lineHeight={documentLineHeight}
+                      canSeedInitialContent={canSeedInitialContent}
+                      seedReady={seedReady}
                       setFontFamily={(value) => {
                         onDocumentFontFamilyChange(value)
                         onDocumentFontFamilyDisplayChange(value)
@@ -565,6 +571,8 @@ export function DocumentViewerPanel({
                   fontFamily={documentFontFamily}
                   fontFamilyValue={documentFontFamilyDisplay}
                   lineHeight={documentLineHeight}
+                  canSeedInitialContent={canSeedInitialContent}
+                  seedReady={seedReady}
                   setFontFamily={(value) => {
                     onDocumentFontFamilyChange(value)
                     onDocumentFontFamilyDisplayChange(value)

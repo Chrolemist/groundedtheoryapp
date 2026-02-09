@@ -21,6 +21,8 @@ type DocumentEditorProps = {
   lineHeight: string
   setFontFamily: (value: string) => void
   setLineHeight: (value: string) => void
+  canSeedInitialContent: boolean
+  seedReady: boolean
 }
 
 export function DocumentEditor({
@@ -38,6 +40,8 @@ export function DocumentEditor({
   lineHeight,
   setFontFamily,
   setLineHeight,
+  canSeedInitialContent,
+  seedReady,
 }: DocumentEditorProps) {
   const extensions = [
     StarterKit.configure({ history: false }),
@@ -66,10 +70,12 @@ export function DocumentEditor({
   useEffect(() => {
     if (!editor) return
     const fragment = ydoc.getXmlFragment(documentId)
+    if (!seedReady) return
+    if (!canSeedInitialContent) return
     if (fragment.toString().length === 0 && initialHtml) {
       editor.commands.setContent(initialHtml, false)
     }
-  }, [editor, documentId, initialHtml, ydoc])
+  }, [editor, documentId, initialHtml, ydoc, canSeedInitialContent, seedReady])
 
   const runCommand = (command: string, value?: string) => {
     if (!editor) return
