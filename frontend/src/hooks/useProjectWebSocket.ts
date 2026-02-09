@@ -19,6 +19,28 @@ const getWebSocketUrl = (projectId?: string | null) => {
   if (clientId) params.set('client_id', clientId)
   params.set('project_id', projectId)
   const query = params.toString() ? `?${params.toString()}` : ''
+  const configuredWsBase = (import.meta.env.VITE_WS_BASE as string | undefined) ?? ''
+  const configuredApiBase = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
+
+  if (configuredWsBase) {
+    const wsUrl = new URL(configuredWsBase, window.location.origin)
+    // Ensure /ws path exists on the configured base.
+    const basePath = wsUrl.pathname.endsWith('/') ? wsUrl.pathname.slice(0, -1) : wsUrl.pathname
+    wsUrl.pathname = `${basePath}/ws`
+    wsUrl.search = query.startsWith('?') ? query : `?${query}`
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : wsUrl.protocol === 'http:' ? 'ws:' : wsUrl.protocol
+    return wsUrl.toString()
+  }
+
+  if (configuredApiBase) {
+    const apiUrl = new URL(configuredApiBase, window.location.origin)
+    const basePath = apiUrl.pathname.endsWith('/') ? apiUrl.pathname.slice(0, -1) : apiUrl.pathname
+    apiUrl.pathname = `${basePath}/ws`
+    apiUrl.search = query.startsWith('?') ? query : `?${query}`
+    apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : apiUrl.protocol === 'http:' ? 'ws:' : apiUrl.protocol
+    return apiUrl.toString()
+  }
+
   const host = window.location.port === '5173' ? 'localhost:8000' : window.location.host
   return `${protocol}://${host}/ws${query}`
 }

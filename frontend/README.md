@@ -1,90 +1,124 @@
-# React + TypeScript + Vite
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# GroundedTheory Frontend
 
-Currently, two official plugins are available:
+This frontend is a Vite + React + TypeScript app using TipTap + Yjs for collaborative editing.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Local collaboration modes
 
-## React Compiler
+The app supports two collaboration transports:
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **WebSocket mode** (default when enabled): Yjs updates and presence go through the backend `/ws`.
+- **Local mode** (when WS is disabled): collaboration runs **between browser tabs** using `BroadcastChannel` + `localStorage`.
 
-## Expanding the ESLint configuration
+The mode is controlled by:
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+- `VITE_DISABLE_WS=true` → local mode (no backend WS)
+- `VITE_DISABLE_WS=false` → WS mode
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+### Production configuration
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+By default the frontend assumes the backend is served from the **same origin** as the frontend.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+If your production backend is on a different origin (e.g. `api.example.com`), set:
 
-## Firestore storage scaling plan
+- `VITE_API_BASE=https://api.example.com`
 
-Current design stores the entire project in a single Firestore document. This is simple, but
-Firestore documents have a hard ~1 MB limit. If we approach that limit, split the project into
-multiple documents while keeping total size (sum of all docs) under the 1 GiB free tier.
+If WebSockets are on a different base than the API, set:
 
-Recommended split when needed:
+- `VITE_WS_BASE=https://api.example.com`
 
-- `projects/{projectId}/meta`: small metadata (codes, categories, memos metadata, theory, settings)
-- `projects/{projectId}/documents/{docId}`: one document per UI document (title, text, html)
-- `projects/{projectId}/highlights/{docId}`: one document per UI document with highlight list
+Repository defaults:
 
-Storage reporting:
+- [frontend/.env](frontend/.env) defaults to `VITE_DISABLE_WS=false` (production-friendly)
+- [frontend/.env.development](frontend/.env.development) sets `VITE_DISABLE_WS=true` for local dev
 
-- Total usage = sum of sizes of all documents under `projects/{projectId}`.
-- Optional: show per-document sizes for troubleshooting.
+## Debug logging
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Most high-signal logs are gated behind a localStorage flag.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Enable:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+- In browser console: `localStorage.setItem('gt-debug','true'); location.reload();`
+
+Disable:
+
+- In browser console: `localStorage.removeItem('gt-debug'); location.reload();`
+
+### Useful log prefixes
+
+- `[DocEditor] ...` → TipTap editor updates + seeding decisions
+- `[Project] ...` → React project state updates (document html/text patches)
+- `[Autosave] ...` → autosave decisions and skips
+- `[Project Save] ...` → backend persistence request/response
+- `[Presence][local] ...` → local presence transport (WS disabled)
+- `[Yjs][local] ...` → local Yjs BroadcastChannel sync and leader election (WS disabled)
+
+## Known issues we fixed (and what to check if they return)
+
+### 1) React error: “Cannot access refs during render”
+
+**Symptom**
+- Build/runtime error in `CollaborationLayer`.
+
+**Cause**
+- Reading `ref.current` during render for remote cursor/selection overlays.
+
+**Fix**
+- `CollaborationLayer` uses a state snapshot of editor instances updated from effects, instead of reading refs directly during render.
+
+### 2) Document body not persisting / disappearing on refresh (while titles persisted)
+
+**Symptom**
+- Document titles saved, but the document body reset/vanished on refresh.
+
+**Cause (typical chain)**
+- TipTap content lives in Yjs fragments.
+- If seeding/hydration gates never open (e.g. “sync received” was never reached in a given mode), the editor body wouldn’t seed/hydrate as expected.
+
+**What to check**
+- You should see this sequence when typing:
+	- `[DocEditor] update` (TipTap emits html/text)
+	- `[Project] updateDocument` (state receives html/text)
+	- `[Autosave] persist ...` (or a clear skip reason)
+	- `[Project Save] response ...` (backend result)
+
+### 3) Duplicated text when opening multiple tabs on the same project (WS disabled)
+
+**Symptom**
+- Tab 1 shows `hej`.
+- Tab 2 shows:
+	- `hej`
+	- `hej`
+- Tab 3 shows 3 copies, etc.
+
+**Root cause**
+- In local mode, if a newly opened tab seeds `initialHtml` into Yjs **before** it receives the existing Yjs state from another tab, Yjs merges both inserts.
+- In development, React `StrictMode` mounts/unmounts effects twice, which can amplify timing races if we clear leadership/sync state during cleanup.
+
+**Fix**
+- Local mode uses a per-project leader lock (`localStorage` key `gt-yjs-leader:${projectId}`) so only one tab is allowed to seed initial content.
+- Followers wait for BroadcastChannel `yjs:sync`/`yjs:update`.
+- The leader key is intentionally not removed during effect cleanup (StrictMode-safe); leadership relies on staleness/heartbeat.
+
+**Logs to look for**
+- `[Yjs][local] leader-check` → which tab is leader
+- `[Yjs][local] recv sync` / `recv update`
+- `[DocEditor] seeding setContent` → should generally happen only once per document when there is no prior Yjs state
+
+### 4) Duplicated projects editing each other (cross-project text leakage)
+
+**Symptom**
+- After duplicating a project, editing the original affected the duplicate.
+
+**Root cause**
+- A single in-memory `Y.Doc` was reused across project switches, so Yjs state could bleed between projects.
+
+**Fix**
+- The Yjs document instance is scoped to `projectId` (new `Y.Doc` per project) and old instances are destroyed.
+
+## React StrictMode note
+
+`React.StrictMode` is enabled in development (see `src/main.tsx`). This is helpful, but it intentionally double-invokes certain lifecycles/effects in dev to surface unsafe patterns.
+
+If you see a bug that happens only in dev but not in prod, check whether it’s due to StrictMode timing and make side-effect logic idempotent.
+

@@ -187,6 +187,8 @@ export function useProjectIO({
 
   const getApiBase = () => {
     if (typeof window === 'undefined') return ''
+    const configured = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
+    if (configured) return configured.replace(/\/$/, '')
     if (window.location.port === '5173') return 'http://localhost:8000'
     return window.location.origin
   }
