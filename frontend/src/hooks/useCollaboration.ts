@@ -76,6 +76,8 @@ const pickDistinctColor = (palette: string[], used: Set<string>, fallbackIndex: 
 // WebSocket-backed presence and cursor tracking.
 export function useCollaboration({ onProjectUpdate, projectId }: UseCollaborationArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const [presenceUsers, setPresenceUsers] = useState<PresenceUser[]>([])
   const [localUser, setLocalUser] = useState<PresenceUser | null>(null)
   const [remoteCursors, setRemoteCursors] = useState<Record<string, CursorPresence>>({})
@@ -98,7 +100,7 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
     const storedDeviceId = window.localStorage.getItem(deviceIdKey)
     const storedName = window.localStorage.getItem(nameKey)
     const storedTabId = window.sessionStorage.getItem(tabIdKey)
-    const tabId = disableWs ? crypto.randomUUID() : storedTabId ?? crypto.randomUUID()
+    const tabId = storedTabId ?? crypto.randomUUID()
     const deviceId = storedDeviceId ?? crypto.randomUUID()
     const id = `tab-${deviceId}-${tabId}`
     const colorKey = `${colorKeyPrefix}${tabId}`
@@ -293,6 +295,9 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
     broadcastRef.current = channel
     const self = localUserRef.current ?? getLocalIdentity()
     localUserRef.current = self
+    if (debugEnabled) {
+      console.log('[Presence][local] init', { projectId, self })
+    }
     setTimeout(() => {
       setLocalUser((current) => current ?? self)
       setPresenceUsers((current) =>
@@ -352,6 +357,10 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
       const type = data.type as string | undefined
       const senderId = data.userId as string | undefined
       if (senderId && senderId === localUserRef.current?.id) return
+
+      if (debugEnabled && type) {
+        console.log('[Presence][local] message', { projectId, type, senderId })
+      }
 
       if (type === 'presence:hello') {
         const user = data.user as PresenceUser | undefined
@@ -515,7 +524,7 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
   }, [])
 
   return {
-    websocketOnline: disableWs ? false : websocketOnline,
+    websocketOnline: disableWs ? true : websocketOnline,
     sendJson: sendJsonLocal,
     presenceUsers,
     localUser,

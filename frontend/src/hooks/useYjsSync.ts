@@ -102,6 +102,7 @@ export function useYjsSync({
   setCoreCategoryDraft,
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const [ydoc] = useState(() => new Y.Doc())
   const [hasRemoteUpdates, setHasRemoteUpdates] = useState(false)
   const [hasReceivedSync, setHasReceivedSync] = useState(false)
@@ -147,10 +148,10 @@ export function useYjsSync({
   })
 
   useEffect(() => {
-    if (!projectId) {
+    if (!projectId || disableWs) {
       setHasReceivedSync(true)
     }
-  }, [projectId])
+  }, [disableWs, projectId])
 
   const readCodesFromYjs = useCallback((current: Code[]) => {
     const codesMap = codesMapRef.current

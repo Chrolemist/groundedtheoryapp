@@ -19,6 +19,9 @@ export function CollaborationLayer({
   documentEditorInstancesRef,
 }: CollaborationLayerProps) {
   const [, forceRender] = useState(0)
+  const [editorInstancesSnapshot, setEditorInstancesSnapshot] = useState<Map<string, Editor>>(
+    () => new Map(),
+  )
   const rafRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -26,6 +29,7 @@ export function CollaborationLayer({
       if (rafRef.current) return
       rafRef.current = window.requestAnimationFrame(() => {
         rafRef.current = null
+        setEditorInstancesSnapshot(new Map(documentEditorInstancesRef.current))
         forceRender((value) => value + 1)
       })
     }
@@ -44,7 +48,11 @@ export function CollaborationLayer({
         rafRef.current = null
       }
     }
-  }, [])
+  }, [documentEditorInstancesRef])
+
+  useEffect(() => {
+    setEditorInstancesSnapshot(new Map(documentEditorInstancesRef.current))
+  }, [remoteCursors, remoteSelections, documentEditorInstancesRef])
 
   const overlays: Array<React.ReactNode> = []
 
@@ -54,7 +62,7 @@ export function CollaborationLayer({
     if (!user) return null
 
     if (typeof cursor.docPos === 'number') {
-      const editor = documentEditorInstancesRef.current.get(cursor.documentId ?? '')
+      const editor = editorInstancesSnapshot.get(cursor.documentId ?? '')
       if (editor) {
         try {
           const coords = editor.view.coordsAtPos(cursor.docPos)
@@ -152,7 +160,7 @@ export function CollaborationLayer({
     const to = Math.max(selection.from, selection.to)
     if (from === to) return null
 
-    const editor = documentEditorInstancesRef.current.get(selection.documentId)
+    const editor = editorInstancesSnapshot.get(selection.documentId)
     if (!editor) return null
     try {
       const domFrom = editor.view.domAtPos(from)

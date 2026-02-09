@@ -1087,6 +1087,21 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
         if not isinstance(project_raw, dict):
             return {"status": "invalid"}
 
+        try:
+            doc_list = project_raw.get("documents", [])
+            docs_count = len(doc_list) if isinstance(doc_list, list) else 0
+            sample = doc_list[0] if docs_count and isinstance(doc_list[0], dict) else {}
+            logger.info(
+                "Save state: project_id=%s docs=%s sample_keys=%s size_bytes=%s",
+                project_id,
+                docs_count,
+                list(sample.keys())[:8] if isinstance(sample, dict) else [],
+                estimate_project_bytes(project_raw),
+            )
+        except Exception:
+            # Keep saves working even if diagnostics fail.
+            pass
+
         limit_error = validate_project_limits(project_raw)
         if limit_error:
             return {

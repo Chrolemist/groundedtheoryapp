@@ -39,6 +39,8 @@ export function useProjectAutosave({
   idlePersistDelayMs = 1200,
   getDocumentContent,
 }: UseProjectAutosaveArgs) {
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
   const lastSyncedDataRef = useRef<string | null>(null)
@@ -80,14 +82,17 @@ export function useProjectAutosave({
     }
     const dataPayload = JSON.stringify(dataSnapshot)
     if (dataPayload === lastSyncedDataRef.current) {
-      if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
-        console.log('[Autosave] skip (unchanged)')
-      }
+      if (debugEnabled) console.log('[Autosave] skip (unchanged)')
       return
     }
     if (!hasLocalProjectUpdateRef.current) {
-      if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
-        console.log('[Autosave] skip (no local change)')
+      if (debugEnabled) {
+        console.log('[Autosave] skip (no local change)', {
+          docs: documents.length,
+          codes: codes.length,
+          categories: categories.length,
+          memos: memos.length,
+        })
       }
       lastSyncedDataRef.current = dataPayload
       return
@@ -103,9 +108,7 @@ export function useProjectAutosave({
     }
 
     if (enableProjectSync && hasRemoteState && sendJson) {
-      if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
-        console.log('[Autosave] send project:update')
-      }
+      if (debugEnabled) console.log('[Autosave] send project:update')
       sendJson({
         type: 'project:update',
         project_raw: projectRaw,
@@ -117,8 +120,13 @@ export function useProjectAutosave({
     }
 
     if (persistProject) {
-      if (typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true') {
-        console.log('[Autosave] persist project')
+      if (debugEnabled) {
+        try {
+          const bytes = new TextEncoder().encode(JSON.stringify(projectRaw)).length
+          console.log('[Autosave] persist project', { bytes })
+        } catch {
+          console.log('[Autosave] persist project')
+        }
       }
       latestProjectRef.current = projectRaw
       if (persistTimerRef.current) {

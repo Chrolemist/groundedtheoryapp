@@ -43,9 +43,12 @@ export function useProjectState({
 }: UseProjectStateArgs) {
   const disableLocalStoragePersist = true
   const maxProjectBytes = Number(import.meta.env.VITE_MAX_PROJECT_BYTES) || 900000
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const selectionRangeRef = useRef<Range | null>(null)
   const selectionDocumentIdRef = useRef<string | null>(null)
   const isApplyingRemoteRef = useRef(false)
+  const lastDocDebugAtRef = useRef(0)
   const pushHistoryRef = useRef<() => void>(() => {})
   const removeHighlightsByCodeIdRef = useRef<(codeId: string) => void>(() => {})
   const clearYjsFragmentsForRemovedCodeRef = useRef<(codeId: string) => void>(() => {})
@@ -124,9 +127,22 @@ export function useProjectState({
       if (shouldMarkDocumentChange()) {
         markLocalChange()
       }
+
+      if (debugEnabled && (typeof patch.html === 'string' || typeof patch.text === 'string')) {
+        const now = Date.now()
+        if (now - lastDocDebugAtRef.current > 800) {
+          lastDocDebugAtRef.current = now
+          console.log('[Project] updateDocument', {
+            documentId,
+            htmlLen: typeof patch.html === 'string' ? patch.html.length : undefined,
+            textLen: typeof patch.text === 'string' ? patch.text.length : undefined,
+            markedDirty: shouldMarkDocumentChange(),
+          })
+        }
+      }
       updateDocument(documentId, patch)
     },
-    [markLocalChange, updateDocument],
+    [debugEnabled, markLocalChange, updateDocument],
   )
 
   const addNewDocumentWithDirty = useCallback(() => {

@@ -49,6 +49,9 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const didSeedRef = useRef(false)
   const didSyncRef = useRef(false)
+  const debugRef = useRef({ lastLogAt: 0 })
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const extensions = [
     StarterKit.configure({ history: false }),
     Underline,
@@ -62,7 +65,20 @@ export function DocumentEditor({
     extensions,
     content: '',
     onUpdate: ({ editor }) => {
-      onUpdate(editor.getHTML(), editor.getText())
+      const html = editor.getHTML()
+      const text = editor.getText()
+      if (debugEnabled) {
+        const now = Date.now()
+        if (now - debugRef.current.lastLogAt > 800) {
+          debugRef.current.lastLogAt = now
+          console.log('[DocEditor] update', {
+            documentId,
+            htmlLen: html.length,
+            textLen: text.length,
+          })
+        }
+      }
+      onUpdate(html, text)
     },
   })
 

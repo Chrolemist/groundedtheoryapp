@@ -21,6 +21,8 @@ export function useProjectPersistence({
   remoteLoadedRef,
   projectIdRef,
 }: UseProjectPersistenceArgs): UseProjectPersistenceResult {
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const saveSeqRef = useRef(0)
   const [isSaving, setIsSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null)
@@ -48,10 +50,24 @@ export function useProjectPersistence({
 
   const persistProject = useCallback(
     (projectRaw: Record<string, unknown>) => {
-      if (!apiBase) return
+      if (!apiBase) {
+        if (debugEnabled) console.warn('[Project Save] skip (no apiBase)')
+        return
+      }
       const projectId = projectIdRef.current
-      if (!projectId) return
-      if (!hasRemoteState && !remoteLoadedRef.current) return
+      if (!projectId) {
+        if (debugEnabled) console.warn('[Project Save] skip (no projectId)')
+        return
+      }
+      if (!hasRemoteState && !remoteLoadedRef.current) {
+        if (debugEnabled) {
+          console.warn('[Project Save] skip (no remote state yet)', {
+            hasRemoteState,
+            remoteLoaded: remoteLoadedRef.current,
+          })
+        }
+        return
+      }
       updateWarning(projectRaw)
       const seq = saveSeqRef.current + 1
       saveSeqRef.current = seq
@@ -63,16 +79,28 @@ export function useProjectPersistence({
         body: JSON.stringify({ project_raw: projectRaw }),
       })
         .then(async (response) => {
+          let data: { status?: string; message?: string; reason?: string } | undefined
+          try {
+            data = (await response.json()) as typeof data
+          } catch {
+            data = undefined
+          }
+
+          if (debugEnabled) {
+            console.log('[Project Save] response', {
+              ok: response.ok,
+              status: response.status,
+              data,
+            })
+          }
+
           if (!response.ok) {
-            let message = `Save failed: ${response.status}`
-            try {
-              const data = (await response.json()) as { message?: string } | undefined
-              if (data?.message) {
-                message = data.message
-              }
-            } catch {
-              // Ignore invalid JSON.
-            }
+            const message = data?.message || `Save failed: ${response.status}`
+            throw new Error(message)
+          }
+
+          if (data?.status && data.status !== 'ok') {
+            const message = data.message || `Save failed: ${data.status}`
             throw new Error(message)
           }
           if (saveSeqRef.current !== seq) return

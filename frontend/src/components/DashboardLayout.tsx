@@ -18,6 +18,7 @@ export function DashboardLayout() {
   const storageKey = 'grounded-theory-app-state'
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
+  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
   const remoteLoadedRef = useRef(false)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -68,21 +69,23 @@ export function DashboardLayout() {
 
   const seedReady = useMemo(() => {
     if (!catalogActiveProjectId) return true
+    if (disableWs) return true
     if (!websocketOnline) return false
     if (!localUser) return false
     if (!presenceUsers.length) return false
     return true
-  }, [catalogActiveProjectId, localUser, presenceUsers.length, websocketOnline])
+  }, [catalogActiveProjectId, disableWs, localUser, presenceUsers.length, websocketOnline])
 
   const canSeedInitialContent = useMemo(() => {
     if (!catalogActiveProjectId) return true
+    if (disableWs) return true
     if (!websocketOnline) return false
     if (!localUser) return false
     if (!presenceUsers.length) return false
     const ids = presenceUsers.map((user) => user.id).filter(Boolean).sort()
     if (!ids.length) return false
     return localUser.id === ids[0]
-  }, [catalogActiveProjectId, localUser, presenceUsers, websocketOnline])
+  }, [catalogActiveProjectId, disableWs, localUser, presenceUsers, websocketOnline])
 
   const { persistProject, isSaving, lastSavedAt, saveError, saveWarning } = useProjectPersistence({
     apiBase,
