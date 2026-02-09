@@ -92,16 +92,44 @@ export function DocumentEditor({
   useEffect(() => {
     if (!editor) return
     const fragment = ydoc.getXmlFragment(documentId)
+    if (debugEnabled) {
+      const now = Date.now()
+      if (now - debugRef.current.lastLogAt > 800) {
+        debugRef.current.lastLogAt = now
+        console.log('[DocEditor] seed-check', {
+          documentId,
+          seedReady,
+          canSeedInitialContent,
+          hasReceivedSync,
+          hasRemoteUpdates,
+          didSeed: didSeedRef.current,
+          fragmentLen: fragment.toString().length,
+          initialHtmlLen: initialHtml?.length ?? 0,
+        })
+      }
+    }
     if (!seedReady) return
     if (!canSeedInitialContent) return
     if (!hasReceivedSync) return
     if (hasRemoteUpdates) return
     if (didSeedRef.current) return
     if (fragment.toString().length === 0 && initialHtml) {
+      if (debugEnabled) {
+        console.log('[DocEditor] seeding setContent', {
+          documentId,
+          initialHtmlLen: initialHtml.length,
+        })
+      }
       editor.commands.setContent(initialHtml, false)
       didSeedRef.current = true
     }
     if (fragment.toString().length > 0) {
+      if (debugEnabled && !didSeedRef.current) {
+        console.log('[DocEditor] seed-skip fragment-not-empty', {
+          documentId,
+          fragmentLen: fragment.toString().length,
+        })
+      }
       didSeedRef.current = true
     }
   }, [

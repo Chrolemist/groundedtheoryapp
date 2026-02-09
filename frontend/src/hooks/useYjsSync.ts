@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type Dispatch,
@@ -38,6 +39,16 @@ type MemoMapValue = Y.Text
 const LOCAL_ORIGIN = 'local-yjs'
 const REMOTE_ORIGIN = 'remote-yjs'
 const BROADCAST_ORIGIN = 'broadcast-yjs'
+
+const getTabId = () => {
+  if (typeof window === 'undefined') return 'server'
+  const tabIdKey = 'gt-tab-id'
+  const stored = window.sessionStorage.getItem(tabIdKey)
+  if (stored) return stored
+  const next = crypto.randomUUID()
+  window.sessionStorage.setItem(tabIdKey, next)
+  return next
+}
 
 const toBase64 = (bytes: Uint8Array) => {
   let binary = ''
@@ -103,7 +114,9 @@ export function useYjsSync({
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
-  const [ydoc] = useState(() => new Y.Doc())
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
+  const ydoc = useMemo(() => new Y.Doc(), [projectId])
   const [hasRemoteUpdates, setHasRemoteUpdates] = useState(false)
   const [hasReceivedSync, setHasReceivedSync] = useState(false)
   const documentsMapRef = useRef<Y.Map<Y.Map<DocumentMapValue>> | null>(null)
@@ -120,6 +133,39 @@ export function useYjsSync({
   const pendingRefreshRef = useRef(false)
   const didHydrateRef = useRef(false)
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
+  const leaderHeartbeatRef = useRef<number | null>(null)
+  const leaderCheckRef = useRef<number | null>(null)
+  const localLeaderSeedTimerRef = useRef<number | null>(null)
+  const [isLocalLeader, setIsLocalLeader] = useState(false)
+  const isLocalLeaderRef = useRef(false)
+
+  useEffect(() => {
+    didHydrateRef.current = false
+    pendingRefreshRef.current = false
+    documentsMapRef.current = null
+    documentsOrderRef.current = null
+    codesMapRef.current = null
+    codesOrderRef.current = null
+    categoriesMapRef.current = null
+    categoriesOrderRef.current = null
+    memosMapRef.current = null
+    memosOrderRef.current = null
+    theoryTextRef.current = null
+    coreCategoryTextRef.current = null
+    coreCategoryDraftTextRef.current = null
+    setHasRemoteUpdates(false)
+    setHasReceivedSync(false)
+    setIsLocalLeader(false)
+    isLocalLeaderRef.current = false
+
+    return () => {
+      try {
+        ydoc.destroy()
+      } catch {
+        // ignore
+      }
+    }
+  }, [ydoc])
 
   const { sendJson } = useProjectWebSocket({
     projectId,
@@ -148,8 +194,122 @@ export function useYjsSync({
   })
 
   useEffect(() => {
-    if (!projectId || disableWs) {
-      setHasReceivedSync(true)
+    if (!disableWs) return undefined
+    if (typeof window === 'undefined') return undefined
+    if (!projectId) {
+      setHasReceivedSync(false)
+      return undefined
+    }
+
+    const tabId = getTabId()
+    const leaderKey = `gt-yjs-leader:${projectId}`
+    const STALE_AFTER_MS = 5500
+    const HEARTBEAT_MS = 2000
+
+    const readLeader = () => {
+      try {
+        const raw = window.localStorage.getItem(leaderKey)
+        if (!raw) return null
+        const parsed = JSON.parse(raw) as { tabId?: string; updatedAt?: number }
+        if (!parsed || typeof parsed.tabId !== 'string' || typeof parsed.updatedAt !== 'number') {
+          return null
+        }
+        return { tabId: parsed.tabId, updatedAt: parsed.updatedAt }
+      } catch {
+        return null
+      }
+    }
+
+    const writeLeader = () => {
+      try {
+        window.localStorage.setItem(
+          leaderKey,
+          JSON.stringify({ tabId, updatedAt: Date.now() }),
+        )
+      } catch {
+        // Ignore storage failures.
+      }
+    }
+
+    const ensureLeaderState = () => {
+      const current = readLeader()
+      const now = Date.now()
+      const isStale = !current || now - current.updatedAt > STALE_AFTER_MS
+      if (isStale) {
+        writeLeader()
+      }
+      const after = readLeader()
+      const amLeader = after?.tabId === tabId
+
+      isLocalLeaderRef.current = amLeader
+      setIsLocalLeader(amLeader)
+
+      if (debugEnabled) {
+        console.log('[Yjs][local] leader-check', {
+          projectId,
+          tabId,
+          leader: after,
+          amLeader,
+        })
+      }
+      return amLeader
+    }
+
+    let amLeader = ensureLeaderState()
+
+    if (leaderHeartbeatRef.current) {
+      window.clearInterval(leaderHeartbeatRef.current)
+      leaderHeartbeatRef.current = null
+    }
+    if (leaderCheckRef.current) {
+      window.clearInterval(leaderCheckRef.current)
+      leaderCheckRef.current = null
+    }
+
+    if (amLeader) {
+      leaderHeartbeatRef.current = window.setInterval(() => {
+        writeLeader()
+      }, HEARTBEAT_MS)
+    }
+
+    // Periodically re-check in case leader disappears and we need to take over.
+    leaderCheckRef.current = window.setInterval(() => {
+      const nextLeader = ensureLeaderState()
+      if (nextLeader && !amLeader) {
+        amLeader = true
+        if (!leaderHeartbeatRef.current) {
+          leaderHeartbeatRef.current = window.setInterval(() => {
+            writeLeader()
+          }, HEARTBEAT_MS)
+        }
+      }
+    }, HEARTBEAT_MS)
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== leaderKey) return
+      // Leader may have changed; re-evaluate.
+      ensureLeaderState()
+    }
+
+    window.addEventListener('storage', handleStorage)
+
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      if (leaderHeartbeatRef.current) {
+        window.clearInterval(leaderHeartbeatRef.current)
+        leaderHeartbeatRef.current = null
+      }
+      if (leaderCheckRef.current) {
+        window.clearInterval(leaderCheckRef.current)
+        leaderCheckRef.current = null
+      }
+      if (localLeaderSeedTimerRef.current) {
+        window.clearTimeout(localLeaderSeedTimerRef.current)
+        localLeaderSeedTimerRef.current = null
+      }
+      // Note: don't remove the leader key here.
+      // In React StrictMode (dev), effects mount/unmount twice and cleanup would temporarily
+      // clear leadership, causing new tabs to seed and duplicate content. We rely on staleness instead.
     }
   }, [disableWs, projectId])
 
@@ -413,11 +573,42 @@ export function useYjsSync({
     broadcastChannelRef.current = channel
     const clientId = ydoc.clientID
 
+    if (disableWs && isLocalLeaderRef.current) {
+      if (localLeaderSeedTimerRef.current) {
+        window.clearTimeout(localLeaderSeedTimerRef.current)
+      }
+      // Grace period: give existing tabs time to reply with yjs:sync.
+      localLeaderSeedTimerRef.current = window.setTimeout(() => {
+        localLeaderSeedTimerRef.current = null
+        if (!isLocalLeaderRef.current) return
+        setHasReceivedSync((prev) => prev || true)
+        if (debugEnabled) {
+          console.log('[Yjs][local] leader-seed-enabled', { projectId })
+        }
+      }, 1500)
+      if (debugEnabled) {
+        console.log('[Yjs][local] leader-seed-timer-start', { projectId })
+      }
+    }
+
     const handleMessage = (event: MessageEvent) => {
       const data = event.data as { type?: string; update?: string; from?: number } | undefined
       if (!data || typeof data.type !== 'string') return
       if (data.type === 'yjs:update' && typeof data.update === 'string') {
         setHasRemoteUpdates(true)
+        if (disableWs) {
+          setHasReceivedSync(true)
+          if (localLeaderSeedTimerRef.current) {
+            window.clearTimeout(localLeaderSeedTimerRef.current)
+            localLeaderSeedTimerRef.current = null
+            if (debugEnabled) {
+              console.log('[Yjs][local] leader-seed-timer-cancel (update)', { projectId })
+            }
+          }
+        }
+        if (debugEnabled) {
+          console.log('[Yjs][local] recv update', { projectId, from: data.from })
+        }
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         return
@@ -425,24 +616,44 @@ export function useYjsSync({
       if (data.type === 'yjs:sync' && typeof data.update === 'string') {
         setHasReceivedSync(true)
         setHasRemoteUpdates(true)
+        if (localLeaderSeedTimerRef.current) {
+          window.clearTimeout(localLeaderSeedTimerRef.current)
+          localLeaderSeedTimerRef.current = null
+          if (debugEnabled) {
+            console.log('[Yjs][local] leader-seed-timer-cancel (sync)', { projectId })
+          }
+        }
+        if (debugEnabled) {
+          console.log('[Yjs][local] recv sync', { projectId, from: data.from })
+        }
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         return
       }
       if (data.type === 'yjs:hello' && typeof data.from === 'number' && data.from !== clientId) {
         const update = Y.encodeStateAsUpdate(ydoc)
+        if (debugEnabled) {
+          console.log('[Yjs][local] recv hello -> sending sync', { projectId, to: data.from })
+        }
         channel.postMessage({ type: 'yjs:sync', update: toBase64(update), from: clientId })
       }
     }
 
     channel.addEventListener('message', handleMessage)
+    if (debugEnabled) {
+      console.log('[Yjs][local] send hello', { projectId, from: clientId })
+    }
     channel.postMessage({ type: 'yjs:hello', from: clientId })
     return () => {
       channel.removeEventListener('message', handleMessage)
       channel.close()
       broadcastChannelRef.current = null
+      if (localLeaderSeedTimerRef.current) {
+        window.clearTimeout(localLeaderSeedTimerRef.current)
+        localLeaderSeedTimerRef.current = null
+      }
     }
-  }, [projectId, ydoc])
+  }, [disableWs, projectId, ydoc])
 
   useEffect(() => {
     const handleFocusOut = () => {
@@ -472,7 +683,7 @@ export function useYjsSync({
     coreCategoryTextRef.current = ydoc.getText('coreCategoryId')
     coreCategoryDraftTextRef.current = ydoc.getText('coreCategoryDraft')
 
-    ydoc.on('update', (update: Uint8Array, origin: unknown) => {
+    const handleUpdate = (update: Uint8Array, origin: unknown) => {
       if (origin === REMOTE_ORIGIN || origin === BROADCAST_ORIGIN) {
         setHasRemoteUpdates(true)
         if (isEditingElement(document.activeElement)) {
@@ -487,7 +698,16 @@ export function useYjsSync({
         type: 'yjs:update',
         update: toBase64(update),
       })
-    })
+    }
+
+    ydoc.on('update', handleUpdate)
+    return () => {
+      try {
+        ydoc.off('update', handleUpdate)
+      } catch {
+        // ignore
+      }
+    }
   }, [refreshFromYjs, sendJson, ydoc])
 
   // Single effect: ensure every React category is represented in the Yjs map
@@ -701,5 +921,6 @@ export function useYjsSync({
     ydoc,
     hasRemoteUpdates,
     hasReceivedSync,
+    isLocalLeader: disableWs ? isLocalLeader : false,
   }
 }
