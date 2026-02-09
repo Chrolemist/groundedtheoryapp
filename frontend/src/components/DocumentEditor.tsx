@@ -21,6 +21,7 @@ type DocumentEditorProps = {
   lineHeight: string
   setFontFamily: (value: string) => void
   setLineHeight: (value: string) => void
+  collaborationEnabled?: boolean
   canSeedInitialContent: boolean
   seedReady: boolean
   hasRemoteUpdates: boolean
@@ -42,6 +43,7 @@ export function DocumentEditor({
   lineHeight,
   setFontFamily,
   setLineHeight,
+  collaborationEnabled = true,
   canSeedInitialContent,
   seedReady,
   hasRemoteUpdates,
@@ -52,15 +54,18 @@ export function DocumentEditor({
   const debugRef = useRef({ lastLogAt: 0 })
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
-  const extensions = [
-    StarterKit.configure({ history: false }),
-    Underline,
-    CodeHighlight,
-    Collaboration.configure({
-      document: ydoc,
-      field: documentId,
-    }),
-  ]
+
+  const extensions = collaborationEnabled
+    ? [
+        StarterKit.configure({ history: false }),
+        Underline,
+        CodeHighlight,
+        Collaboration.configure({
+          document: ydoc,
+          field: documentId,
+        }),
+      ]
+    : [StarterKit, Underline, CodeHighlight]
   const editor = useEditor({
     extensions,
     content: '',
@@ -91,6 +96,20 @@ export function DocumentEditor({
 
   useEffect(() => {
     if (!editor) return
+    if (!collaborationEnabled) {
+      if (didSeedRef.current) return
+      if (!initialHtml) return
+      if (debugEnabled) {
+        console.log('[DocEditor] plain seed setContent', {
+          documentId,
+          initialHtmlLen: initialHtml.length,
+        })
+      }
+      editor.commands.setContent(initialHtml, false)
+      didSeedRef.current = true
+      return
+    }
+
     const fragment = ydoc.getXmlFragment(documentId)
     if (debugEnabled) {
       const now = Date.now()
@@ -137,6 +156,7 @@ export function DocumentEditor({
     documentId,
     initialHtml,
     ydoc,
+    collaborationEnabled,
     canSeedInitialContent,
     seedReady,
     hasRemoteUpdates,

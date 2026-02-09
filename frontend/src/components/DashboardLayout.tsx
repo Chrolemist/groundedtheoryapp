@@ -19,6 +19,12 @@ export function DashboardLayout() {
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const isolationMode = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    const envEnabled = (import.meta.env.VITE_ISOLATION_MODE as string | undefined) === 'true'
+    const localEnabled = window.localStorage.getItem('gt-isolation') === 'true'
+    return envEnabled || localEnabled
+  }, [])
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
   const remoteLoadedRef = useRef(false)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -65,7 +71,7 @@ export function DashboardLayout() {
     remoteSelections,
     hasRemoteState,
   } = useCollaboration({
-    projectId: catalogActiveProjectId,
+    projectId: isolationMode ? null : catalogActiveProjectId,
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
@@ -341,16 +347,18 @@ export function DashboardLayout() {
     }
 
     const nextUpdatedAt = Date.now()
-    const documentsSnapshot = project.documents.map((doc) => {
-      const editor = project.documentEditorInstancesRef.current.get(doc.id)
-      if (!editor) return { ...doc }
-      const html = editor.getHTML()
-      const text = editor.getText()
-      if (html !== doc.html || text !== doc.text) {
-        return { ...doc, html, text }
-      }
-      return { ...doc }
-    })
+    const documentsSnapshot = isolationMode
+      ? project.documents.map((doc) => ({ ...doc }))
+      : project.documents.map((doc) => {
+          const editor = project.documentEditorInstancesRef.current.get(doc.id)
+          if (!editor) return { ...doc }
+          const html = editor.getHTML()
+          const text = editor.getText()
+          if (html !== doc.html || text !== doc.text) {
+            return { ...doc, html, text }
+          }
+          return { ...doc }
+        })
 
     const projectRaw: Record<string, unknown> = {
       documents: documentsSnapshot,
@@ -371,6 +379,7 @@ export function DashboardLayout() {
   }, [
     apiBase,
     catalogActiveProjectId,
+    isolationMode,
     persistProject,
     project.activeDocumentId,
     project.categories,
@@ -506,18 +515,20 @@ export function DashboardLayout() {
               seedReady={seedReady}
               hasRemoteUpdates={project.hasRemoteUpdates}
               hasReceivedSync={project.hasReceivedSync}
+              isolationMode={isolationMode}
             />
 
-            <CodingSidebar
-              codes={project.codes}
-              categories={project.categories}
-              ungroupedCodes={project.ungroupedCodes}
-              coreCategoryId={project.coreCategoryId}
-              coreCategoryDraft={project.coreCategoryDraft}
-              memos={project.memos}
-              isTheoryEmpty={project.isTheoryEmpty}
-              showMemos={project.showMemos}
-              ydoc={project.ydoc}
+            {isolationMode ? null : (
+              <CodingSidebar
+                codes={project.codes}
+                categories={project.categories}
+                ungroupedCodes={project.ungroupedCodes}
+                coreCategoryId={project.coreCategoryId}
+                coreCategoryDraft={project.coreCategoryDraft}
+                memos={project.memos}
+                isTheoryEmpty={project.isTheoryEmpty}
+                showMemos={project.showMemos}
+                ydoc={project.ydoc}
               onAddCode={project.addNewCode}
               onApplyCode={project.applyCodeToSelection}
               onUpdateCode={project.updateCode}
@@ -538,7 +549,8 @@ export function DashboardLayout() {
               onTheoryInput={project.setTheoryHtml}
               onTheoryEditorRef={project.setTheoryEditorRef}
               onMoveCode={project.moveCodeToCategory}
-            />
+              />
+            )}
           </>
         ) : (
           <div className="col-span-full flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">

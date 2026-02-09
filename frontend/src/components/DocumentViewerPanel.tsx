@@ -46,6 +46,7 @@ type DocumentViewerPanelProps = {
   seedReady: boolean
   hasRemoteUpdates: boolean
   hasReceivedSync: boolean
+  isolationMode?: boolean
 }
 
 export function DocumentViewerPanel({
@@ -84,6 +85,7 @@ export function DocumentViewerPanel({
   seedReady,
   hasRemoteUpdates,
   hasReceivedSync,
+  isolationMode = false,
 }: DocumentViewerPanelProps) {
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
@@ -522,6 +524,7 @@ export function DocumentViewerPanel({
                       fontFamily={documentFontFamily}
                       fontFamilyValue={documentFontFamilyDisplay}
                       lineHeight={documentLineHeight}
+                      collaborationEnabled={!isolationMode}
                       canSeedInitialContent={canSeedInitialContent}
                       seedReady={seedReady}
                       hasRemoteUpdates={hasRemoteUpdates}
@@ -577,6 +580,7 @@ export function DocumentViewerPanel({
                   fontFamily={documentFontFamily}
                   fontFamilyValue={documentFontFamilyDisplay}
                   lineHeight={documentLineHeight}
+                  collaborationEnabled={!isolationMode}
                   canSeedInitialContent={canSeedInitialContent}
                   seedReady={seedReady}
                   hasRemoteUpdates={hasRemoteUpdates}
