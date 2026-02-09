@@ -104,6 +104,7 @@ export function useYjsSync({
 }: UseYjsSyncArgs) {
   const [ydoc] = useState(() => new Y.Doc())
   const [hasRemoteUpdates, setHasRemoteUpdates] = useState(false)
+  const [hasReceivedSync, setHasReceivedSync] = useState(false)
   const documentsMapRef = useRef<Y.Map<Y.Map<DocumentMapValue>> | null>(null)
   const documentsOrderRef = useRef<Y.Array<string> | null>(null)
   const codesMapRef = useRef<Y.Map<Y.Map<CodeMapValue>> | null>(null)
@@ -126,8 +127,9 @@ export function useYjsSync({
       const data = payload as Record<string, unknown>
       if (!ydoc) return
       if (data.type === 'yjs:sync') {
-        setHasRemoteUpdates(true)
         const updates = Array.isArray(data.updates) ? data.updates : []
+        setHasReceivedSync(true)
+        if (updates.length > 0) setHasRemoteUpdates(true)
         updates.forEach((update) => {
           if (typeof update !== 'string') return
           const decoded = fromBase64(update)
@@ -143,6 +145,12 @@ export function useYjsSync({
       Y.applyUpdate(ydoc, decoded, REMOTE_ORIGIN)
     },
   })
+
+  useEffect(() => {
+    if (!projectId) {
+      setHasReceivedSync(true)
+    }
+  }, [projectId])
 
   const readCodesFromYjs = useCallback((current: Code[]) => {
     const codesMap = codesMapRef.current
@@ -414,6 +422,7 @@ export function useYjsSync({
         return
       }
       if (data.type === 'yjs:sync' && typeof data.update === 'string') {
+        setHasReceivedSync(true)
         setHasRemoteUpdates(true)
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
@@ -690,5 +699,6 @@ export function useYjsSync({
   return {
     ydoc,
     hasRemoteUpdates,
+    hasReceivedSync,
   }
 }

@@ -422,7 +422,7 @@ export function useProjectState({
   }, [documents, codes, categories, memos, coreCategoryId, theoryHtml])
 
 
-  const { ydoc, hasRemoteUpdates } = useYjsSync({
+  const { ydoc, hasRemoteUpdates, hasReceivedSync } = useYjsSync({
     documents,
     codes,
     categories,
@@ -586,5 +586,6 @@ export function useProjectState({
     projectSizeBytes,
     projectSizeLimitBytes: maxProjectBytes,
     hasRemoteUpdates,
+    hasReceivedSync,
   }
 }

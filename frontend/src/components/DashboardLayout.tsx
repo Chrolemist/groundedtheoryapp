@@ -441,6 +441,7 @@ export function DashboardLayout() {
               canSeedInitialContent={canSeedInitialContent}
               seedReady={seedReady}
               hasRemoteUpdates={project.hasRemoteUpdates}
+              hasReceivedSync={project.hasReceivedSync}
             />
 
             <CodingSidebar

@@ -24,6 +24,7 @@ type DocumentEditorProps = {
   canSeedInitialContent: boolean
   seedReady: boolean
   hasRemoteUpdates: boolean
+  hasReceivedSync: boolean
 }
 
 export function DocumentEditor({
@@ -44,6 +45,7 @@ export function DocumentEditor({
   canSeedInitialContent,
   seedReady,
   hasRemoteUpdates,
+  hasReceivedSync,
 }: DocumentEditorProps) {
   const didSeedRef = useRef(false)
   const extensions = [
@@ -75,6 +77,7 @@ export function DocumentEditor({
     const fragment = ydoc.getXmlFragment(documentId)
     if (!seedReady) return
     if (!canSeedInitialContent) return
+    if (!hasReceivedSync) return
     if (hasRemoteUpdates) return
     if (didSeedRef.current) return
     if (fragment.toString().length === 0 && initialHtml) {
@@ -84,7 +87,16 @@ export function DocumentEditor({
     if (fragment.toString().length > 0) {
       didSeedRef.current = true
     }
-  }, [editor, documentId, initialHtml, ydoc, canSeedInitialContent, seedReady, hasRemoteUpdates])
+  }, [
+    editor,
+    documentId,
+    initialHtml,
+    ydoc,
+    canSeedInitialContent,
+    seedReady,
+    hasRemoteUpdates,
+    hasReceivedSync,
+  ])
 
   const runCommand = (command: string, value?: string) => {
     if (!editor) return

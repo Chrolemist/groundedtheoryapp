@@ -45,6 +45,7 @@ type DocumentViewerPanelProps = {
   canSeedInitialContent: boolean
   seedReady: boolean
   hasRemoteUpdates: boolean
+  hasReceivedSync: boolean
 }
 
 export function DocumentViewerPanel({
@@ -82,6 +83,7 @@ export function DocumentViewerPanel({
   canSeedInitialContent,
   seedReady,
   hasRemoteUpdates,
+  hasReceivedSync,
 }: DocumentViewerPanelProps) {
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
@@ -523,6 +525,7 @@ export function DocumentViewerPanel({
                       canSeedInitialContent={canSeedInitialContent}
                       seedReady={seedReady}
                       hasRemoteUpdates={hasRemoteUpdates}
+                      hasReceivedSync={hasReceivedSync}
                       setFontFamily={(value) => {
                         onDocumentFontFamilyChange(value)
                         onDocumentFontFamilyDisplayChange(value)
@@ -577,6 +580,7 @@ export function DocumentViewerPanel({
                   canSeedInitialContent={canSeedInitialContent}
                   seedReady={seedReady}
                   hasRemoteUpdates={hasRemoteUpdates}
+                  hasReceivedSync={hasReceivedSync}
                   setFontFamily={(value) => {
                     onDocumentFontFamilyChange(value)
                     onDocumentFontFamilyDisplayChange(value)
