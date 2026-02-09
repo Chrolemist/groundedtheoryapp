@@ -48,6 +48,7 @@ export function DocumentEditor({
   hasReceivedSync,
 }: DocumentEditorProps) {
   const didSeedRef = useRef(false)
+  const didSyncRef = useRef(false)
   const extensions = [
     StarterKit.configure({ history: false }),
     Underline,
@@ -97,6 +98,17 @@ export function DocumentEditor({
     hasRemoteUpdates,
     hasReceivedSync,
   ])
+
+  useEffect(() => {
+    if (!editor) return
+    if (!hasReceivedSync) return
+    if (didSyncRef.current) return
+    const html = editor.getHTML()
+    const text = editor.getText()
+    if (!html && !text) return
+    onUpdate(html, text)
+    didSyncRef.current = true
+  }, [editor, hasReceivedSync, onUpdate])
 
   const runCommand = (command: string, value?: string) => {
     if (!editor) return

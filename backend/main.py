@@ -278,6 +278,11 @@ class ConnectionManager:
                 "name": self._generate_user_name(),
                 "color": self._generate_user_color(project_id),
             }
+        else:
+            if "name" not in user or not user.get("name"):
+                user["name"] = self._generate_user_name()
+            if "color" not in user or not user.get("color"):
+                user["color"] = self._generate_user_color(project_id)
 
         project_connections.append(websocket)
         self.connection_users[websocket] = user_id
