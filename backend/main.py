@@ -654,6 +654,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             "project_raw": project_raw or None,
         }
     )
+    logger.info("WS hello sent: project_id=%s user_id=%s users=%s", project_id, user.get("id"), len(manager.get_users(project_id)))
     project_yjs_log = yjs_update_logs.get(project_id, [])
     if project_yjs_log:
         await websocket.send_json({"type": "yjs:sync", "updates": project_yjs_log})
@@ -672,6 +673,8 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
             message_type = data.get("type")
             user_id = manager.connection_users.get(websocket)
+            if message_type:
+                logger.info("WS message: project_id=%s user_id=%s type=%s", project_id, user_id, message_type)
             if message_type == "ping":
                 await websocket.send_json({"type": "pong", "ts": data.get("ts")})
                 continue
