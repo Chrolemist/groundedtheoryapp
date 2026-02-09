@@ -62,6 +62,14 @@ export function useProjectState({
   )
   const projectUpdatedAtRef = useRef<number>(storedState?.updatedAt ?? 0)
   const hasLocalProjectUpdateRef = useRef(false)
+
+  useEffect(() => {
+    // When switching/closing projects, ensure we don't carry a "dirty" flag or updatedAt
+    // into the next project. Otherwise an autosave timer can persist an empty snapshot
+    // and overwrite a real project.
+    hasLocalProjectUpdateRef.current = false
+    projectUpdatedAtRef.current = 0
+  }, [projectId])
   const markLocalChange = useCallback(() => {
     if (isApplyingRemoteRef.current) return
     hasLocalProjectUpdateRef.current = true

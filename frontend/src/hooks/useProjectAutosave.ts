@@ -3,6 +3,7 @@ import { type Category, type Code, type Memo } from '../types'
 import { type DocumentItem } from '../components/DashboardLayout.types'
 
 type UseProjectAutosaveArgs = {
+  projectId?: string | null
   documents: DocumentItem[]
   codes: Code[]
   categories: Category[]
@@ -22,6 +23,7 @@ type UseProjectAutosaveArgs = {
 }
 
 export function useProjectAutosave({
+  projectId,
   documents,
   codes,
   categories,
@@ -44,6 +46,17 @@ export function useProjectAutosave({
   const persistTimerRef = useRef<number | null>(null)
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
   const lastSyncedDataRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    // On project switches, cancel pending saves and reset snapshot comparisons.
+    // This prevents a delayed timer from persisting an empty snapshot after close/reopen.
+    if (persistTimerRef.current) {
+      window.clearTimeout(persistTimerRef.current)
+      persistTimerRef.current = null
+    }
+    latestProjectRef.current = null
+    lastSyncedDataRef.current = null
+  }, [projectId])
 
   useEffect(() => {
     return () => {

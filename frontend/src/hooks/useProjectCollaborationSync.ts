@@ -170,6 +170,7 @@ export function useProjectCollaborationSync({
   )
 
   useProjectAutosave({
+    projectId,
     documents,
     codes,
     categories,

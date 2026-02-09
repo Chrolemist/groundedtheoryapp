@@ -32,6 +32,8 @@ BUILD_TAG = os.getenv("BUILD_TAG", "local-dev")
 logger.info("Build tag: %s", BUILD_TAG)
 MAX_PROJECT_BYTES = int(os.getenv("MAX_PROJECT_BYTES", "900000"))
 MAX_PROJECT_TOTAL_BYTES = int(os.getenv("MAX_PROJECT_TOTAL_BYTES", "900000000"))
+EMPTY_OVERWRITE_MAX_BYTES = int(os.getenv("EMPTY_OVERWRITE_MAX_BYTES", "800"))
+NONEMPTY_PROJECT_MIN_BYTES = int(os.getenv("NONEMPTY_PROJECT_MIN_BYTES", "1600"))
 logger.info(
     "Firestore config: project_id=%s collection=%s",
     os.getenv("FIREBASE_PROJECT_ID"),
@@ -486,6 +488,37 @@ def validate_project_limits(project_raw: Dict) -> Optional[Dict[str, str]]:
     return None
 
 
+def is_project_effectively_empty(project_raw: Dict) -> bool:
+    try:
+        if not project_raw:
+            return True
+        documents = project_raw.get("documents")
+        codes = project_raw.get("codes")
+        categories = project_raw.get("categories")
+        memos = project_raw.get("memos")
+        core_category_id = project_raw.get("coreCategoryId") or project_raw.get("core_category_id")
+        theory_html = project_raw.get("theoryHtml") or project_raw.get("theory_description")
+        updated_at = project_raw.get("updated_at")
+
+        docs_count = len(documents) if isinstance(documents, list) else 0
+        codes_count = len(codes) if isinstance(codes, list) else 0
+        categories_count = len(categories) if isinstance(categories, list) else 0
+        memos_count = len(memos) if isinstance(memos, list) else 0
+
+        # Treat payload as empty when it only contains metadata/updated_at and no real content.
+        return (
+            docs_count == 0
+            and codes_count == 0
+            and categories_count == 0
+            and memos_count == 0
+            and (not str(core_category_id or "").strip())
+            and (not str(theory_html or "").strip())
+            and updated_at is not None
+        )
+    except Exception:
+        return False
+
+
 def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = None) -> bool:
     global last_saved_project_hash
     doc_ref = get_project_doc_ref(project_id) if project_id else get_firestore_doc_ref()
@@ -703,8 +736,9 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     )
     logger.info("WS hello sent: project_id=%s user_id=%s users=%s", project_id, user.get("id"), len(manager.get_users(project_id)))
     project_yjs_log = yjs_update_logs.get(project_id, [])
-    if project_yjs_log:
-        await websocket.send_json({"type": "yjs:sync", "updates": project_yjs_log})
+    # Always send a sync message (even if empty) so clients can complete their
+    # startup handshake and seed initial content when needed.
+    await websocket.send_json({"type": "yjs:sync", "updates": project_yjs_log})
     await manager.broadcast(
         project_id,
         {"type": "presence:update", "users": manager.get_users(project_id)},
@@ -1137,6 +1171,7 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
     try:
         project_raw = payload.get("project_raw") or payload.get("project") or payload
         project_name = payload.get("name")
+        force_overwrite = bool(payload.get("force"))
         if not isinstance(project_raw, dict):
             return {"status": "invalid"}
 
@@ -1161,6 +1196,41 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
                 "status": "error",
                 **limit_error,
             }
+
+        # Safety net: avoid wiping a real project due to a client race/bug.
+        # Blocks both obviously empty payloads and suspiciously small payloads compared to existing state.
+        if not force_overwrite:
+            incoming_bytes = estimate_project_bytes(project_raw) or 0
+            existing = load_project_from_firestore(project_id)
+            existing_bytes = estimate_project_bytes(existing) if isinstance(existing, dict) else 0
+
+            looks_empty = is_project_effectively_empty(project_raw) or incoming_bytes <= 32
+            looks_suspiciously_small = (
+                isinstance(existing, dict)
+                and existing_bytes is not None
+                and incoming_bytes is not None
+                and existing_bytes >= NONEMPTY_PROJECT_MIN_BYTES
+                and incoming_bytes <= EMPTY_OVERWRITE_MAX_BYTES
+            )
+
+            if looks_empty or looks_suspiciously_small:
+                if isinstance(existing, dict) and not is_project_effectively_empty(existing):
+                    logger.warning(
+                        "Refusing overwrite. project_id=%s incoming_bytes=%s existing_bytes=%s empty=%s suspicious=%s",
+                        project_id,
+                        incoming_bytes,
+                        existing_bytes,
+                        looks_empty,
+                        looks_suspiciously_small,
+                    )
+                    return JSONResponse(
+                        status_code=409,
+                        content={
+                            "status": "error",
+                            "reason": "empty_overwrite",
+                            "message": "Refusing to overwrite a non-empty project with an empty or suspiciously small payload.",
+                        },
+                    )
 
         set_in_memory_project(project_id, project_raw)
         saved_ok = save_project_to_firestore(project_raw, project_id=project_id)
