@@ -32,6 +32,11 @@ Repository defaults:
 - [frontend/.env](frontend/.env) defaults to `VITE_DISABLE_WS=false` (production-friendly)
 - [frontend/.env.development](frontend/.env.development) sets `VITE_DISABLE_WS=true` for local dev
 
+### Production troubleshooting notes
+
+- Backend persistence: the API now returns `{status:"error"}` when Firestore is unavailable or a save fails (instead of returning a false `{status:"ok"}`). If you see `[Project Save] response ... status:"error"`, check Cloud Run logs for a `Failed to save project to Firestore` stack trace.
+- WebSocket collaboration on Cloud Run: the backend currently keeps presence + Yjs update logs **in process memory**. If Cloud Run runs more than one instance, users connected to different instances will not see each other. For a quick validation, temporarily set Cloud Run to a single instance (max instances = 1) or add a shared pub/sub layer for WS fanout.
+
 ## Debug logging
 
 Most high-signal logs are gated behind a localStorage flag.

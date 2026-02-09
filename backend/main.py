@@ -409,7 +409,7 @@ def get_firestore_client() -> Optional[firestore.Client]:
         firestore_client = firestore.client()
         return firestore_client
     except Exception as exc:
-        logger.warning(f"Firestore not configured or failed to initialize: {exc}")
+        logger.exception("Firestore not configured or failed to initialize")
         return None
 
 
@@ -475,15 +475,19 @@ def validate_project_limits(project_raw: Dict) -> Optional[Dict[str, str]]:
     return None
 
 
-def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = None) -> None:
+def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = None) -> bool:
     global last_saved_project_hash
     doc_ref = get_project_doc_ref(project_id) if project_id else get_firestore_doc_ref()
     if not doc_ref:
-        return
+        logger.error(
+            "Firestore save skipped (no doc ref). project_id=%s",
+            project_id or "default",
+        )
+        return False
     current_hash = compute_project_hash(project_raw)
     hash_key = project_id or "default"
     if current_hash and current_hash == last_saved_project_hash.get(hash_key):
-        return
+        return True
     try:
         doc_ref.set(
             {
@@ -494,8 +498,13 @@ def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = Non
         )
         if current_hash:
             last_saved_project_hash[hash_key] = current_hash
+        return True
     except Exception as exc:
-        logger.warning(f"Failed to save project to Firestore: {exc}")
+        logger.exception(
+            "Failed to save project to Firestore. project_id=%s",
+            project_id or "default",
+        )
+        return False
 
 
 def load_project_from_firestore(project_id: Optional[str] = None) -> Optional[Dict]:
@@ -509,7 +518,10 @@ def load_project_from_firestore(project_id: Optional[str] = None) -> Optional[Di
         data = snapshot.to_dict() or {}
         return data.get("project")
     except Exception as exc:
-        logger.warning(f"Failed to load project from Firestore: {exc}")
+        logger.exception(
+            "Failed to load project from Firestore. project_id=%s",
+            project_id or "default",
+        )
         return None
 
 
@@ -756,7 +768,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                         continue
                 set_in_memory_project(project_id, project_raw)
                 storage_id = None if project_id == DEFAULT_PROJECT_ID else project_id
-                save_project_to_firestore(project_raw, project_id=storage_id)
+                saved_ok = save_project_to_firestore(project_raw, project_id=storage_id)
+                if not saved_ok:
+                    await websocket.send_json(
+                        {
+                            "type": "project:save:error",
+                            "reason": "firestore_error",
+                            "message": "Failed to save project to Firestore.",
+                        }
+                    )
                 await manager.broadcast(
                     project_id,
                     {
@@ -1110,14 +1130,16 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
             }
 
         set_in_memory_project(project_id, project_raw)
-        save_project_to_firestore(project_raw, project_id=project_id)
+        saved_ok = save_project_to_firestore(project_raw, project_id=project_id)
+        if not saved_ok:
+            return {
+                "status": "error",
+                "message": "Failed to save project to Firestore",
+            }
         if project_name:
             doc_ref = get_project_doc_ref(project_id)
             if doc_ref:
                 doc_ref.set({"name": project_name}, merge=True)
-        project_hash = compute_project_hash(project_raw)
-        if project_hash:
-            last_saved_project_hash[project_id] = project_hash
         return {"status": "ok"}
     except Exception:
         logger.exception("Failed to save project state")
@@ -1140,10 +1162,12 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
 
         project_id = DEFAULT_PROJECT_ID
         set_in_memory_project(project_id, project_raw)
-        save_project_to_firestore(project_raw)
-        project_hash = compute_project_hash(project_raw)
-        if project_hash:
-            last_saved_project_hash[project_id] = project_hash
+        saved_ok = save_project_to_firestore(project_raw)
+        if not saved_ok:
+            return {
+                "status": "error",
+                "message": "Failed to save project to Firestore",
+            }
         await manager.broadcast(
             project_id,
             {
@@ -1172,10 +1196,12 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
             **limit_error,
         }
     set_in_memory_project(project_id, project_raw)
-    save_project_to_firestore(project_raw)
-    project_hash = compute_project_hash(project_raw)
-    if project_hash:
-        last_saved_project_hash[project_id] = project_hash
+    saved_ok = save_project_to_firestore(project_raw)
+    if not saved_ok:
+        return {
+            "status": "error",
+            "message": "Failed to save project to Firestore",
+        }
     await manager.broadcast(project_id, get_in_memory_project(project_id).model_dump())
 
     return {"status": "ok"}
