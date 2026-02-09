@@ -67,20 +67,22 @@ export function DashboardLayout() {
   })
 
   const seedReady = useMemo(() => {
-    if (!websocketOnline) return true
+    if (!catalogActiveProjectId) return true
+    if (!websocketOnline) return false
     if (!localUser) return false
     if (!presenceUsers.length) return false
     return true
-  }, [localUser, presenceUsers.length, websocketOnline])
+  }, [catalogActiveProjectId, localUser, presenceUsers.length, websocketOnline])
 
   const canSeedInitialContent = useMemo(() => {
-    if (!websocketOnline) return true
+    if (!catalogActiveProjectId) return true
+    if (!websocketOnline) return false
     if (!localUser) return false
     if (!presenceUsers.length) return false
     const ids = presenceUsers.map((user) => user.id).filter(Boolean).sort()
     if (!ids.length) return false
     return localUser.id === ids[0]
-  }, [localUser, presenceUsers, websocketOnline])
+  }, [catalogActiveProjectId, localUser, presenceUsers, websocketOnline])
 
   const { persistProject, isSaving, lastSavedAt, saveError, saveWarning } = useProjectPersistence({
     apiBase,

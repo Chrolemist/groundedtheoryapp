@@ -255,6 +255,16 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
   }, [localUser])
 
   useEffect(() => {
+    if (!localUser) return
+    setPresenceUsers((current) => (current.length ? current : [localUser]))
+  }, [localUser])
+
+  useEffect(() => {
+    if (!localUser) return
+    setPresenceUsers((current) => (current.length > 0 ? current : [localUser]))
+  }, [localUser])
+
+  useEffect(() => {
     if (!disableWs) return undefined
     if (!projectId) return undefined
     const channel = new BroadcastChannel(`gt-presence:${projectId}`)
