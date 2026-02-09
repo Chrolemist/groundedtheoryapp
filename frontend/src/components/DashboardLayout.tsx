@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { OnboardingTour } from './OnboardingTour'
 import { useOnboardingTour } from '../hooks/useOnboardingTour'
 import { DocumentViewerPanel } from './DocumentViewerPanel'
@@ -84,7 +84,7 @@ export function DashboardLayout() {
     remoteSelections,
     hasRemoteState,
   } = useCollaboration({
-    projectId: isolationMode || disableWs ? null : catalogActiveProjectId,
+    projectId: isolationMode ? null : catalogActiveProjectId,
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
@@ -347,64 +347,6 @@ export function DashboardLayout() {
     setAdminToken(null)
   }
 
-  const canManualSave = Boolean(apiBase && catalogActiveProjectId)
-
-  const handleManualSave = useCallback(() => {
-    if (!apiBase) {
-      window.alert('Backend not available.')
-      return
-    }
-    if (!catalogActiveProjectId) {
-      window.alert('No active project selected.')
-      return
-    }
-
-    const nextUpdatedAt = Date.now()
-    const documentsSnapshot = isolationMode
-      ? project.documents.map((doc) => ({ ...doc }))
-      : project.documents.map((doc) => {
-          const editor = project.documentEditorInstancesRef.current.get(doc.id)
-          if (!editor) return { ...doc }
-          const html = editor.getHTML()
-          const text = editor.getText()
-          if (html !== doc.html || text !== doc.text) {
-            return { ...doc, html, text }
-          }
-          return { ...doc }
-        })
-
-    const projectRaw: Record<string, unknown> = {
-      documents: documentsSnapshot,
-      codes: project.codes.map((code) => ({ ...code })),
-      categories: project.categories.map((category) => ({
-        ...category,
-        codeIds: [...category.codeIds],
-      })),
-      memos: project.memos.map((memo) => ({ ...memo })),
-      activeDocumentId: project.activeDocumentId,
-      documentViewMode: project.documentViewMode,
-      coreCategoryId: project.coreCategoryId,
-      theoryHtml: project.theoryHtml,
-      updated_at: nextUpdatedAt,
-    }
-
-    persistProject(projectRaw)
-  }, [
-    apiBase,
-    catalogActiveProjectId,
-    isolationMode,
-    persistProject,
-    project.activeDocumentId,
-    project.categories,
-    project.codes,
-    project.coreCategoryId,
-    project.documentEditorInstancesRef,
-    project.documentViewMode,
-    project.documents,
-    project.memos,
-    project.theoryHtml,
-  ])
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <AdminLoginModal
@@ -439,8 +381,6 @@ export function DashboardLayout() {
         lastSavedAt={lastSavedAt}
         saveError={saveError}
         saveWarning={saveWarning}
-        canManualSave={canManualSave}
-        onManualSave={handleManualSave}
         projectSizeBytes={headerSizeBytes}
         projectSizeLimitBytes={headerSizeLimit ?? undefined}
         projectSizeLabel={headerSizeLabel}

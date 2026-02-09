@@ -1,129 +1,76 @@
 
-# GroundedTheory Frontend
+# Grounded Theory App (Frontend)
 
-This frontend is a Vite + React + TypeScript app using TipTap + Yjs for collaborative editing.
+## Local development
 
-## Local collaboration modes
+- Install deps: `npm install`
+- Run dev server: `npm run dev`
+- Build: `npm run build`
 
-The app supports two collaboration transports:
+### WebSocket vs local mode
 
-- **WebSocket mode** (default when enabled): Yjs updates and presence go through the backend `/ws`.
-- **Local mode** (when WS is disabled): collaboration runs **between browser tabs** using `BroadcastChannel` + `localStorage`.
+The app supports two collaboration modes:
 
-The mode is controlled by:
+- **WebSocket mode (prod-like):** `VITE_DISABLE_WS=false`
+  - Frontend connects to `/ws` and receives `hello`, `presence:update`, `yjs:sync`, `yjs:update`.
+- **Local mode:** `VITE_DISABLE_WS=true`
+  - Collaboration/presence uses `BroadcastChannel` + `localStorage` heartbeats (no backend WS).
 
-- `VITE_DISABLE_WS=true` → local mode (no backend WS)
-- `VITE_DISABLE_WS=false` → WS mode
+By default, local dev typically uses `VITE_DISABLE_WS=true` via `.env.development`.
 
-### Production configuration
+## Debugging switches
 
-By default the frontend assumes the backend is served from the **same origin** as the frontend.
+Runtime toggles (browser console):
 
-If your production backend is on a different origin (e.g. `api.example.com`), set:
+- Enable debug logs: `localStorage.setItem('gt-debug', 'true')`
+- Disable debug logs: `localStorage.removeItem('gt-debug')`
 
-- `VITE_API_BASE=https://api.example.com`
+Other toggles used during troubleshooting:
 
-If WebSockets are on a different base than the API, set:
+- Disable WS at runtime: `localStorage.setItem('gt-disable-ws', 'true')`
+- Isolation mode: `localStorage.setItem('gt-isolation', 'true')`
+- Plain editor (no Yjs/Collab): `localStorage.setItem('gt-plain-editor', 'true')`
+- Hide sidebar: `localStorage.setItem('gt-hide-sidebar', 'true')`
 
-- `VITE_WS_BASE=https://api.example.com`
+Remove any of them with `localStorage.removeItem('<key>')`.
 
-Repository defaults:
+## Postmortem: “saved in wrong project / only first document saves”
 
-- [frontend/.env](frontend/.env) defaults to `VITE_DISABLE_WS=false` (production-friendly)
-- [frontend/.env.development](frontend/.env.development) sets `VITE_DISABLE_WS=true` for local dev
+### What the problem ultimately was
 
-### Production troubleshooting notes
+Symptoms we observed:
 
-- Backend persistence: the API now returns `{status:"error"}` when Firestore is unavailable or a save fails (instead of returning a false `{status:"ok"}`). If you see `[Project Save] response ... status:"error"`, check Cloud Run logs for a `Failed to save project to Firestore` stack trace.
-- WebSocket collaboration on Cloud Run: the backend currently keeps presence + Yjs update logs **in process memory**. If Cloud Run runs more than one instance, users connected to different instances will not see each other. For a quick validation, temporarily set Cloud Run to a single instance (max instances = 1) or add a shared pub/sub layer for WS fanout.
+- Text sometimes disappeared after close/reopen even though the backend save returned `200`.
+- After switching projects/documents, edits could end up saved into the *previous* project/document.
+- In some cases a “new” document appeared (similar to pressing “Create document”), and titles could look like they were taken from the project name.
 
-## Debug logging
+Root cause:
 
-Most high-signal logs are gated behind a localStorage flag.
+- **Stale WebSocket reconnect race:** when the shared WS disconnected, a reconnect was scheduled using an *old* URL (captured in a closure). If you switched project while reconnect was pending, the app could reconnect to the previous project and still deliver `hello` / `yjs:*` messages.
+- **No reliable project identity on messages:** the client had no `project_id` on WS payloads, so it could not safely ignore late/stale messages that belonged to a different project.
+- **Stale editor instance snapshotting:** manual save snapshots TipTap editor instances from a map keyed by document id. When switching projects, stale editor instances from the previous project could still exist and be snapshotted into the next save.
 
-Enable:
+### How we prevent it now
 
-- In browser console: `localStorage.setItem('gt-debug','true'); location.reload();`
+Guardrails added to stop the bug class (race + cross-project bleed):
 
-Disable:
+1. **Backend includes `project_id` in WS messages**
+	- `hello`, `yjs:sync`, and broadcasts now include `project_id`.
 
-- In browser console: `localStorage.removeItem('gt-debug'); location.reload();`
+2. **Frontend ignores WS/Yjs messages for the wrong project**
+	- Presence/project updates and Yjs updates are ignored when `payload.project_id !== currentProjectId`.
 
-### Useful log prefixes
+3. **Reconnect always targets the latest active URL**
+	- Reconnect uses the current `sharedUrl`, not a stale URL captured when the socket was created.
+	- If an active socket is connected to the wrong URL, it is closed and replaced.
 
-- `[DocEditor] ...` → TipTap editor updates + seeding decisions
-- `[Project] ...` → React project state updates (document html/text patches)
-- `[Autosave] ...` → autosave decisions and skips
-- `[Project Save] ...` → backend persistence request/response
-- `[Presence][local] ...` → local presence transport (WS disabled)
-- `[Yjs][local] ...` → local Yjs BroadcastChannel sync and leader election (WS disabled)
+4. **Clear editor instance caches on project switch**
+	- TipTap editor instance maps are cleared when `projectId` changes to prevent saving from stale editors.
 
-## Known issues we fixed (and what to check if they return)
+### How to avoid regressions
 
-### 1) React error: “Cannot access refs during render”
-
-**Symptom**
-- Build/runtime error in `CollaborationLayer`.
-
-**Cause**
-- Reading `ref.current` during render for remote cursor/selection overlays.
-
-**Fix**
-- `CollaborationLayer` uses a state snapshot of editor instances updated from effects, instead of reading refs directly during render.
-
-### 2) Document body not persisting / disappearing on refresh (while titles persisted)
-
-**Symptom**
-- Document titles saved, but the document body reset/vanished on refresh.
-
-**Cause (typical chain)**
-- TipTap content lives in Yjs fragments.
-- If seeding/hydration gates never open (e.g. “sync received” was never reached in a given mode), the editor body wouldn’t seed/hydrate as expected.
-
-**What to check**
-- You should see this sequence when typing:
-	- `[DocEditor] update` (TipTap emits html/text)
-	- `[Project] updateDocument` (state receives html/text)
-	- `[Autosave] persist ...` (or a clear skip reason)
-	- `[Project Save] response ...` (backend result)
-
-### 3) Duplicated text when opening multiple tabs on the same project (WS disabled)
-
-**Symptom**
-- Tab 1 shows `hej`.
-- Tab 2 shows:
-	- `hej`
-	- `hej`
-- Tab 3 shows 3 copies, etc.
-
-**Root cause**
-- In local mode, if a newly opened tab seeds `initialHtml` into Yjs **before** it receives the existing Yjs state from another tab, Yjs merges both inserts.
-- In development, React `StrictMode` mounts/unmounts effects twice, which can amplify timing races if we clear leadership/sync state during cleanup.
-
-**Fix**
-- Local mode uses a per-project leader lock (`localStorage` key `gt-yjs-leader:${projectId}`) so only one tab is allowed to seed initial content.
-- Followers wait for BroadcastChannel `yjs:sync`/`yjs:update`.
-- The leader key is intentionally not removed during effect cleanup (StrictMode-safe); leadership relies on staleness/heartbeat.
-
-**Logs to look for**
-- `[Yjs][local] leader-check` → which tab is leader
-- `[Yjs][local] recv sync` / `recv update`
-- `[DocEditor] seeding setContent` → should generally happen only once per document when there is no prior Yjs state
-
-### 4) Duplicated projects editing each other (cross-project text leakage)
-
-**Symptom**
-- After duplicating a project, editing the original affected the duplicate.
-
-**Root cause**
-- A single in-memory `Y.Doc` was reused across project switches, so Yjs state could bleed between projects.
-
-**Fix**
-- The Yjs document instance is scoped to `projectId` (new `Y.Doc` per project) and old instances are destroyed.
-
-## React StrictMode note
-
-`React.StrictMode` is enabled in development (see `src/main.tsx`). This is helpful, but it intentionally double-invokes certain lifecycles/effects in dev to surface unsafe patterns.
-
-If you see a bug that happens only in dev but not in prod, check whether it’s due to StrictMode timing and make side-effect logic idempotent.
+- Treat **project identity** as part of the protocol: keep `project_id` on all messages that can mutate state.
+- When using a **shared singleton WS** with reconnect timers, ensure reconnect logic is always keyed to the *current* connection target.
+- On project switch/close, reset state that can “leak” across projects (presence, cursors, editor instance maps, pending timers).
+- When investigating: enable `gt-debug` and verify that the WS URL `project_id=...` always matches the currently active project.
 

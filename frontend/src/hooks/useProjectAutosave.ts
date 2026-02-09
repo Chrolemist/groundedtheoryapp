@@ -40,7 +40,7 @@ export function useProjectAutosave({
   enableProjectSync = true,
   enabled = true,
   onBroadcastProjectUpdate,
-  idlePersistDelayMs = 1200,
+  idlePersistDelayMs = 1000,
   getDocumentContent,
 }: UseProjectAutosaveArgs) {
   const debugEnabled =

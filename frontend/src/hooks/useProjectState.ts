@@ -537,8 +537,8 @@ export function useProjectState({
     setTheoryHtml,
     getReadableTextColor,
     persistProject,
-    enableAutosave: false,
-    enableProjectSync: false,
+    enableAutosave: true,
+    enableProjectSync: true,
   })
 
   return {
