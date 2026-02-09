@@ -89,7 +89,15 @@ const clearSharedPing = () => {
 }
 
 const notifyStatus = (online: boolean) => {
-  sharedStatusHandlers.forEach((handler) => handler(online))
+  sharedStatusHandlers.forEach((handler) => {
+    try {
+      handler(online)
+    } catch (error) {
+      if (isDebugEnabled()) {
+        console.warn('[WS] status handler error', error)
+      }
+    }
+  })
 }
 
 const scheduleSharedReconnect = (connect: () => void) => {
@@ -188,7 +196,15 @@ const connectSharedSocket = (url: string) => {
       sharedLastYjsSync = payload
       sharedLastYjsSyncUrl = url
     }
-    sharedHandlers.forEach((handler) => handler(payload))
+    sharedHandlers.forEach((handler) => {
+      try {
+        handler(payload)
+      } catch (error) {
+        if (isDebugEnabled()) {
+          console.warn('[WS] message handler error', error)
+        }
+      }
+    })
   }
 }
 
@@ -259,6 +275,9 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     // Replay cached Yjs sync for this URL if it was received before we subscribed.
     if (sharedLastYjsSync && sharedLastYjsSyncUrl === sharedUrl) {
       window.setTimeout(() => {
+        if (isDebugEnabled()) {
+          console.log('[WS] replay yjs:sync')
+        }
         handleMessage(sharedLastYjsSync)
       }, 0)
     }
