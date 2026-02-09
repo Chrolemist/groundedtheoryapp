@@ -61,6 +61,8 @@ let sharedPingTimer: number | null = null
 let sharedReconnectTimer: number | null = null
 let sharedRetryCount = 0
 let sharedRefCount = 0
+let sharedLastHello: unknown | null = null
+let sharedLastHelloUrl: string | null = null
 
 const isDebugEnabled = () => {
   if (typeof window === 'undefined') return false
@@ -70,6 +72,11 @@ const isDebugEnabled = () => {
 const isSocketActive = (socket: WebSocket | null) => {
   if (!socket) return false
   return socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING
+}
+
+const isSocketOpen = (socket: WebSocket | null) => {
+  if (!socket) return false
+  return socket.readyState === WebSocket.OPEN
 }
 
 const clearSharedPing = () => {
@@ -103,6 +110,8 @@ const connectSharedSocket = (url: string) => {
 
   const socket = new WebSocket(url)
   sharedSocket = socket
+  sharedLastHello = null
+  sharedLastHelloUrl = null
   
 
   socket.onopen = () => {
@@ -152,6 +161,17 @@ const connectSharedSocket = (url: string) => {
     } catch {
       // Keep raw payload.
     }
+
+    // Cache the hello message so late subscribers (e.g. presence layer) don't miss it.
+    // This fixes cases where Yjs attaches first and drops non-yjs messages.
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      (payload as Record<string, unknown>).type === 'hello'
+    ) {
+      sharedLastHello = payload
+      sharedLastHelloUrl = url
+    }
     sharedHandlers.forEach((handler) => handler(payload))
   }
 }
@@ -174,6 +194,9 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       return undefined
     }
     const handleMessage = (payload: unknown) => {
+      // If we are receiving any message, the connection is effectively online.
+      // This also fixes a race where the socket opens before status handlers subscribe.
+      setIsOnline(true)
       messageHandlerRef.current?.(payload)
     }
     const handleStatus = (online: boolean) => {
@@ -196,8 +219,19 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       sharedSocket = null
       sharedUrl = url
       sharedRetryCount = 0
+      sharedLastHello = null
+      sharedLastHelloUrl = null
     }
     connectSharedSocket(sharedUrl)
+    // Initialize state from current socket status in case the socket is already open.
+    setIsOnline(isSocketOpen(sharedSocket))
+
+    // Replay cached hello for this URL if it was received before we subscribed.
+    if (sharedLastHello && sharedLastHelloUrl === sharedUrl) {
+      window.setTimeout(() => {
+        handleMessage(sharedLastHello)
+      }, 0)
+    }
     document.addEventListener('visibilitychange', handleVisibility)
 
     return () => {
@@ -216,6 +250,8 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         sharedSocket = null
         sharedUrl = null
         sharedRetryCount = 0
+        sharedLastHello = null
+        sharedLastHelloUrl = null
       }
     }
   }, [disableWs, projectId])
