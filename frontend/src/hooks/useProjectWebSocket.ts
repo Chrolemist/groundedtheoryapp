@@ -55,8 +55,8 @@ type StatusHandler = (online: boolean) => void
 
 let sharedSocket: WebSocket | null = null
 let sharedUrl: string | null = null
-let sharedHandlers = new Set<MessageHandler>()
-let sharedStatusHandlers = new Set<StatusHandler>()
+const sharedHandlers = new Set<MessageHandler>()
+const sharedStatusHandlers = new Set<StatusHandler>()
 let sharedPingTimer: number | null = null
 let sharedReconnectTimer: number | null = null
 let sharedRetryCount = 0
@@ -190,7 +190,6 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     if (disableWs) return undefined
     const url = getWebSocketUrl(projectId)
     if (!url) {
-      setIsOnline(false)
       return undefined
     }
     const handleMessage = (payload: unknown) => {
@@ -224,7 +223,10 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     }
     connectSharedSocket(sharedUrl)
     // Initialize state from current socket status in case the socket is already open.
-    setIsOnline(isSocketOpen(sharedSocket))
+    // Defer to a microtask to avoid synchronous setState inside the effect body.
+    queueMicrotask(() => {
+      setIsOnline(isSocketOpen(sharedSocket))
+    })
 
     // Replay cached hello for this URL if it was received before we subscribed.
     if (sharedLastHello && sharedLastHelloUrl === sharedUrl) {
@@ -268,5 +270,6 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     }
   }, [disableWs, projectId])
 
-  return { isOnline, sendJson }
+  const effectiveOnline = !disableWs && Boolean(projectId) && isOnline
+  return { isOnline: effectiveOnline, sendJson }
 }

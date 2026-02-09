@@ -16,6 +16,7 @@ type UseProjectAutosaveArgs = {
   hasRemoteState: boolean
   sendJson?: (payload: Record<string, unknown>) => void
   persistProject?: (projectRaw: Record<string, unknown>) => void
+  enabled?: boolean
   enableProjectSync?: boolean
   onBroadcastProjectUpdate?: (projectRaw: Record<string, unknown>) => void
   idlePersistDelayMs?: number
@@ -37,6 +38,7 @@ export function useProjectAutosave({
   sendJson,
   persistProject,
   enableProjectSync = true,
+  enabled = true,
   onBroadcastProjectUpdate,
   idlePersistDelayMs = 1200,
   getDocumentContent,
@@ -69,6 +71,7 @@ export function useProjectAutosave({
 
   useEffect(() => {
     if (isApplyingRemoteRef.current) return
+    if (!enabled) return
     const isEmptyProject =
       documents.length === 0 &&
       codes.length === 0 &&
@@ -152,6 +155,7 @@ export function useProjectAutosave({
       }, idlePersistDelayMs)
     }
   }, [
+    enabled,
     documents,
     codes,
     categories,

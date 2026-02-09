@@ -32,6 +32,7 @@ type UseProjectCollaborationSyncArgs = {
   setTheoryHtml: Dispatch<SetStateAction<string>>
   getReadableTextColor: (hex: string) => string
   persistProject?: (projectRaw: Record<string, unknown>) => void
+  enableAutosave?: boolean
   enableProjectSync?: boolean
 }
 
@@ -63,6 +64,7 @@ export function useProjectCollaborationSync({
   setTheoryHtml,
   getReadableTextColor,
   persistProject,
+  enableAutosave = true,
   enableProjectSync = true,
 }: UseProjectCollaborationSyncArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
@@ -183,6 +185,7 @@ export function useProjectCollaborationSync({
     hasRemoteState,
     sendJson,
     persistProject,
+    enabled: enableAutosave,
     enableProjectSync,
     onBroadcastProjectUpdate: handleBroadcastProjectUpdate,
     getDocumentContent: (documentId) => {

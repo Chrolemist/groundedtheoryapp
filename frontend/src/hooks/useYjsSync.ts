@@ -153,9 +153,11 @@ export function useYjsSync({
     theoryTextRef.current = null
     coreCategoryTextRef.current = null
     coreCategoryDraftTextRef.current = null
-    setHasRemoteUpdates(false)
-    setHasReceivedSync(false)
-    setIsLocalLeader(false)
+    queueMicrotask(() => {
+      setHasRemoteUpdates(false)
+      setHasReceivedSync(false)
+      setIsLocalLeader(false)
+    })
     isLocalLeaderRef.current = false
 
     return () => {
@@ -197,7 +199,7 @@ export function useYjsSync({
     if (!disableWs) return undefined
     if (typeof window === 'undefined') return undefined
     if (!projectId) {
-      setHasReceivedSync(false)
+      queueMicrotask(() => setHasReceivedSync(false))
       return undefined
     }
 

@@ -8,6 +8,8 @@ type DashboardHeaderProps = {
   lastSavedAt: number | null
   saveError: string | null
   saveWarning?: string | null
+  canManualSave?: boolean
+  onManualSave?: () => void
   projectSizeBytes?: number | null
   projectSizeLimitBytes?: number
   projectSizeLabel?: string
@@ -48,6 +50,8 @@ export function DashboardHeader({
   lastSavedAt,
   saveError,
   saveWarning,
+  canManualSave,
+  onManualSave,
   projectSizeBytes,
   projectSizeLimitBytes,
   projectSizeLabel,
@@ -188,6 +192,21 @@ export function DashboardHeader({
             onAdminLogin={onAdminLogin}
             onAdminLogout={onAdminLogout}
           />
+          {onManualSave ? (
+            <button
+              type="button"
+              onClick={onManualSave}
+              disabled={!canManualSave || isSaving}
+              className={cn(
+                'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition',
+                !canManualSave || isSaving
+                  ? 'cursor-not-allowed opacity-50'
+                  : 'hover:bg-slate-50',
+              )}
+            >
+              Save
+            </button>
+          ) : null}
           <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
             {presenceUsers.map((user) => (
               <span
