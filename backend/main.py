@@ -38,6 +38,8 @@ logger.info(
     os.getenv("FIRESTORE_COLLECTION", "projects"),
 )
 
+DEFAULT_PROJECT_ID = "default"
+
 
 class DocumentItem(BaseModel):
     id: str
