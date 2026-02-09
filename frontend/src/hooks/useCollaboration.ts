@@ -260,6 +260,12 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
   }, [localUser])
 
   useEffect(() => {
+    if (!websocketOnline) return
+    if (!localUser) return
+    setPresenceUsers((current) => (current.length ? current : [localUser]))
+  }, [localUser, websocketOnline])
+
+  useEffect(() => {
     if (!localUser) return
     setPresenceUsers((current) => (current.length > 0 ? current : [localUser]))
   }, [localUser])
