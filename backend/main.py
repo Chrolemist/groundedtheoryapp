@@ -19,7 +19,7 @@ from docx import Document
 from dotenv import load_dotenv
 from fastapi import Body, FastAPI, File, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -1017,6 +1017,16 @@ async def get_project(project_id: str) -> Dict[str, object]:
         if not snapshot.exists:
             return {"status": "not_found"}
         data = snapshot.to_dict() or {}
+        try:
+            project_raw = data.get("project")
+            logger.info(
+                "Load project: project_id=%s has_project=%s size_bytes=%s",
+                project_id,
+                isinstance(project_raw, dict),
+                estimate_project_bytes(project_raw) if isinstance(project_raw, dict) else None,
+            )
+        except Exception:
+            pass
         return {
             "project_raw": data.get("project") or None,
             "project": normalize_project_state(data.get("project") or {}).model_dump(),
@@ -1144,10 +1154,13 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
         set_in_memory_project(project_id, project_raw)
         saved_ok = save_project_to_firestore(project_raw, project_id=project_id)
         if not saved_ok:
-            return {
-                "status": "error",
-                "message": "Failed to save project to Firestore",
-            }
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": "Failed to save project to Firestore",
+                },
+            )
         if project_name:
             doc_ref = get_project_doc_ref(project_id)
             if doc_ref:
@@ -1176,10 +1189,13 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
         set_in_memory_project(project_id, project_raw)
         saved_ok = save_project_to_firestore(project_raw)
         if not saved_ok:
-            return {
-                "status": "error",
-                "message": "Failed to save project to Firestore",
-            }
+            return JSONResponse(
+                status_code=503,
+                content={
+                    "status": "error",
+                    "message": "Failed to save project to Firestore",
+                },
+            )
         await manager.broadcast(
             project_id,
             {
@@ -1210,10 +1226,13 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
     set_in_memory_project(project_id, project_raw)
     saved_ok = save_project_to_firestore(project_raw)
     if not saved_ok:
-        return {
-            "status": "error",
-            "message": "Failed to save project to Firestore",
-        }
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "message": "Failed to save project to Firestore",
+            },
+        )
     await manager.broadcast(project_id, get_in_memory_project(project_id).model_dump())
 
     return {"status": "ok"}
