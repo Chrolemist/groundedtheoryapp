@@ -63,6 +63,8 @@ let sharedRetryCount = 0
 let sharedRefCount = 0
 let sharedLastHello: unknown | null = null
 let sharedLastHelloUrl: string | null = null
+let sharedLastYjsSync: unknown | null = null
+let sharedLastYjsSyncUrl: string | null = null
 
 const isDebugEnabled = () => {
   if (typeof window === 'undefined') return false
@@ -112,6 +114,8 @@ const connectSharedSocket = (url: string) => {
   sharedSocket = socket
   sharedLastHello = null
   sharedLastHelloUrl = null
+  sharedLastYjsSync = null
+  sharedLastYjsSyncUrl = null
   
 
   socket.onopen = () => {
@@ -172,6 +176,18 @@ const connectSharedSocket = (url: string) => {
       sharedLastHello = payload
       sharedLastHelloUrl = url
     }
+
+    // Cache the initial Yjs sync so late subscribers (e.g. the editor/Yjs layer)
+    // don't miss it. Missing this can leave hasReceivedSync=false and block seeding,
+    // especially after Close project -> reopen where the presence layer may connect first.
+    if (
+      payload &&
+      typeof payload === 'object' &&
+      (payload as Record<string, unknown>).type === 'yjs:sync'
+    ) {
+      sharedLastYjsSync = payload
+      sharedLastYjsSyncUrl = url
+    }
     sharedHandlers.forEach((handler) => handler(payload))
   }
 }
@@ -220,6 +236,8 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       sharedRetryCount = 0
       sharedLastHello = null
       sharedLastHelloUrl = null
+      sharedLastYjsSync = null
+      sharedLastYjsSyncUrl = null
     }
     connectSharedSocket(sharedUrl)
     // Initialize state from current socket status in case the socket is already open.
@@ -232,6 +250,13 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     if (sharedLastHello && sharedLastHelloUrl === sharedUrl) {
       window.setTimeout(() => {
         handleMessage(sharedLastHello)
+      }, 0)
+    }
+
+    // Replay cached Yjs sync for this URL if it was received before we subscribed.
+    if (sharedLastYjsSync && sharedLastYjsSyncUrl === sharedUrl) {
+      window.setTimeout(() => {
+        handleMessage(sharedLastYjsSync)
       }, 0)
     }
     document.addEventListener('visibilitychange', handleVisibility)
@@ -254,6 +279,8 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         sharedRetryCount = 0
         sharedLastHello = null
         sharedLastHelloUrl = null
+        sharedLastYjsSync = null
+        sharedLastYjsSyncUrl = null
       }
     }
   }, [disableWs, projectId])
