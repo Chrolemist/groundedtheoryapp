@@ -586,6 +586,7 @@ export function useYjsSync({
         window.clearTimeout(localLeaderSeedTimerRef.current)
       }
       // Grace period: give existing tabs time to reply with yjs:sync.
+      // Keep this short so single-tab local usage hydrates quickly.
       localLeaderSeedTimerRef.current = window.setTimeout(() => {
         localLeaderSeedTimerRef.current = null
         if (!isLocalLeaderRef.current) return
@@ -593,7 +594,7 @@ export function useYjsSync({
         if (debugEnabled) {
           console.log('[Yjs][local] leader-seed-enabled', { projectId })
         }
-      }, 1500)
+      }, 250)
       if (debugEnabled) {
         console.log('[Yjs][local] leader-seed-timer-start', { projectId })
       }
