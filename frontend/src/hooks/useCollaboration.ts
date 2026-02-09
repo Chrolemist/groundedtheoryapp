@@ -156,7 +156,11 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
 
       if (type === 'presence:update') {
         const users = data.users as PresenceUser[] | undefined
-        if (users) setPresenceUsers(users)
+        if (users && users.length > 0) {
+          setPresenceUsers(users)
+        } else if (localUserRef.current) {
+          setPresenceUsers([localUserRef.current])
+        }
         return
       }
 
