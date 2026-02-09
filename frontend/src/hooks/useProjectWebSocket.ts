@@ -112,7 +112,20 @@ const scheduleSharedReconnect = (connect: () => void) => {
 }
 
 const connectSharedSocket = (url: string) => {
-  if (isSocketActive(sharedSocket)) return
+  if (isSocketActive(sharedSocket)) {
+    // If a reconnect was scheduled with an old URL, we may have an active socket
+    // pointing at the wrong project. Replace it.
+    if (sharedSocket?.url !== url) {
+      try {
+        sharedSocket?.close()
+      } catch {
+        // ignore
+      }
+      sharedSocket = null
+    } else {
+      return
+    }
+  }
 
   if (isDebugEnabled()) {
     console.log('[WS] connect', url)
@@ -150,7 +163,10 @@ const connectSharedSocket = (url: string) => {
     clearSharedPing()
     sharedRetryCount += 1
     sharedSocket = null
-    scheduleSharedReconnect(() => connectSharedSocket(url))
+    scheduleSharedReconnect(() => {
+      if (!sharedUrl) return
+      connectSharedSocket(sharedUrl)
+    })
   }
 
   socket.onerror = () => {
@@ -162,7 +178,10 @@ const connectSharedSocket = (url: string) => {
     clearSharedPing()
     sharedRetryCount += 1
     sharedSocket = null
-    scheduleSharedReconnect(() => connectSharedSocket(url))
+    scheduleSharedReconnect(() => {
+      if (!sharedUrl) return
+      connectSharedSocket(sharedUrl)
+    })
   }
 
   socket.onmessage = (event) => {

@@ -70,6 +70,13 @@ export function useProjectState({
     hasLocalProjectUpdateRef.current = false
     projectUpdatedAtRef.current = 0
   }, [projectId])
+
+  useEffect(() => {
+    // Ensure stale editor instances from a previous project can't be snapshotted
+    // into the next project's manual save.
+    documentEditorInstancesRef.current.clear()
+    documentEditorInstanceRef.current = null
+  }, [projectId])
   const markLocalChange = useCallback(() => {
     if (isApplyingRemoteRef.current) return
     hasLocalProjectUpdateRef.current = true

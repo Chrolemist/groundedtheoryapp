@@ -326,6 +326,9 @@ class ConnectionManager:
         return list(self.users.get(project_id, {}).values())
 
     async def broadcast(self, project_id: str, message: Dict) -> None:
+        # Include project_id so clients can ignore stale cross-project messages.
+        if isinstance(message, dict) and "project_id" not in message:
+            message = {**message, "project_id": project_id}
         for connection in list(self.active_connections.get(project_id, [])):
             try:
                 await connection.send_json(message)
@@ -333,6 +336,9 @@ class ConnectionManager:
                 self.disconnect(connection)
 
     async def broadcast_except(self, project_id: str, message: Dict, skip: WebSocket) -> None:
+        # Include project_id so clients can ignore stale cross-project messages.
+        if isinstance(message, dict) and "project_id" not in message:
+            message = {**message, "project_id": project_id}
         for connection in list(self.active_connections.get(project_id, [])):
             if connection == skip:
                 continue
@@ -728,6 +734,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await websocket.send_json(
         {
             "type": "hello",
+            "project_id": project_id,
             "user": user,
             "users": manager.get_users(project_id),
             "project": project_state.model_dump(),
@@ -738,7 +745,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     project_yjs_log = yjs_update_logs.get(project_id, [])
     # Always send a sync message (even if empty) so clients can complete their
     # startup handshake and seed initial content when needed.
-    await websocket.send_json({"type": "yjs:sync", "updates": project_yjs_log})
+    await websocket.send_json({"type": "yjs:sync", "project_id": project_id, "updates": project_yjs_log})
     await manager.broadcast(
         project_id,
         {"type": "presence:update", "users": manager.get_users(project_id)},

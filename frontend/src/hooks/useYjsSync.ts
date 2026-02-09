@@ -178,6 +178,18 @@ export function useYjsSync({
       if (!payload || typeof payload !== 'object') return
       const data = payload as Record<string, unknown>
       if (!ydoc) return
+
+      const payloadProjectId = typeof data.project_id === 'string' ? data.project_id : null
+      if (payloadProjectId && projectId && payloadProjectId !== projectId) {
+        if (debugEnabled) {
+          console.warn('[Yjs] ignore message for wrong project', {
+            expected: projectId,
+            got: payloadProjectId,
+            type: data.type,
+          })
+        }
+        return
+      }
       if (data.type === 'yjs:sync') {
         const updates = Array.isArray(data.updates) ? data.updates : []
         setHasReceivedSync(true)

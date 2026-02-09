@@ -90,6 +90,15 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
   const colorKeyPrefix = 'gt-tab-color:'
   const colorKeyRef = useRef<string | null>(null)
 
+  useEffect(() => {
+    setPresenceUsers([])
+    setLocalUser(null)
+    localUserRef.current = null
+    setRemoteCursors({})
+    setRemoteSelections({})
+    setHasRemoteState(disableWs)
+  }, [disableWs, projectId])
+
   const getLocalIdentity = useCallback(() => {
     if (typeof window === 'undefined') {
       return { id: 'local', name: 'Local', color: '#7C3AED' }
@@ -138,6 +147,18 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
       }
       const data = payload as Record<string, unknown>
       const type = data.type as string | undefined
+
+      const payloadProjectId = typeof data.project_id === 'string' ? data.project_id : null
+      if (payloadProjectId && projectId && payloadProjectId !== projectId) {
+        if (debugEnabled) {
+          console.warn('[WS] ignore message for wrong project', {
+            expected: projectId,
+            got: payloadProjectId,
+            type,
+          })
+        }
+        return
+      }
 
       if (type === 'hello') {
         const user = data.user as PresenceUser | undefined
