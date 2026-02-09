@@ -47,6 +47,7 @@ type DocumentViewerPanelProps = {
   hasRemoteUpdates: boolean
   hasReceivedSync: boolean
   isolationMode?: boolean
+  plainEditorMode?: boolean
 }
 
 export function DocumentViewerPanel({
@@ -86,7 +87,9 @@ export function DocumentViewerPanel({
   hasRemoteUpdates,
   hasReceivedSync,
   isolationMode = false,
+  plainEditorMode = false,
 }: DocumentViewerPanelProps) {
+    const collaborationEnabled = !isolationMode && !plainEditorMode
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
@@ -524,7 +527,7 @@ export function DocumentViewerPanel({
                       fontFamily={documentFontFamily}
                       fontFamilyValue={documentFontFamilyDisplay}
                       lineHeight={documentLineHeight}
-                      collaborationEnabled={!isolationMode}
+                      collaborationEnabled={collaborationEnabled}
                       canSeedInitialContent={canSeedInitialContent}
                       seedReady={seedReady}
                       hasRemoteUpdates={hasRemoteUpdates}
@@ -580,7 +583,7 @@ export function DocumentViewerPanel({
                   fontFamily={documentFontFamily}
                   fontFamilyValue={documentFontFamilyDisplay}
                   lineHeight={documentLineHeight}
-                  collaborationEnabled={!isolationMode}
+                  collaborationEnabled={collaborationEnabled}
                   canSeedInitialContent={canSeedInitialContent}
                   seedReady={seedReady}
                   hasRemoteUpdates={hasRemoteUpdates}

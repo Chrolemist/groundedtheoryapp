@@ -113,7 +113,10 @@ export function useYjsSync({
   setCoreCategoryDraft,
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
-  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const disableWsEnv = import.meta.env.VITE_DISABLE_WS === 'true'
+  const disableWsDebug =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-disable-ws') === 'true'
+  const disableWs = disableWsEnv || disableWsDebug
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
   const ydoc = useMemo(() => new Y.Doc(), [projectId])

@@ -18,13 +18,26 @@ export function DashboardLayout() {
   const storageKey = 'grounded-theory-app-state'
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
-  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const disableWsEnv = import.meta.env.VITE_DISABLE_WS === 'true'
   const isolationMode = useMemo(() => {
     if (typeof window === 'undefined') return false
     const envEnabled = (import.meta.env.VITE_ISOLATION_MODE as string | undefined) === 'true'
     const localEnabled = window.localStorage.getItem('gt-isolation') === 'true'
     return envEnabled || localEnabled
   }, [])
+  const plainEditorMode = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('gt-plain-editor') === 'true'
+  }, [])
+  const hideSidebarMode = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('gt-hide-sidebar') === 'true'
+  }, [])
+  const disableWsDebug = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return window.localStorage.getItem('gt-disable-ws') === 'true'
+  }, [])
+  const disableWs = disableWsEnv || disableWsDebug
   const projectUpdateRef = useRef<(project: Record<string, unknown>) => void>(() => {})
   const remoteLoadedRef = useRef(false)
   const activeProjectIdRef = useRef<string | null>(null)
@@ -71,7 +84,7 @@ export function DashboardLayout() {
     remoteSelections,
     hasRemoteState,
   } = useCollaboration({
-    projectId: isolationMode ? null : catalogActiveProjectId,
+    projectId: isolationMode || disableWs ? null : catalogActiveProjectId,
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
@@ -516,9 +529,10 @@ export function DashboardLayout() {
               hasRemoteUpdates={project.hasRemoteUpdates}
               hasReceivedSync={project.hasReceivedSync}
               isolationMode={isolationMode}
+              plainEditorMode={plainEditorMode}
             />
 
-            {isolationMode ? null : (
+            {isolationMode || hideSidebarMode ? null : (
               <CodingSidebar
                 codes={project.codes}
                 categories={project.categories}

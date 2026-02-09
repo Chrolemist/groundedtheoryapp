@@ -195,7 +195,10 @@ const connectSharedSocket = (url: string) => {
 export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
-  const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const disableWsEnv = import.meta.env.VITE_DISABLE_WS === 'true'
+  const disableWsDebug =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-disable-ws') === 'true'
+  const disableWs = disableWsEnv || disableWsDebug
   const projectId = options.projectId ?? null
 
   useEffect(() => {
