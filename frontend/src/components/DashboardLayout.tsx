@@ -93,7 +93,7 @@ export function DashboardLayout() {
     apiBase,
     hasRemoteState,
     remoteLoadedRef,
-    projectIdRef: activeProjectIdRef,
+    projectId: catalogActiveProjectId,
   })
 
   const project = useProjectState({

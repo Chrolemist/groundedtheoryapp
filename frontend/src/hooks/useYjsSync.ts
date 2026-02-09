@@ -363,11 +363,14 @@ export function useYjsSync({
       return orderedIds.map((id) => {
         const map = documentsMap.get(id)
         const fallback = currentById.get(id)
+        const title = (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? ''
+        const html = (map?.get('html') as Y.Text | undefined)?.toString() ?? fallback?.html ?? ''
+        const text = (map?.get('text') as Y.Text | undefined)?.toString() ?? fallback?.text ?? ''
         return {
           id,
-          title: (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? '',
-          text: fallback?.text ?? '',
-          html: fallback?.html ?? '',
+          title,
+          text,
+          html,
         }
       })
     },
@@ -819,6 +822,8 @@ export function useYjsSync({
           documentsMap.set(doc.id, map)
         }
         ensureText(map as Y.Map<Y.Text>, 'title', doc.title)
+        ensureText(map as Y.Map<Y.Text>, 'html', doc.html ?? '')
+        ensureText(map as Y.Map<Y.Text>, 'text', doc.text ?? '')
       })
       Array.from(documentsMap.keys()).forEach((id) => {
         if (documentIds.includes(id)) return

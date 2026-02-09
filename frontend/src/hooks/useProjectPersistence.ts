@@ -4,7 +4,7 @@ type UseProjectPersistenceArgs = {
   apiBase: string
   hasRemoteState: boolean
   remoteLoadedRef: MutableRefObject<boolean>
-  projectIdRef: MutableRefObject<string | null>
+  projectId?: string | null
 }
 
 type UseProjectPersistenceResult = {
@@ -19,7 +19,7 @@ export function useProjectPersistence({
   apiBase,
   hasRemoteState,
   remoteLoadedRef,
-  projectIdRef,
+  projectId,
 }: UseProjectPersistenceArgs): UseProjectPersistenceResult {
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
@@ -54,7 +54,6 @@ export function useProjectPersistence({
         if (debugEnabled) console.warn('[Project Save] skip (no apiBase)')
         return
       }
-      const projectId = projectIdRef.current
       if (!projectId) {
         if (debugEnabled) console.warn('[Project Save] skip (no projectId)')
         return
@@ -119,7 +118,7 @@ export function useProjectPersistence({
           }
         })
     },
-    [apiBase, hasRemoteState, remoteLoadedRef, projectIdRef, updateWarning],
+    [apiBase, hasRemoteState, remoteLoadedRef, projectId, updateWarning],
   )
 
   return { persistProject, isSaving, lastSavedAt, saveError, saveWarning }
