@@ -113,7 +113,6 @@ export function useProjectState({
     const active = document.activeElement
     if (!active) return true
     if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement) return true
-    hasRemoteUpdates,
     if (active instanceof HTMLElement && active.isContentEditable) return true
     if (active instanceof HTMLElement && active.closest('.document-content')) return true
     if (active instanceof HTMLElement && active.closest('.ProseMirror')) return true
