@@ -585,5 +585,6 @@ export function useProjectState({
     ydoc,
     projectSizeBytes,
     projectSizeLimitBytes: maxProjectBytes,
+    hasRemoteUpdates,
   }
 }
