@@ -127,12 +127,17 @@ export function DocumentEditor({
         })
       }
     }
-    if (!seedReady) return
-    if (!canSeedInitialContent) return
+    // Presence can be flaky (especially on reconnect / Close project -> reopen).
+    // We only *enforce* leader election when presence is ready.
+    if (seedReady && !canSeedInitialContent) return
     if (!hasReceivedSync) return
     if (hasRemoteUpdates) return
     if (didSeedRef.current) return
-    if (fragment.toString().length === 0 && initialHtml) {
+
+    const currentText = editor.getText().trim()
+    const editorIsEmpty = currentText.length === 0
+
+    if (editorIsEmpty && initialHtml) {
       if (debugEnabled) {
         console.log('[DocEditor] seeding setContent', {
           documentId,
@@ -142,11 +147,15 @@ export function DocumentEditor({
       editor.commands.setContent(initialHtml, false)
       didSeedRef.current = true
     }
-    if (fragment.toString().length > 0) {
+
+    if (!editorIsEmpty) {
+      // Editor already has content (from Yjs). Mark as seeded.
+      didSeedRef.current = true
+    } else if (fragment.length > 0) {
       if (debugEnabled && !didSeedRef.current) {
         console.log('[DocEditor] seed-skip fragment-not-empty', {
           documentId,
-          fragmentLen: fragment.toString().length,
+          fragmentLen: fragment.length,
         })
       }
       didSeedRef.current = true
