@@ -170,11 +170,12 @@ def require_admin(request: Request) -> None:
 
 class ConnectionManager:
     def __init__(self) -> None:
-        self.active_connections: List[WebSocket] = []
+        self.active_connections: Dict[str, List[WebSocket]] = {}
         self.connection_users: Dict[WebSocket, str] = {}
-        self.users: Dict[str, Dict[str, str]] = {}
-        self.client_users: Dict[str, str] = {}
-        self.user_connections: Dict[str, WebSocket] = {}
+        self.users: Dict[str, Dict[str, Dict[str, str]]] = {}
+        self.client_users: Dict[str, Dict[str, str]] = {}
+        self.user_connections: Dict[str, Dict[str, WebSocket]] = {}
+        self.connection_projects: Dict[WebSocket, str] = {}
 
     def _generate_user_name(self) -> str:
         first_parts = [
@@ -217,7 +218,7 @@ class ConnectionManager:
             suffix += 1
         return f"{base} {suffix}"
 
-    def _generate_user_color(self) -> str:
+    def _generate_user_color(self, project_id: str) -> str:
         palette = [
             "#2563EB",
             "#7C3AED",
@@ -228,22 +229,33 @@ class ConnectionManager:
             "#DB2777",
             "#0F766E",
         ]
-        return palette[len(self.users) % len(palette)]
+        return palette[len(self.users.get(project_id, {})) % len(palette)]
 
-    async def connect(self, websocket: WebSocket, client_id: Optional[str] = None) -> Dict[str, str]:
+    async def connect(
+        self,
+        websocket: WebSocket,
+        client_id: Optional[str] = None,
+        project_id: str = DEFAULT_PROJECT_ID,
+    ) -> Dict[str, str]:
         await websocket.accept()
         user_id: Optional[str] = None
         user: Optional[Dict[str, str]] = None
 
+        project_users = self.users.setdefault(project_id, {})
+        project_client_users = self.client_users.setdefault(project_id, {})
+        project_user_connections = self.user_connections.setdefault(project_id, {})
+        project_connections = self.active_connections.setdefault(project_id, [])
+
         if client_id:
-            existing_user_id = self.client_users.get(client_id)
+            existing_user_id = project_client_users.get(client_id)
             if existing_user_id:
-                existing_user = self.users.get(existing_user_id)
-                old_socket = self.user_connections.get(existing_user_id)
+                existing_user = project_users.get(existing_user_id)
+                old_socket = project_user_connections.get(existing_user_id)
                 if old_socket:
-                    if old_socket in self.active_connections:
-                        self.active_connections.remove(old_socket)
+                    if old_socket in project_connections:
+                        project_connections.remove(old_socket)
                     self.connection_users.pop(old_socket, None)
+                    self.connection_projects.pop(old_socket, None)
                     try:
                         logger.info(
                             "Closing previous socket for client_id=%s user_id=%s",
@@ -262,43 +274,49 @@ class ConnectionManager:
             user = {
                 "id": user_id,
                 "name": self._generate_user_name(),
-                "color": self._generate_user_color(),
+                "color": self._generate_user_color(project_id),
             }
 
-        self.active_connections.append(websocket)
+        project_connections.append(websocket)
         self.connection_users[websocket] = user_id
-        self.users[user_id] = user
-        self.user_connections[user_id] = websocket
+        project_users[user_id] = user
+        project_user_connections[user_id] = websocket
+        self.connection_projects[websocket] = project_id
         if client_id:
-            self.client_users[client_id] = user_id
-            self.users[user_id]["client_id"] = client_id
+            project_client_users[client_id] = user_id
+            project_users[user_id]["client_id"] = client_id
         return user
 
     def disconnect(self, websocket: WebSocket) -> None:
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+        project_id = self.connection_projects.pop(websocket, DEFAULT_PROJECT_ID)
+        project_connections = self.active_connections.get(project_id, [])
+        if websocket in project_connections:
+            project_connections.remove(websocket)
         user_id = self.connection_users.pop(websocket, None)
-        if user_id and user_id in self.users:
-            client_id = self.users[user_id].get("client_id")
-            self.users.pop(user_id, None)
-            self.user_connections.pop(user_id, None)
+        project_users = self.users.get(project_id, {})
+        project_client_users = self.client_users.get(project_id, {})
+        project_user_connections = self.user_connections.get(project_id, {})
+        if user_id and user_id in project_users:
+            client_id = project_users[user_id].get("client_id")
+            project_users.pop(user_id, None)
+            project_user_connections.pop(user_id, None)
             if client_id:
-                existing = self.client_users.get(client_id)
+                existing = project_client_users.get(client_id)
                 if existing == user_id:
-                    self.client_users.pop(client_id, None)
+                    project_client_users.pop(client_id, None)
 
-    def get_users(self) -> List[Dict[str, str]]:
-        return list(self.users.values())
+    def get_users(self, project_id: str) -> List[Dict[str, str]]:
+        return list(self.users.get(project_id, {}).values())
 
-    async def broadcast(self, message: Dict) -> None:
-        for connection in list(self.active_connections):
+    async def broadcast(self, project_id: str, message: Dict) -> None:
+        for connection in list(self.active_connections.get(project_id, [])):
             try:
                 await connection.send_json(message)
             except Exception:
                 self.disconnect(connection)
 
-    async def broadcast_except(self, message: Dict, skip: WebSocket) -> None:
-        for connection in list(self.active_connections):
+    async def broadcast_except(self, project_id: str, message: Dict, skip: WebSocket) -> None:
+        for connection in list(self.active_connections.get(project_id, [])):
             if connection == skip:
                 continue
             try:
@@ -310,13 +328,49 @@ class ConnectionManager:
 app = FastAPI()
 manager = ConnectionManager()
 
-in_memory_project = ProjectState()
-in_memory_project_raw: Dict = {}
-yjs_update_log: List[str] = []
+DEFAULT_PROJECT_ID = "default"
+in_memory_projects: Dict[str, ProjectState] = {}
+in_memory_project_raws: Dict[str, Dict] = {}
+yjs_update_logs: Dict[str, List[str]] = {}
 yjs_update_limit = 200
 
 firestore_client: Optional[firestore.Client] = None
 last_saved_project_hash: Dict[str, str] = {}
+
+
+def resolve_project_id(project_id: Optional[str]) -> str:
+    return project_id or DEFAULT_PROJECT_ID
+
+
+def get_in_memory_project(project_id: str) -> ProjectState:
+    return in_memory_projects.setdefault(project_id, ProjectState())
+
+
+def get_in_memory_project_raw(project_id: str) -> Dict:
+    return in_memory_project_raws.get(project_id, {})
+
+
+def set_in_memory_project(project_id: str, project_raw: Dict) -> None:
+    in_memory_project_raws[project_id] = project_raw
+    in_memory_projects[project_id] = normalize_project_state(project_raw)
+
+
+def ensure_project_loaded(project_id: str) -> None:
+    project_raw = load_project_from_firestore(None if project_id == DEFAULT_PROJECT_ID else project_id)
+    if project_raw:
+        set_in_memory_project(project_id, project_raw)
+        project_hash = compute_project_hash(project_raw)
+        if project_hash:
+            last_saved_project_hash[project_id] = project_hash
+        return
+
+    if project_id not in in_memory_projects:
+        in_memory_projects[project_id] = ProjectState()
+    if project_id not in in_memory_project_raws and in_memory_projects[project_id].documents:
+        in_memory_project_raws[project_id] = in_memory_projects[project_id].model_dump()
+        project_hash = compute_project_hash(in_memory_project_raws[project_id])
+        if project_hash:
+            last_saved_project_hash[project_id] = project_hash
 
 
 def get_firestore_client() -> Optional[firestore.Client]:
@@ -481,16 +535,8 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def load_persisted_project() -> None:
-    global in_memory_project
-    global in_memory_project_raw
-    global last_saved_project_hash
-    project_raw = load_project_from_firestore()
-    if project_raw:
-        in_memory_project_raw = project_raw
-        in_memory_project = normalize_project_state(project_raw)
-        project_hash = compute_project_hash(project_raw)
-        if project_hash:
-            last_saved_project_hash["default"] = project_hash
+    ensure_project_loaded(DEFAULT_PROJECT_ID)
+    if get_in_memory_project_raw(DEFAULT_PROJECT_ID):
         logger.info("Loaded project from Firestore")
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
@@ -501,21 +547,18 @@ if (FRONTEND_DIST / "assets").exists():
 
 
 def get_code_by_id(code_id: str) -> Optional[CodeItem]:
-    return next((code for code in in_memory_project.codes if code.id == code_id), None)
+    project = get_in_memory_project(DEFAULT_PROJECT_ID)
+    return next((code for code in project.codes if code.id == code_id), None)
 
 
 def get_category_by_id(category_id: str) -> Optional[CategoryItem]:
-    return next(
-        (category for category in in_memory_project.categories if category.id == category_id),
-        None,
-    )
+    project = get_in_memory_project(DEFAULT_PROJECT_ID)
+    return next((category for category in project.categories if category.id == category_id), None)
 
 
 def get_document_by_id(document_id: str) -> Optional[DocumentItem]:
-    return next(
-        (document for document in in_memory_project.documents if document.id == document_id),
-        None,
-    )
+    project = get_in_memory_project(DEFAULT_PROJECT_ID)
+    return next((document for document in project.documents if document.id == document_id), None)
 
 
 def normalize_project_state(payload: Dict) -> ProjectState:
@@ -577,11 +620,10 @@ def normalize_project_state(payload: Dict) -> ProjectState:
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket) -> None:
     logger.info("New WebSocket connection request")
-    global in_memory_project
-    global in_memory_project_raw
     try:
         client_id = websocket.query_params.get("client_id")
-        user = await manager.connect(websocket, client_id)
+        project_id = resolve_project_id(websocket.query_params.get("project_id"))
+        user = await manager.connect(websocket, client_id, project_id)
         user_agent = websocket.headers.get("user-agent")
         origin = websocket.headers.get("origin")
         logger.info(
@@ -597,18 +639,26 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         logger.error(f"WebSocket connection failed: {e}")
         return
 
+    ensure_project_loaded(project_id)
+    project_state = get_in_memory_project(project_id)
+    project_raw = get_in_memory_project_raw(project_id)
+
     await websocket.send_json(
         {
             "type": "hello",
             "user": user,
-            "users": manager.get_users(),
-            "project": in_memory_project.model_dump(),
-            "project_raw": in_memory_project_raw or None,
+            "users": manager.get_users(project_id),
+            "project": project_state.model_dump(),
+            "project_raw": project_raw or None,
         }
     )
-    if yjs_update_log:
-        await websocket.send_json({"type": "yjs:sync", "updates": yjs_update_log})
-    await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
+    project_yjs_log = yjs_update_logs.get(project_id, [])
+    if project_yjs_log:
+        await websocket.send_json({"type": "yjs:sync", "updates": project_yjs_log})
+    await manager.broadcast(
+        project_id,
+        {"type": "presence:update", "users": manager.get_users(project_id)},
+    )
     try:
         while True:
             raw = await websocket.receive_text()
@@ -626,9 +676,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
             if message_type == "presence:rename" and user_id:
                 next_name = str(data.get("name", "")).strip()
                 if next_name:
-                    manager.users[user_id]["name"] = next_name[:40]
+                    project_users = manager.users.get(project_id, {})
+                    if user_id in project_users:
+                        project_users[user_id]["name"] = next_name[:40]
                     await manager.broadcast(
-                        {"type": "presence:update", "users": manager.get_users()}
+                        project_id,
+                        {"type": "presence:update", "users": manager.get_users(project_id)},
                     )
             elif message_type == "cursor:update" and user_id:
                 payload = {
@@ -636,10 +689,12 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     "userId": user_id,
                     "cursor": data.get("cursor"),
                 }
-                await manager.broadcast_except(payload, websocket)
+                await manager.broadcast_except(project_id, payload, websocket)
             elif message_type == "cursor:clear" and user_id:
                 await manager.broadcast_except(
-                    {"type": "cursor:clear", "userId": user_id}, websocket
+                    project_id,
+                    {"type": "cursor:clear", "userId": user_id},
+                    websocket,
                 )
             elif message_type == "selection:update" and user_id:
                 payload = {
@@ -647,18 +702,22 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                     "userId": user_id,
                     "selection": data.get("selection"),
                 }
-                await manager.broadcast_except(payload, websocket)
+                await manager.broadcast_except(project_id, payload, websocket)
             elif message_type == "selection:clear" and user_id:
                 await manager.broadcast_except(
-                    {"type": "selection:clear", "userId": user_id}, websocket
+                    project_id,
+                    {"type": "selection:clear", "userId": user_id},
+                    websocket,
                 )
             elif message_type == "yjs:update" and user_id:
                 update = data.get("update")
                 if update:
-                    yjs_update_log.append(update)
-                    if len(yjs_update_log) > yjs_update_limit:
-                        yjs_update_log[:] = yjs_update_log[-yjs_update_limit:]
+                    project_yjs_log = yjs_update_logs.setdefault(project_id, [])
+                    project_yjs_log.append(update)
+                    if len(project_yjs_log) > yjs_update_limit:
+                        project_yjs_log[:] = project_yjs_log[-yjs_update_limit:]
                     await manager.broadcast_except(
+                        project_id,
                         {
                             "type": "yjs:update",
                             "update": update,
@@ -678,16 +737,17 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                             }
                         )
                         continue
-                in_memory_project_raw = project_raw
-                in_memory_project = normalize_project_state(project_raw)
-                save_project_to_firestore(in_memory_project_raw)
+                set_in_memory_project(project_id, project_raw)
+                storage_id = None if project_id == DEFAULT_PROJECT_ID else project_id
+                save_project_to_firestore(project_raw, project_id=storage_id)
                 await manager.broadcast(
+                    project_id,
                     {
                         "type": "project:update",
-                        "project": in_memory_project.model_dump(),
-                        "project_raw": in_memory_project_raw,
+                        "project": get_in_memory_project(project_id).model_dump(),
+                        "project_raw": get_in_memory_project_raw(project_id),
                         "sender_id": user_id,
-                    }
+                    },
                 )
     except WebSocketDisconnect as exc:
         user_agent = websocket.headers.get("user-agent")
@@ -703,33 +763,27 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
         )
         user_id = manager.connection_users.get(websocket)
         manager.disconnect(websocket)
-        await manager.broadcast({"type": "presence:update", "users": manager.get_users()})
+        await manager.broadcast(
+            project_id,
+            {"type": "presence:update", "users": manager.get_users(project_id)},
+        )
         if user_id:
-            await manager.broadcast({"type": "cursor:clear", "userId": user_id})
-            await manager.broadcast({"type": "selection:clear", "userId": user_id})
+            await manager.broadcast(project_id, {"type": "cursor:clear", "userId": user_id})
+            await manager.broadcast(
+                project_id,
+                {"type": "selection:clear", "userId": user_id},
+            )
 
 
 @app.get("/project/state")
 async def get_project_state() -> Dict[str, Optional[Dict]]:
-    global in_memory_project
-    global in_memory_project_raw
-    global last_saved_project_hash
-    project_raw = load_project_from_firestore()
-    if project_raw:
-        in_memory_project_raw = project_raw
-        in_memory_project = normalize_project_state(project_raw)
-        project_hash = compute_project_hash(project_raw)
-        if project_hash:
-            last_saved_project_hash["default"] = project_hash
-    elif not in_memory_project_raw and in_memory_project.documents:
-        in_memory_project_raw = in_memory_project.model_dump()
-        project_hash = compute_project_hash(in_memory_project_raw)
-        if project_hash:
-            last_saved_project_hash["default"] = project_hash
-
+    project_id = DEFAULT_PROJECT_ID
+    ensure_project_loaded(project_id)
+    project_raw = get_in_memory_project_raw(project_id)
+    project_state = get_in_memory_project(project_id)
     return {
-        "project_raw": in_memory_project_raw or None,
-        "project": in_memory_project.model_dump(),
+        "project_raw": project_raw or None,
+        "project": project_state.model_dump(),
     }
 
 
@@ -1010,10 +1064,6 @@ async def delete_project(project_id: str, request: Request) -> Dict[str, str]:
 
 @app.post("/projects/{project_id}/state")
 async def set_project_state_for_project(project_id: str, payload: Dict = Body(...)) -> Dict[str, str]:
-    global in_memory_project
-    global in_memory_project_raw
-    global last_saved_project_hash
-
     try:
         project_raw = payload.get("project_raw") or payload.get("project") or payload
         project_name = payload.get("name")
@@ -1027,14 +1077,13 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
                 **limit_error,
             }
 
-        in_memory_project_raw = project_raw
-        in_memory_project = normalize_project_state(project_raw)
-        save_project_to_firestore(in_memory_project_raw, project_id=project_id)
+        set_in_memory_project(project_id, project_raw)
+        save_project_to_firestore(project_raw, project_id=project_id)
         if project_name:
             doc_ref = get_project_doc_ref(project_id)
             if doc_ref:
                 doc_ref.set({"name": project_name}, merge=True)
-        project_hash = compute_project_hash(in_memory_project_raw)
+        project_hash = compute_project_hash(project_raw)
         if project_hash:
             last_saved_project_hash[project_id] = project_hash
         return {"status": "ok"}
@@ -1045,10 +1094,6 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
 
 @app.post("/project/state")
 async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
-    global in_memory_project
-    global in_memory_project_raw
-    global last_saved_project_hash
-
     try:
         project_raw = payload.get("project_raw") or payload.get("project") or payload
         if not isinstance(project_raw, dict):
@@ -1061,18 +1106,19 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
                 **limit_error,
             }
 
-        in_memory_project_raw = project_raw
-        in_memory_project = normalize_project_state(project_raw)
-        save_project_to_firestore(in_memory_project_raw)
-        project_hash = compute_project_hash(in_memory_project_raw)
+        project_id = DEFAULT_PROJECT_ID
+        set_in_memory_project(project_id, project_raw)
+        save_project_to_firestore(project_raw)
+        project_hash = compute_project_hash(project_raw)
         if project_hash:
-            last_saved_project_hash["default"] = project_hash
+            last_saved_project_hash[project_id] = project_hash
         await manager.broadcast(
+            project_id,
             {
                 "type": "project:update",
-                "project": in_memory_project.model_dump(),
-                "project_raw": in_memory_project_raw,
-            }
+                "project": get_in_memory_project(project_id).model_dump(),
+                "project_raw": get_in_memory_project_raw(project_id),
+            },
         )
         return {"status": "ok"}
     except Exception as exc:
@@ -1085,29 +1131,27 @@ async def load_project(file: UploadFile = File(...)) -> Dict[str, str]:
     payload = await file.read()
     project_state = ProjectState.model_validate_json(payload)
 
-    global in_memory_project
-    global in_memory_project_raw
-    global last_saved_project_hash
-    in_memory_project = project_state
-    in_memory_project_raw = project_state.model_dump()
-    limit_error = validate_project_limits(in_memory_project_raw)
+    project_id = DEFAULT_PROJECT_ID
+    project_raw = project_state.model_dump()
+    limit_error = validate_project_limits(project_raw)
     if limit_error:
         return {
             "status": "error",
             **limit_error,
         }
-    save_project_to_firestore(project_state.model_dump())
-    project_hash = compute_project_hash(in_memory_project_raw)
+    set_in_memory_project(project_id, project_raw)
+    save_project_to_firestore(project_raw)
+    project_hash = compute_project_hash(project_raw)
     if project_hash:
-        last_saved_project_hash["default"] = project_hash
-    await manager.broadcast(in_memory_project.model_dump())
+        last_saved_project_hash[project_id] = project_hash
+    await manager.broadcast(project_id, get_in_memory_project(project_id).model_dump())
 
     return {"status": "ok"}
 
 
 @app.get("/project/save")
 async def save_project() -> Response:
-    content = in_memory_project.model_dump_json(indent=2)
+    content = get_in_memory_project(DEFAULT_PROJECT_ID).model_dump_json(indent=2)
     headers = {
         "Content-Disposition": "attachment; filename=project_backup.json",
     }
@@ -1116,8 +1160,9 @@ async def save_project() -> Response:
 
 @app.get("/export/word")
 async def export_word(project_id: Optional[str] = None) -> Response:
-    project_raw = load_project_from_firestore(project_id) if project_id else None
-    project = normalize_project_state(project_raw) if project_raw else in_memory_project
+    resolved_id = resolve_project_id(project_id)
+    project_raw = load_project_from_firestore(resolved_id) if project_id else None
+    project = normalize_project_state(project_raw) if project_raw else get_in_memory_project(resolved_id)
     document = Document()
     document.add_heading("Grounded Theory Analysrapport", level=1)
 
@@ -1188,8 +1233,9 @@ async def export_word(project_id: Optional[str] = None) -> Response:
 
 @app.get("/export/excel")
 async def export_excel(project_id: Optional[str] = None) -> Response:
-    project_raw = load_project_from_firestore(project_id) if project_id else None
-    project = normalize_project_state(project_raw) if project_raw else in_memory_project
+    resolved_id = resolve_project_id(project_id)
+    project_raw = load_project_from_firestore(resolved_id) if project_id else None
+    project = normalize_project_state(project_raw) if project_raw else get_in_memory_project(resolved_id)
     rows = []
     code_by_id = {code.id: code for code in project.codes}
     category_by_id = {category.id: category for category in project.categories}

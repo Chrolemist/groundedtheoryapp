@@ -19,6 +19,7 @@ type UseYjsSyncArgs = {
   theoryHtml: string
   coreCategoryId: string
   coreCategoryDraft: string
+  projectId?: string | null
   setDocuments: Dispatch<SetStateAction<{ id: string; title: string; text: string; html: string }[]>>
   setCodes: Dispatch<SetStateAction<Code[]>>
   setCategories: Dispatch<SetStateAction<Category[]>>
@@ -91,6 +92,7 @@ export function useYjsSync({
   theoryHtml,
   coreCategoryId,
   coreCategoryDraft,
+  projectId,
   setDocuments,
   setCodes,
   setCategories,
@@ -117,6 +119,7 @@ export function useYjsSync({
   const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
 
   const { sendJson } = useProjectWebSocket({
+    projectId,
     onMessage: (payload) => {
       if (!payload || typeof payload !== 'object') return
       const data = payload as Record<string, unknown>
@@ -393,7 +396,8 @@ export function useYjsSync({
 
   useEffect(() => {
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return
-    const channel = new BroadcastChannel('gt-yjs')
+    if (!projectId) return
+    const channel = new BroadcastChannel(`gt-yjs:${projectId}`)
     broadcastChannelRef.current = channel
     const clientId = ydoc.clientID
 
@@ -423,7 +427,7 @@ export function useYjsSync({
       channel.close()
       broadcastChannelRef.current = null
     }
-  }, [ydoc])
+  }, [projectId, ydoc])
 
   useEffect(() => {
     const handleFocusOut = () => {

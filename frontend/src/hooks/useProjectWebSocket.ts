@@ -10,17 +10,22 @@ const getClientId = () => {
   return next
 }
 
-const getWebSocketUrl = () => {
+const getWebSocketUrl = (projectId?: string | null) => {
   if (typeof window === 'undefined') return ''
+  if (!projectId) return ''
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const clientId = getClientId()
-  const query = clientId ? `?client_id=${encodeURIComponent(clientId)}` : ''
+  const params = new URLSearchParams()
+  if (clientId) params.set('client_id', clientId)
+  params.set('project_id', projectId)
+  const query = params.toString() ? `?${params.toString()}` : ''
   const host = window.location.port === '5173' ? 'localhost:8000' : window.location.host
   return `${protocol}://${host}/ws${query}`
 }
 
 type UseProjectWebSocketOptions = {
   onMessage?: (data: unknown) => void
+  projectId?: string | null
 }
 
 type MessageHandler = (data: unknown) => void
@@ -115,6 +120,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const [isOnline, setIsOnline] = useState(false)
   const messageHandlerRef = useRef(options.onMessage)
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
+  const projectId = options.projectId ?? null
 
   useEffect(() => {
     messageHandlerRef.current = options.onMessage
@@ -122,8 +128,11 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
 
   useEffect(() => {
     if (disableWs) return undefined
-    const url = getWebSocketUrl()
-    if (!url) return undefined
+    const url = getWebSocketUrl(projectId)
+    if (!url) {
+      setIsOnline(false)
+      return undefined
+    }
     const handleMessage = (payload: unknown) => {
       messageHandlerRef.current?.(payload)
     }
@@ -143,7 +152,10 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       sharedUrl = url
     }
     if (sharedUrl !== url) {
+      sharedSocket?.close()
+      sharedSocket = null
       sharedUrl = url
+      sharedRetryCount = 0
     }
     connectSharedSocket(sharedUrl)
     document.addEventListener('visibilitychange', handleVisibility)
@@ -166,10 +178,11 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         sharedRetryCount = 0
       }
     }
-  }, [disableWs])
+  }, [disableWs, projectId])
 
   const sendJson = useCallback((payload: unknown) => {
     if (disableWs) return false
+    if (!projectId) return false
     if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return false
     try {
       sharedSocket.send(JSON.stringify(payload))
@@ -177,7 +190,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
     } catch {
       return false
     }
-  }, [disableWs])
+  }, [disableWs, projectId])
 
   return { isOnline, sendJson }
 }

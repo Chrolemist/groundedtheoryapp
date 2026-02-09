@@ -8,6 +8,7 @@ import { useProjectAutosave } from './useProjectAutosave'
 type UseProjectCollaborationSyncArgs = {
   sendJson?: (payload: Record<string, unknown>) => void
   hasRemoteState: boolean
+  projectId?: string | null
   isApplyingRemoteRef: MutableRefObject<boolean>
   selectionRangeRef: MutableRefObject<Range | null>
   selectionDocumentIdRef: MutableRefObject<string | null>
@@ -38,6 +39,7 @@ type UseProjectCollaborationSyncArgs = {
 export function useProjectCollaborationSync({
   sendJson,
   hasRemoteState,
+  projectId,
   isApplyingRemoteRef,
   selectionRangeRef,
   selectionDocumentIdRef,
@@ -138,7 +140,8 @@ export function useProjectCollaborationSync({
   useEffect(() => {
     if (!disableWs) return undefined
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return undefined
-    const channel = new BroadcastChannel('gt-project')
+    if (!projectId) return undefined
+    const channel = new BroadcastChannel(`gt-project:${projectId}`)
     broadcastRef.current = channel
     const handleMessage = (event: MessageEvent) => {
       const data = event.data as Record<string, unknown> | undefined
@@ -153,7 +156,7 @@ export function useProjectCollaborationSync({
       channel.close()
       broadcastRef.current = null
     }
-  }, [applyRemoteProject, disableWs])
+  }, [applyRemoteProject, disableWs, projectId])
 
   const handleBroadcastProjectUpdate = useCallback(
     (projectRaw: Record<string, unknown>) => {

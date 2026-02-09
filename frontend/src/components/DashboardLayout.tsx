@@ -37,6 +37,22 @@ export function DashboardLayout() {
     return window.location.origin
   }, [])
 
+  const catalog = useProjectCatalog({
+    apiBase,
+    adminToken,
+    remoteLoadedRef,
+    applyRemoteProject: (project) => projectUpdateRef.current(project),
+    autoCreateIfEmpty: false,
+    onActiveProjectChange: (projectId, name) => {
+      activeProjectIdRef.current = projectId
+      document.title = name
+        ? `GT · Grounded Theory - ${name}`
+        : 'GT · Grounded Theory'
+    },
+  })
+
+  const { activeProjectId: catalogActiveProjectId, refreshStorage: refreshCatalogStorage } = catalog
+
   const {
     websocketOnline,
     sendJson,
@@ -46,6 +62,7 @@ export function DashboardLayout() {
     remoteSelections,
     hasRemoteState,
   } = useCollaboration({
+    projectId: catalogActiveProjectId,
     onProjectUpdate: (project) => projectUpdateRef.current(project),
   })
 
@@ -78,27 +95,12 @@ export function DashboardLayout() {
     sendJson,
     hasRemoteState,
     persistProject,
+    projectId: catalogActiveProjectId,
   })
 
   useEffect(() => {
     projectUpdateRef.current = project.applyRemoteProject
   }, [project.applyRemoteProject])
-
-  const catalog = useProjectCatalog({
-    apiBase,
-    adminToken,
-    remoteLoadedRef,
-    applyRemoteProject: project.applyRemoteProject,
-    autoCreateIfEmpty: false,
-    onActiveProjectChange: (projectId, name) => {
-      activeProjectIdRef.current = projectId
-      document.title = name
-        ? `GT · Grounded Theory - ${name}`
-        : 'GT · Grounded Theory'
-    },
-  })
-
-  const { activeProjectId: catalogActiveProjectId, refreshStorage: refreshCatalogStorage } = catalog
 
   useEffect(() => {
     if (!catalogActiveProjectId) {

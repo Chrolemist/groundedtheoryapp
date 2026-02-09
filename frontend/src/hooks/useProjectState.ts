@@ -29,6 +29,7 @@ type UseProjectStateArgs = {
   sendJson?: (payload: Record<string, unknown>) => void
   hasRemoteState: boolean
   persistProject?: (projectRaw: Record<string, unknown>) => void
+  projectId?: string | null
 }
 
 // Core state + editing behavior for grounded theory workflows.
@@ -38,6 +39,7 @@ export function useProjectState({
   sendJson,
   hasRemoteState,
   persistProject,
+  projectId,
 }: UseProjectStateArgs) {
   const disableLocalStoragePersist = true
   const maxProjectBytes = Number(import.meta.env.VITE_MAX_PROJECT_BYTES) || 900000
@@ -428,6 +430,7 @@ export function useProjectState({
     theoryHtml,
     coreCategoryId,
     coreCategoryDraft,
+    projectId,
     setDocuments,
     setCodes,
     setCategories,
@@ -478,6 +481,7 @@ export function useProjectState({
   const { applyRemoteProject } = useProjectCollaborationSync({
     sendJson,
     hasRemoteState,
+    projectId,
     isApplyingRemoteRef,
     selectionRangeRef,
     selectionDocumentIdRef,
