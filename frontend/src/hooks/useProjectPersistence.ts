@@ -59,14 +59,14 @@ export function useProjectPersistence({
         if (debugEnabled) console.warn('[Project Save] skip (no projectId)')
         return
       }
-      if (!hasRemoteState && !remoteLoadedRef.current) {
-        if (debugEnabled) {
-          console.warn('[Project Save] skip (no remote state yet)', {
-            hasRemoteState,
-            remoteLoaded: remoteLoadedRef.current,
-          })
-        }
-        return
+      // Persistence should not depend on WebSocket presence.
+      // In prod we observed "only saves when 2 collaborators" which was caused by
+      // hasRemoteState/remoteLoaded gating. Server-side guardrails now prevent empty overwrites.
+      if (debugEnabled && !hasRemoteState && !remoteLoadedRef.current) {
+        console.warn('[Project Save] proceeding without remote handshake', {
+          hasRemoteState,
+          remoteLoaded: remoteLoadedRef.current,
+        })
       }
       updateWarning(projectRaw)
       const seq = saveSeqRef.current + 1
@@ -104,6 +104,7 @@ export function useProjectPersistence({
             throw new Error(message)
           }
           if (saveSeqRef.current !== seq) return
+          remoteLoadedRef.current = true
           setLastSavedAt(Date.now())
         })
         .catch((error) => {
