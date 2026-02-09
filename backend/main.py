@@ -393,7 +393,7 @@ def get_firestore_client() -> Optional[firestore.Client]:
     if firestore_client is not None:
         return firestore_client
 
-    project_id = os.getenv("FIREBASE_PROJECT_ID")
+    project_id = (os.getenv("FIREBASE_PROJECT_ID") or "").strip() or None
     credentials_json = os.getenv("FIREBASE_CREDENTIALS_JSON")
     credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
 
@@ -401,20 +401,23 @@ def get_firestore_client() -> Optional[firestore.Client]:
         if not firebase_admin._apps:
             if credentials_json:
                 creds_dict = json.loads(credentials_json)
-                firebase_admin.initialize_app(credentials.Certificate(creds_dict), {
-                    "projectId": project_id or creds_dict.get("project_id"),
-                })
+                resolved_project_id = project_id or creds_dict.get("project_id")
+                options = {"projectId": resolved_project_id} if resolved_project_id else {}
+                firebase_admin.initialize_app(credentials.Certificate(creds_dict), options)
             elif credentials_path:
-                firebase_admin.initialize_app(credentials.Certificate(credentials_path), {
-                    "projectId": project_id,
-                })
+                options = {"projectId": project_id} if project_id else {}
+                firebase_admin.initialize_app(credentials.Certificate(credentials_path), options)
             else:
                 # Use Application Default Credentials (Cloud Run service account)
-                firebase_admin.initialize_app(credentials.ApplicationDefault(), {
-                    "projectId": project_id,
-                })
+                options = {"projectId": project_id} if project_id else {}
+                firebase_admin.initialize_app(credentials.ApplicationDefault(), options)
 
         firestore_client = firestore.client()
+        logger.info(
+            "Firestore client initialized. app_project_id=%s client_project=%s",
+            project_id,
+            getattr(firestore_client, "project", None),
+        )
         return firestore_client
     except Exception as exc:
         logger.exception("Firestore not configured or failed to initialize")
@@ -506,6 +509,14 @@ def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = Non
         )
         if current_hash:
             last_saved_project_hash[hash_key] = current_hash
+        try:
+            logger.info(
+                "Saved project to Firestore. project_id=%s size_bytes=%s",
+                project_id or "default",
+                estimate_project_bytes(project_raw),
+            )
+        except Exception:
+            pass
         return True
     except Exception as exc:
         logger.exception(
