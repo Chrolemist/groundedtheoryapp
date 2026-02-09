@@ -44,6 +44,7 @@ type DocumentViewerPanelProps = {
   onEditorRef: (node: HTMLDivElement | null) => void
   canSeedInitialContent: boolean
   seedReady: boolean
+  hasRemoteUpdates: boolean
 }
 
 export function DocumentViewerPanel({
@@ -80,6 +81,7 @@ export function DocumentViewerPanel({
   onEditorRef,
   canSeedInitialContent,
   seedReady,
+  hasRemoteUpdates,
 }: DocumentViewerPanelProps) {
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
@@ -520,6 +522,7 @@ export function DocumentViewerPanel({
                       lineHeight={documentLineHeight}
                       canSeedInitialContent={canSeedInitialContent}
                       seedReady={seedReady}
+                      hasRemoteUpdates={hasRemoteUpdates}
                       setFontFamily={(value) => {
                         onDocumentFontFamilyChange(value)
                         onDocumentFontFamilyDisplayChange(value)
@@ -573,6 +576,7 @@ export function DocumentViewerPanel({
                   lineHeight={documentLineHeight}
                   canSeedInitialContent={canSeedInitialContent}
                   seedReady={seedReady}
+                  hasRemoteUpdates={hasRemoteUpdates}
                   setFontFamily={(value) => {
                     onDocumentFontFamilyChange(value)
                     onDocumentFontFamilyDisplayChange(value)

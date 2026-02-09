@@ -440,6 +440,7 @@ export function DashboardLayout() {
               onEditorRef={project.setDocumentEditorRef}
               canSeedInitialContent={canSeedInitialContent}
               seedReady={seedReady}
+              hasRemoteUpdates={project.hasRemoteUpdates}
             />
 
             <CodingSidebar

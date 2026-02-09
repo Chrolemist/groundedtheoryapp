@@ -422,7 +422,7 @@ export function useProjectState({
   }, [documents, codes, categories, memos, coreCategoryId, theoryHtml])
 
 
-  const { ydoc } = useYjsSync({
+  const { ydoc, hasRemoteUpdates } = useYjsSync({
     documents,
     codes,
     categories,
@@ -476,6 +476,7 @@ export function useProjectState({
     codeById,
     applyCodeStylesToEditor,
     ydoc,
+    hasRemoteUpdates,
   ])
 
   const { applyRemoteProject } = useProjectCollaborationSync({

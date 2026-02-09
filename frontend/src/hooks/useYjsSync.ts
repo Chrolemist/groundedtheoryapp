@@ -103,6 +103,7 @@ export function useYjsSync({
   isApplyingRemoteRef,
 }: UseYjsSyncArgs) {
   const [ydoc] = useState(() => new Y.Doc())
+  const [hasRemoteUpdates, setHasRemoteUpdates] = useState(false)
   const documentsMapRef = useRef<Y.Map<Y.Map<DocumentMapValue>> | null>(null)
   const documentsOrderRef = useRef<Y.Array<string> | null>(null)
   const codesMapRef = useRef<Y.Map<Y.Map<CodeMapValue>> | null>(null)
@@ -125,6 +126,7 @@ export function useYjsSync({
       const data = payload as Record<string, unknown>
       if (!ydoc) return
       if (data.type === 'yjs:sync') {
+        setHasRemoteUpdates(true)
         const updates = Array.isArray(data.updates) ? data.updates : []
         updates.forEach((update) => {
           if (typeof update !== 'string') return
@@ -136,6 +138,7 @@ export function useYjsSync({
       if (data.type !== 'yjs:update') return
       const update = typeof data.update === 'string' ? data.update : null
       if (!update) return
+      setHasRemoteUpdates(true)
       const decoded = fromBase64(update)
       Y.applyUpdate(ydoc, decoded, REMOTE_ORIGIN)
     },
@@ -405,11 +408,13 @@ export function useYjsSync({
       const data = event.data as { type?: string; update?: string; from?: number } | undefined
       if (!data || typeof data.type !== 'string') return
       if (data.type === 'yjs:update' && typeof data.update === 'string') {
+        setHasRemoteUpdates(true)
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         return
       }
       if (data.type === 'yjs:sync' && typeof data.update === 'string') {
+        setHasRemoteUpdates(true)
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         return
@@ -459,6 +464,7 @@ export function useYjsSync({
 
     ydoc.on('update', (update: Uint8Array, origin: unknown) => {
       if (origin === REMOTE_ORIGIN || origin === BROADCAST_ORIGIN) {
+        setHasRemoteUpdates(true)
         if (isEditingElement(document.activeElement)) {
           pendingRefreshRef.current = true
           return
@@ -683,5 +689,6 @@ export function useYjsSync({
 
   return {
     ydoc,
+    hasRemoteUpdates,
   }
 }

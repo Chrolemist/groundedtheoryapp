@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
@@ -23,6 +23,7 @@ type DocumentEditorProps = {
   setLineHeight: (value: string) => void
   canSeedInitialContent: boolean
   seedReady: boolean
+  hasRemoteUpdates: boolean
 }
 
 export function DocumentEditor({
@@ -42,7 +43,9 @@ export function DocumentEditor({
   setLineHeight,
   canSeedInitialContent,
   seedReady,
+  hasRemoteUpdates,
 }: DocumentEditorProps) {
+  const didSeedRef = useRef(false)
   const extensions = [
     StarterKit.configure({ history: false }),
     Underline,
@@ -72,10 +75,16 @@ export function DocumentEditor({
     const fragment = ydoc.getXmlFragment(documentId)
     if (!seedReady) return
     if (!canSeedInitialContent) return
+    if (hasRemoteUpdates) return
+    if (didSeedRef.current) return
     if (fragment.toString().length === 0 && initialHtml) {
       editor.commands.setContent(initialHtml, false)
+      didSeedRef.current = true
     }
-  }, [editor, documentId, initialHtml, ydoc, canSeedInitialContent, seedReady])
+    if (fragment.toString().length > 0) {
+      didSeedRef.current = true
+    }
+  }, [editor, documentId, initialHtml, ydoc, canSeedInitialContent, seedReady, hasRemoteUpdates])
 
   const runCommand = (command: string, value?: string) => {
     if (!editor) return
