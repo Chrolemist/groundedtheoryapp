@@ -74,6 +74,33 @@ export function useProjectCollaborationSync({
   const lastDebugAtRef = useRef(0)
   const lastSkipDebugAtRef = useRef(0)
 
+  const isEffectivelyEmptyHtml = (value: string) => {
+    const html = (value ?? '').trim()
+    if (!html) return true
+    const normalized = html.replace(/\s+/g, '').toLowerCase()
+    return (
+      normalized === '<p></p>' ||
+      normalized === '<p><br></p>' ||
+      normalized === '<p><br/></p>'
+    )
+  }
+
+  const estimateDocsContentChars = (docs: DocumentItem[]) => {
+    let total = 0
+    docs.forEach((doc) => {
+      const text = (doc.text ?? '').trim()
+      if (text) {
+        total += text.replace(/\s+/g, '').length
+        return
+      }
+      const html = (doc.html ?? '').trim()
+      if (!html || isEffectivelyEmptyHtml(html)) return
+      // Rough heuristic: count non-whitespace chars.
+      total += html.replace(/\s+/g, '').length
+    })
+    return total
+  }
+
   const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
     const incomingUpdatedAt =
       typeof project.updated_at === 'number' ? project.updated_at : 0
@@ -91,6 +118,28 @@ export function useProjectCollaborationSync({
 
     const hydrated = hydrateRemoteProject(project, getReadableTextColor)
     const hydratedMemos = hydrated.memos ?? []
+
+    // Client-side safety net: ignore remote updates that appear to wipe all document
+    // content while we currently have content. This can happen due to races where a
+    // client without Yjs sync persists empty `html/text` fields.
+    if (!allowReplace) {
+      const localDocChars = estimateDocsContentChars(documents)
+      const incomingDocChars = estimateDocsContentChars(hydrated.documents)
+      if (localDocChars > 0 && hydrated.documents.length > 0 && incomingDocChars === 0) {
+        if (debugEnabled) {
+          console.warn('[Project Sync] skip applyRemoteProject (content wipe)', {
+            projectId,
+            allowReplace,
+            incomingUpdatedAt,
+            localUpdatedAt: projectUpdatedAtRef.current,
+            localDocChars,
+            incomingDocChars,
+            incomingDocs: hydrated.documents.length,
+          })
+        }
+        return
+      }
+    }
     const incomingHasData =
       hydrated.documents.length > 0 ||
       hydrated.codes.length > 0 ||

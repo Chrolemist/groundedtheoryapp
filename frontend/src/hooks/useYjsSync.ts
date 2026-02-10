@@ -101,6 +101,24 @@ const normalizeOrder = (order: string[], ids: string[]) => {
   return normalized
 }
 
+const isEffectivelyEmptyHtml = (value: string) => {
+  const html = (value ?? '').trim()
+  if (!html) return true
+  const normalized = html.replace(/\s+/g, '').toLowerCase()
+  return (
+    normalized === '<p></p>' ||
+    normalized === '<p><br></p>' ||
+    normalized === '<p><br/></p>'
+  )
+}
+
+const hasMeaningfulContent = (html: string, text: string) => {
+  if ((text ?? '').trim().length > 0) return true
+  const trimmedHtml = (html ?? '').trim()
+  if (!trimmedHtml) return false
+  return !isEffectivelyEmptyHtml(trimmedHtml)
+}
+
 export function useYjsSync({
   documents,
   codes,
@@ -387,8 +405,15 @@ export function useYjsSync({
         const map = documentsMap.get(id)
         const fallback = currentById.get(id)
         const title = (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? ''
-        const html = (map?.get('html') as Y.Text | undefined)?.toString() ?? fallback?.html ?? ''
-        const text = (map?.get('text') as Y.Text | undefined)?.toString() ?? fallback?.text ?? ''
+        const mapHtml = (map?.get('html') as Y.Text | undefined)?.toString() ?? ''
+        const mapText = (map?.get('text') as Y.Text | undefined)?.toString() ?? ''
+        const fallbackHtml = fallback?.html ?? ''
+        const fallbackText = fallback?.text ?? ''
+        const mapHas = hasMeaningfulContent(mapHtml, mapText)
+        const fallbackHas = hasMeaningfulContent(fallbackHtml, fallbackText)
+
+        const html = mapHas || !fallbackHas ? mapHtml : fallbackHtml
+        const text = mapHas || !fallbackHas ? mapText : fallbackText
         return {
           id,
           title,
