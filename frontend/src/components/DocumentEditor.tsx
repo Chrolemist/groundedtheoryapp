@@ -54,6 +54,7 @@ export function DocumentEditor({
   const didSeedRef = useRef(false)
   const didSyncRef = useRef(false)
   const fallbackSeedTimerRef = useRef<number | null>(null)
+  const lastAppliedHtmlRef = useRef<string>('')
   const debugRef = useRef({ lastLogAt: 0 })
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
@@ -78,6 +79,7 @@ export function DocumentEditor({
       }
       const html = editor.getHTML()
       const text = editor.getText()
+      lastAppliedHtmlRef.current = html
       if (debugEnabled) {
         const now = Date.now()
         if (now - debugRef.current.lastLogAt > 800) {
@@ -113,6 +115,7 @@ export function DocumentEditor({
       }
       editor.commands.setContent(initialHtml, false)
       didSeedRef.current = true
+      lastAppliedHtmlRef.current = editor.getHTML()
       return
     }
 
@@ -192,6 +195,7 @@ export function DocumentEditor({
       }
       editor.commands.setContent(initialHtml, false)
       didSeedRef.current = true
+      lastAppliedHtmlRef.current = editor.getHTML()
     }
 
     if (!editorIsEmpty) {
@@ -217,6 +221,34 @@ export function DocumentEditor({
     hasRemoteUpdates,
     hasReceivedSync,
   ])
+
+  useEffect(() => {
+    if (!editor) return
+    if (collaborationEnabled) return
+    if (!didSeedRef.current) return
+
+    // In plain editor mode (no Yjs Collaboration extension), remote collaborators
+    // update `initialHtml` via project snapshots. Keep the editor in sync when the
+    // user isn't actively editing.
+    const hasFocus = editor.view?.hasFocus?.() ?? false
+    if (hasFocus) return
+
+    const next = (initialHtml ?? '').trim()
+    const last = (lastAppliedHtmlRef.current ?? '').trim()
+    if (!next) return
+    if (next === last) return
+
+    if (debugEnabled) {
+      console.log('[DocEditor] plain remote sync setContent', {
+        documentId,
+        nextLen: next.length,
+        lastLen: last.length,
+      })
+    }
+
+    editor.commands.setContent(next, false)
+    lastAppliedHtmlRef.current = editor.getHTML()
+  }, [collaborationEnabled, debugEnabled, documentId, editor, initialHtml])
 
   useEffect(() => {
     return () => {
