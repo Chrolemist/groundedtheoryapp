@@ -438,6 +438,7 @@ export function DashboardLayout() {
                 project.removeDocument(documentId)
               }}
               onAddDocument={project.addNewDocument}
+              onMoveDocument={project.moveDocument}
               documentTitle={project.getDocumentById(project.activeDocumentId)?.title ?? ''}
               onDocumentTitleChange={(title) =>
                 project.updateDocument(project.activeDocumentId, { title })

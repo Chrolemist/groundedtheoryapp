@@ -123,6 +123,7 @@ export function useProjectState({
     getDocumentById,
     addNewDocument,
     removeDocument: removeDocumentState,
+    moveDocument: moveDocumentState,
     applyCodeStylesToEditor,
   } = documentState
 
@@ -171,6 +172,14 @@ export function useProjectState({
       removeDocumentState(documentId)
     },
     [markLocalChange, removeDocumentState],
+  )
+
+  const moveDocumentWithDirty = useCallback(
+    (documentId: string, direction: 'up' | 'down') => {
+      markLocalChange()
+      moveDocumentState(documentId, direction)
+    },
+    [markLocalChange, moveDocumentState],
   )
 
   const {
@@ -589,6 +598,7 @@ export function useProjectState({
     getDocumentById,
     addNewDocument: addNewDocumentWithDirty,
     removeDocument: handleRemoveDocument,
+    moveDocument: moveDocumentWithDirty,
     addNewCode: addNewCodeWithDirty,
     updateCode: updateCodeWithDirty,
     removeCode: removeCodeWithDirty,

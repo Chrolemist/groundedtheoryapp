@@ -36,6 +36,7 @@ type DocumentViewerPanelProps = {
   onDocumentLineHeightChange: (value: string) => void
   showCodeLabels: boolean
   onAddDocument: () => void
+  onMoveDocument: (documentId: string, direction: 'up' | 'down') => void
   onDocumentInput: (documentId: string, patch: { html: string; text: string }) => void
   onEditorReady: (documentId: string, editor: Editor | null) => void
   onHighlightMouseDown: (event: MouseEvent<HTMLElement>) => void
@@ -76,6 +77,7 @@ export function DocumentViewerPanel({
   onDocumentLineHeightChange,
   showCodeLabels,
   onAddDocument,
+  onMoveDocument,
   onDocumentInput,
   onEditorReady,
   onHighlightMouseDown,
@@ -453,6 +455,14 @@ export function DocumentViewerPanel({
           >
             Overview
           </button>
+
+          <button
+            type="button"
+            onClick={onAddDocument}
+            className="ml-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+          >
+            Create document
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <select
@@ -534,6 +544,36 @@ export function DocumentViewerPanel({
                       <span className="text-xs text-slate-400">Document {index + 1}</span>
                       <button
                         type="button"
+                        onClick={() => onMoveDocument(doc.id, 'up')}
+                        disabled={index === 0}
+                        className={cn(
+                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                          index === 0
+                            ? 'cursor-not-allowed text-slate-300'
+                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                        )}
+                        title="Move up"
+                        aria-label="Move document up"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onMoveDocument(doc.id, 'down')}
+                        disabled={index === documents.length - 1}
+                        className={cn(
+                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                          index === documents.length - 1
+                            ? 'cursor-not-allowed text-slate-300'
+                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                        )}
+                        title="Move down"
+                        aria-label="Move document down"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onRemoveDocument(doc.id, doc.title)}
                         className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
                         title="Delete document"
@@ -584,14 +624,57 @@ export function DocumentViewerPanel({
             </div>
           ) : (
             <div className="relative" data-doc-id={activeDocumentId}>
-              <button
-                type="button"
-                onClick={() => onRemoveDocument(activeDocumentId, documentTitle || 'Untitled document')}
-                className="absolute right-0 top-0 inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
-                title="Delete document"
-              >
-                ×
-              </button>
+              <div className="absolute right-0 top-0 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onMoveDocument(activeDocumentId, 'up')}
+                  disabled={documents.findIndex((doc) => doc.id === activeDocumentId) <= 0}
+                  className={cn(
+                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                    documents.findIndex((doc) => doc.id === activeDocumentId) <= 0
+                      ? 'cursor-not-allowed text-slate-300'
+                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                  )}
+                  title="Move up"
+                  aria-label="Move document up"
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMoveDocument(activeDocumentId, 'down')}
+                  disabled={
+                    (() => {
+                      const idx = documents.findIndex((doc) => doc.id === activeDocumentId)
+                      return idx === -1 || idx >= documents.length - 1
+                    })()
+                  }
+                  className={cn(
+                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                    (() => {
+                      const idx = documents.findIndex((doc) => doc.id === activeDocumentId)
+                      return idx === -1 || idx >= documents.length - 1
+                    })()
+                      ? 'cursor-not-allowed text-slate-300'
+                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                  )}
+                  title="Move down"
+                  aria-label="Move document down"
+                >
+                  ↓
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onRemoveDocument(activeDocumentId, documentTitle || 'Untitled document')
+                  }
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
+                  title="Delete document"
+                  aria-label="Delete document"
+                >
+                  ×
+                </button>
+              </div>
               {debugDisableEditors ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
                   Editor disabled (debug).

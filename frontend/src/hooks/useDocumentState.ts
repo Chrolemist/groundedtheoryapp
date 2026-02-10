@@ -77,6 +77,21 @@ export function useDocumentState({
     })
   }
 
+  const moveDocument = (documentId: string, direction: 'up' | 'down') => {
+    pushHistoryRef.current()
+    setDocuments((current) => {
+      const index = current.findIndex((doc) => doc.id === documentId)
+      if (index === -1) return current
+      const nextIndex = direction === 'up' ? index - 1 : index + 1
+      if (nextIndex < 0 || nextIndex >= current.length) return current
+      const next = [...current]
+      const temp = next[index]
+      next[index] = next[nextIndex]
+      next[nextIndex] = temp
+      return next
+    })
+  }
+
   const applyCodeStylesToContainer = (container: HTMLElement, nextCodeMap: Map<string, Code>) => {
     container.querySelectorAll('span[data-code-id]').forEach((span) => {
       const codeId = span.getAttribute('data-code-id')
@@ -332,6 +347,7 @@ export function useDocumentState({
     getDocumentById,
     addNewDocument,
     removeDocument,
+    moveDocument,
     syncDocumentsForCodes,
     syncEditorForCodes,
     syncTipTapEditorsForCodes,
