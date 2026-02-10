@@ -78,11 +78,22 @@ export function useProjectPersistence({
         body: JSON.stringify({ project_raw: projectRaw }),
       })
         .then(async (response) => {
-          let data: { status?: string; message?: string; reason?: string } | undefined
+          // Read body once and attempt to parse JSON; if parsing fails we still keep the text.
+          let bodyText: string | undefined
+          let data:
+            | { status?: string; message?: string; reason?: string; updated_at?: number }
+            | undefined
           try {
-            data = (await response.json()) as typeof data
+            bodyText = await response.text()
           } catch {
-            data = undefined
+            bodyText = undefined
+          }
+          if (bodyText) {
+            try {
+              data = JSON.parse(bodyText) as typeof data
+            } catch {
+              data = undefined
+            }
           }
 
           if (debugEnabled) {
@@ -90,11 +101,14 @@ export function useProjectPersistence({
               ok: response.ok,
               status: response.status,
               data,
+              bodyText: bodyText ? bodyText.slice(0, 500) : undefined,
             })
           }
 
           if (!response.ok) {
-            const message = data?.message || `Save failed: ${response.status}`
+            const message =
+              data?.message ||
+              (bodyText ? `Save failed: ${response.status} ${bodyText.slice(0, 200)}` : `Save failed: ${response.status}`)
             throw new Error(message)
           }
 
@@ -104,6 +118,7 @@ export function useProjectPersistence({
           }
           if (saveSeqRef.current !== seq) return
           remoteLoadedRef.current = true
+          // If backend returned canonical updated_at, prefer that in diagnostics.
           setLastSavedAt(Date.now())
         })
         .catch((error) => {

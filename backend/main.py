@@ -1275,7 +1275,10 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
         project_name = payload.get("name")
         force_overwrite = bool(payload.get("force"))
         if not isinstance(project_raw, dict):
-            return {"status": "invalid"}
+            return JSONResponse(
+                status_code=400,
+                content={"status": "invalid", "message": "project_raw must be an object"},
+            )
 
         # Canonicalize updated_at using server time to avoid client clock skew.
         prev_updated_at = project_raw.get("updated_at")
@@ -1299,10 +1302,13 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
 
         limit_error = validate_project_limits(project_raw)
         if limit_error:
-            return {
-                "status": "error",
-                **limit_error,
-            }
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "status": "error",
+                    **limit_error,
+                },
+            )
 
         # Safety net: avoid wiping a real project due to a client race/bug.
         # Blocks both obviously empty payloads and suspiciously small payloads compared to existing state.
@@ -1384,7 +1390,13 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
         return {"status": "ok", "updated_at": project_raw.get("updated_at")}
     except Exception:
         logger.exception("Failed to save project state")
-        return {"status": "error"}
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Failed to save project state",
+            },
+        )
 
 
 @app.post("/project/state")
@@ -1392,7 +1404,10 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
     try:
         project_raw = payload.get("project_raw") or payload.get("project") or payload
         if not isinstance(project_raw, dict):
-            return {"status": "invalid"}
+            return JSONResponse(
+                status_code=400,
+                content={"status": "invalid", "message": "project_raw must be an object"},
+            )
 
         prev_updated_at = project_raw.get("updated_at")
         prev_ms = prev_updated_at if isinstance(prev_updated_at, int) else 0
@@ -1400,10 +1415,13 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
 
         limit_error = validate_project_limits(project_raw)
         if limit_error:
-            return {
-                "status": "error",
-                **limit_error,
-            }
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "status": "error",
+                    **limit_error,
+                },
+            )
 
         project_id = DEFAULT_PROJECT_ID
         set_in_memory_project(project_id, project_raw)
@@ -1427,7 +1445,13 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
         return {"status": "ok", "updated_at": project_raw.get("updated_at")}
     except Exception as exc:
         logger.exception("Failed to save project state")
-        return {"status": "error"}
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Failed to save project state",
+            },
+        )
 
 
 @app.post("/project/load")
