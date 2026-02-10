@@ -40,6 +40,9 @@ const createRemoveButton = (
   button.addEventListener('click', (event) => {
     event.preventDefault()
     event.stopPropagation()
+    // Ensure the ProseMirror editor keeps focus so downstream "dirty" heuristics
+    // (used by autosave) treat this as a local document edit.
+    view.focus()
     const pos = getPos()
     const text = node.textContent || ''
     const tr = view.state.tr
