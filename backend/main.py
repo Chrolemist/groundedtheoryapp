@@ -862,8 +862,39 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                             }
                         )
                         continue
+
+                    # Safety net: avoid wiping a real project due to a client race/bug.
+                    # The REST save endpoint has similar guardrails; apply them here too
+                    # because `project:update` can persist to Firestore.
+                    storage_id = None if project_id == DEFAULT_PROJECT_ID else project_id
+                    existing = load_project_from_firestore(storage_id)
+                    existing_doc_chars = (
+                        estimate_document_content_chars(existing)
+                        if isinstance(existing, dict)
+                        else 0
+                    )
+                    incoming_doc_chars = estimate_document_content_chars(project_raw)
+                    looks_like_content_wipe = (
+                        isinstance(existing, dict)
+                        and existing_doc_chars > 0
+                        and incoming_doc_chars == 0
+                    )
+                    if looks_like_content_wipe:
+                        logger.warning(
+                            "Refusing content wipe via WS. project_id=%s incoming_doc_chars=%s existing_doc_chars=%s",
+                            project_id,
+                            incoming_doc_chars,
+                            existing_doc_chars,
+                        )
+                        await websocket.send_json(
+                            {
+                                "type": "project:save:error",
+                                "reason": "content_wipe",
+                                "message": "Refusing to overwrite a project with a payload that contains no document content.",
+                            }
+                        )
+                        continue
                 set_in_memory_project(project_id, project_raw)
-                storage_id = None if project_id == DEFAULT_PROJECT_ID else project_id
                 saved_ok = save_project_to_firestore(project_raw, project_id=storage_id)
                 if not saved_ok:
                     await websocket.send_json(

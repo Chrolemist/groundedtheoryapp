@@ -49,6 +49,24 @@ export function useProjectAutosave({
   const latestProjectRef = useRef<Record<string, unknown> | null>(null)
   const lastSyncedDataRef = useRef<string | null>(null)
 
+  const isEffectivelyEmptyHtml = (value: string) => {
+    const html = (value ?? '').trim()
+    if (!html) return true
+    const normalized = html.replace(/\s+/g, '').toLowerCase()
+    return (
+      normalized === '<p></p>' ||
+      normalized === '<p><br></p>' ||
+      normalized === '<p><br/></p>'
+    )
+  }
+
+  const hasMeaningfulContent = (html: string, text: string) => {
+    if ((text ?? '').trim().length > 0) return true
+    const trimmedHtml = (html ?? '').trim()
+    if (!trimmedHtml) return false
+    return !isEffectivelyEmptyHtml(trimmedHtml)
+  }
+
   useEffect(() => {
     // On project switches, cancel pending saves and reset snapshot comparisons.
     // This prevents a delayed timer from persisting an empty snapshot after close/reopen.
@@ -83,9 +101,29 @@ export function useProjectAutosave({
 
     const documentsSnapshot = documents.map((doc) => {
       const fallback = getDocumentContent?.(doc.id)
-      if (fallback && (fallback.html !== doc.html || fallback.text !== doc.text)) {
+      if (!fallback) return doc
+
+      const docHas = hasMeaningfulContent(doc.html ?? '', doc.text ?? '')
+      const fallbackHas = hasMeaningfulContent(fallback.html ?? '', fallback.text ?? '')
+
+      // Never allow an empty editor fallback to overwrite a non-empty stored doc.
+      // This can happen when a client hasn't received Yjs sync yet and the editor is blank.
+      if (docHas && !fallbackHas) {
+        if (debugEnabled) {
+          console.warn('[Autosave] skip empty doc fallback (protect content)', {
+            documentId: doc.id,
+            title: doc.title,
+            docHtmlLen: (doc.html ?? '').length,
+            docTextLen: (doc.text ?? '').length,
+          })
+        }
+        return doc
+      }
+
+      if (fallbackHas && (fallback.html !== doc.html || fallback.text !== doc.text)) {
         return { ...doc, html: fallback.html, text: fallback.text }
       }
+
       return doc
     })
     const dataSnapshot = {

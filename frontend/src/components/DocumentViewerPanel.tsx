@@ -125,10 +125,10 @@ export function DocumentViewerPanel({
     if (!doc) return ''
     const html = (doc.html ?? '').trim()
     const text = doc.text ?? ''
-    if (!text.trim()) return ''
     // If HTML exists but is effectively empty (e.g. '<p></p>'), prefer text so we don't
     // seed the editor with empty HTML and accidentally overwrite a valid `text` payload.
     if (html && !isEffectivelyEmptyHtml(html)) return html
+    if (!text.trim()) return ''
     // TipTap expects HTML content. Convert plain text into a minimal HTML representation.
     return `<p>${escapeHtml(text).replace(/\n/g, '<br />')}</p>`
   }
