@@ -102,12 +102,31 @@ export function DocumentViewerPanel({
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;')
 
+  const isEffectivelyEmptyHtml = (value: string) => {
+    const html = (value ?? '').trim()
+    if (!html) return true
+    try {
+      const container = document.createElement('div')
+      container.innerHTML = html
+      container.querySelectorAll('[data-remove-code], .code-remove, .code-label').forEach((node) =>
+        node.remove(),
+      )
+      const text = (container.textContent ?? '').replace(/\u00A0/g, ' ').trim()
+      return text.length === 0
+    } catch {
+      // If parsing fails, treat as non-empty to avoid hiding content.
+      return false
+    }
+  }
+
   const toInitialHtml = (doc: DocumentItem | undefined) => {
     if (!doc) return ''
     const html = (doc.html ?? '').trim()
-    if (html) return html
     const text = doc.text ?? ''
     if (!text.trim()) return ''
+    // If HTML exists but is effectively empty (e.g. '<p></p>'), prefer text so we don't
+    // seed the editor with empty HTML and accidentally overwrite a valid `text` payload.
+    if (html && !isEffectivelyEmptyHtml(html)) return html
     // TipTap expects HTML content. Convert plain text into a minimal HTML representation.
     return `<p>${escapeHtml(text).replace(/\n/g, '<br />')}</p>`
   }

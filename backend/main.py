@@ -525,6 +525,38 @@ def is_project_effectively_empty(project_raw: Dict) -> bool:
         return False
 
 
+def estimate_document_content_chars(project_raw: Dict) -> int:
+    """Heuristic: count non-whitespace characters across document content fields."""
+    try:
+        documents = project_raw.get("documents")
+        if not isinstance(documents, list):
+            return 0
+        total = 0
+        for doc in documents:
+            if not isinstance(doc, dict):
+                continue
+            # Prefer explicit text/content; HTML can be present but empty like '<p></p>'.
+            text = doc.get("text")
+            if not isinstance(text, str) or not text.strip():
+                text = doc.get("content")
+            if isinstance(text, str) and text.strip():
+                total += len("".join(text.split()))
+                continue
+            html = doc.get("html")
+            if isinstance(html, str) and html.strip():
+                # Very rough HTML-to-text stripping; still better than treating any tag as content.
+                stripped = "".join(html.replace("&nbsp;", " ").split())
+                # Remove common empty-paragraph patterns.
+                if stripped in ("<p></p>", "<p><br/></p>", "<p><br></p>"):
+                    continue
+                # If it contains any letter/digit, count it.
+                if any(ch.isalnum() for ch in stripped):
+                    total += sum(1 for ch in stripped if not ch.isspace())
+        return total
+    except Exception:
+        return 0
+
+
 def save_project_to_firestore(project_raw: Dict, project_id: Optional[str] = None) -> bool:
     global last_saved_project_hash
     doc_ref = get_project_doc_ref(project_id) if project_id else get_firestore_doc_ref()
@@ -1211,6 +1243,15 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
             existing = load_project_from_firestore(project_id)
             existing_bytes = estimate_project_bytes(existing) if isinstance(existing, dict) else 0
 
+            existing_doc_chars = estimate_document_content_chars(existing) if isinstance(existing, dict) else 0
+            incoming_doc_chars = estimate_document_content_chars(project_raw)
+
+            looks_like_content_wipe = (
+                isinstance(existing, dict)
+                and existing_doc_chars > 0
+                and incoming_doc_chars == 0
+            )
+
             looks_empty = is_project_effectively_empty(project_raw) or incoming_bytes <= 32
             looks_suspiciously_small = (
                 isinstance(existing, dict)
@@ -1238,6 +1279,25 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
                             "message": "Refusing to overwrite a non-empty project with an empty or suspiciously small payload.",
                         },
                     )
+
+            # Additional guard: prevent saving a payload that wipes all document content.
+            if looks_like_content_wipe:
+                logger.warning(
+                    "Refusing content wipe. project_id=%s incoming_doc_chars=%s existing_doc_chars=%s incoming_bytes=%s existing_bytes=%s",
+                    project_id,
+                    incoming_doc_chars,
+                    existing_doc_chars,
+                    incoming_bytes,
+                    existing_bytes,
+                )
+                return JSONResponse(
+                    status_code=409,
+                    content={
+                        "status": "error",
+                        "reason": "content_wipe",
+                        "message": "Refusing to overwrite a project with a payload that contains no document content.",
+                    },
+                )
 
         set_in_memory_project(project_id, project_raw)
         saved_ok = save_project_to_firestore(project_raw, project_id=project_id)
