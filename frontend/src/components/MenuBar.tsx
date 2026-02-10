@@ -52,7 +52,9 @@ const MenuItem = ({ label, onClick, shortcut, destructive, disabled }: MenuItemP
       disabled={disabled}
       className={cn(
         'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition',
-        disabled ? 'cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent' : null,
+        disabled
+          ? 'cursor-not-allowed opacity-50 hover:bg-transparent dark:hover:bg-transparent'
+          : null,
         destructive
           ? 'text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30'
           : 'text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800',
@@ -92,121 +94,138 @@ export function MenuBar({
   onAdminLogin,
   onAdminLogout,
 }: MenuBarProps) {
-  if (variant === 'drawer') {
-    return (
-      <div className="flex flex-col gap-4 text-sm">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            File
-          </p>
-          <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
-            <MenuItem label="Open project" onClick={onOpenProject} />
-            <MenuItem label="New project" onClick={onNewProject} />
-            <MenuItem
-              label="Close project"
-              onClick={() => {
-                if (!canCloseProject) return
-                onCloseProject()
-              }}
-              destructive
-              disabled={!canCloseProject}
-            />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem label="New document" onClick={onAddDocument} />
-            <MenuItem
-              label="Delete document"
-              onClick={() => {
-                if (!canDeleteDocument) return
-                if (!window.confirm(`Delete "${deleteDocumentLabel}"? This cannot be undone.`)) return
-                onDeleteDocument()
-              }}
-              destructive
-              disabled={!canDeleteDocument}
-            />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem label="Export as Excel" onClick={onExportExcel} />
-            <MenuItem label="Export as Word" onClick={onExportWord} />
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Edit
-          </p>
-          <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
-            <MenuItem label="Undo" shortcut="Ctrl+Z" onClick={onUndo} />
-            <MenuItem label="Redo" shortcut="Ctrl+Y" onClick={onRedo} />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem label="Cut" shortcut="Ctrl+X" onClick={onCut} />
-            <MenuItem label="Copy" shortcut="Ctrl+C" onClick={onCopy} />
-            <MenuItem label="Paste" shortcut="Ctrl+V" onClick={onPaste} />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem label="Select all" shortcut="Ctrl+A" onClick={onSelectAll} />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem label="Change my name" onClick={onRenameUser} />
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            View
-          </p>
-          <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
-            <MenuItem label={showCodeLabels ? 'Hide labels' : 'Show labels'} onClick={onToggleCodeLabels} />
-            <MenuItem label={showMemos ? 'Hide memos' : 'Show memos'} onClick={onToggleMemos} />
-            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
-            <MenuItem
-              label="Toggle dark mode"
-              onClick={() => {
-                toggleTheme()
-              }}
-            />
-          </div>
-        </div>
-
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            Help
-          </p>
-          <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
-            <MenuItem label="Restart tour" onClick={onTour} />
-            <MenuItem
-              label={isAdmin ? 'Admin logout' : 'Admin login'}
-              onClick={() => {
-                if (isAdmin) {
-                  onAdminLogout()
-                } else {
-                  onAdminLogin()
-                }
-              }}
-            />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
+  const [drawerMenu, setDrawerMenu] = useState<MenuKey>('file')
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    if (variant !== 'bar') return
+
     const handleClick = (event: MouseEvent) => {
       if (!containerRef.current) return
       if (!containerRef.current.contains(event.target as Node)) {
         setOpenMenu(null)
       }
     }
+
     document.addEventListener('mousedown', handleClick)
     return () => {
       document.removeEventListener('mousedown', handleClick)
     }
-  }, [])
+  }, [variant])
 
   const toggleMenu = (menu: MenuKey) => {
     setOpenMenu((current) => (current === menu ? null : menu))
   }
 
   const closeMenu = () => setOpenMenu(null)
+
+  if (variant === 'drawer') {
+    const sectionButton = (menu: MenuKey, label: string) => (
+      <button
+        key={menu}
+        type="button"
+        onClick={() => setDrawerMenu(menu)}
+        className={cn(
+          'flex-1 rounded-lg px-2 py-1.5 text-xs font-semibold transition',
+          drawerMenu === menu
+            ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900'
+            : 'text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800',
+        )}
+      >
+        {label}
+      </button>
+    )
+
+    return (
+      <div className="flex flex-col gap-3 text-sm">
+        <div className="rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
+          <div className="flex items-center gap-1">
+            {sectionButton('file', 'File')}
+            {sectionButton('edit', 'Edit')}
+            {sectionButton('view', 'View')}
+            {sectionButton('help', 'Help')}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+          {drawerMenu === 'file' ? (
+            <>
+              <MenuItem label="Open project" onClick={onOpenProject} />
+              <MenuItem label="New project" onClick={onNewProject} />
+              <MenuItem
+                label="Close project"
+                onClick={() => {
+                  if (!canCloseProject) return
+                  onCloseProject()
+                }}
+                destructive
+                disabled={!canCloseProject}
+              />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem label="New document" onClick={onAddDocument} />
+              <MenuItem
+                label="Delete document"
+                onClick={() => {
+                  if (!canDeleteDocument) return
+                  if (!window.confirm(`Delete "${deleteDocumentLabel}"? This cannot be undone.`))
+                    return
+                  onDeleteDocument()
+                }}
+                destructive
+                disabled={!canDeleteDocument}
+              />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem label="Export as Excel" onClick={onExportExcel} />
+              <MenuItem label="Export as Word" onClick={onExportWord} />
+            </>
+          ) : drawerMenu === 'edit' ? (
+            <>
+              <MenuItem label="Undo" shortcut="Ctrl+Z" onClick={onUndo} />
+              <MenuItem label="Redo" shortcut="Ctrl+Y" onClick={onRedo} />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem label="Cut" shortcut="Ctrl+X" onClick={onCut} />
+              <MenuItem label="Copy" shortcut="Ctrl+C" onClick={onCopy} />
+              <MenuItem label="Paste" shortcut="Ctrl+V" onClick={onPaste} />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem label="Select all" shortcut="Ctrl+A" onClick={onSelectAll} />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem label="Change my name" onClick={onRenameUser} />
+            </>
+          ) : drawerMenu === 'view' ? (
+            <>
+              <MenuItem
+                label={showCodeLabels ? 'Hide labels' : 'Show labels'}
+                onClick={onToggleCodeLabels}
+              />
+              <MenuItem label={showMemos ? 'Hide memos' : 'Show memos'} onClick={onToggleMemos} />
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              <MenuItem
+                label="Toggle dark mode"
+                onClick={() => {
+                  toggleTheme()
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <MenuItem label="Restart tour" onClick={onTour} />
+              <MenuItem
+                label={isAdmin ? 'Admin logout' : 'Admin login'}
+                onClick={() => {
+                  if (isAdmin) {
+                    onAdminLogout()
+                  } else {
+                    onAdminLogin()
+                  }
+                }}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div ref={containerRef} className="flex items-center gap-2 text-sm">
