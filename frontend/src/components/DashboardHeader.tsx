@@ -163,25 +163,31 @@ export function DashboardHeader({
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-2 px-4 py-2 lg:gap-3 lg:px-6 lg:py-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-2 lg:flex-row lg:flex-wrap lg:items-center lg:gap-4">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-slate-900 text-xs font-semibold text-white shadow-sm dark:bg-slate-100 dark:text-slate-900 lg:h-10 lg:w-10 lg:text-sm">
               GT
             </div>
-            <div>
-              <p className="text-lg font-semibold">Grounded Theory</p>
-              {activeProjectName ? (
-                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{activeProjectName}</p>
-              ) : null}
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100 sm:hidden">
+                  {activeProjectName ?? 'Grounded Theory'}
+                </p>
+                <p className="hidden text-lg font-semibold sm:block">Grounded Theory</p>
+                {activeProjectName ? (
+                  <p className="hidden truncate text-xs font-medium text-slate-500 dark:text-slate-400 sm:block">
+                    {activeProjectName}
+                  </p>
+                ) : null}
+                <div className="mt-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 lg:flex-wrap lg:overflow-visible lg:whitespace-normal">
                 <span
                   className={cn(
                     'h-2 w-2 rounded-full',
                     websocketOnline ? 'bg-emerald-500' : 'bg-rose-500',
                   )}
                 />
-                <span>{websocketOnline ? 'Online' : 'Offline'} WebSocket</span>
+                <span>{websocketOnline ? 'Online' : 'Offline'}</span>
                 <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
                   <span
                     className={cn(
@@ -195,7 +201,7 @@ export function DashboardHeader({
                             : 'bg-slate-300',
                     )}
                   />
-                  <span className="min-w-[120px] tabular-nums">{saveLabel}</span>
+                  <span className="tabular-nums">{saveLabel}</span>
                   {saveWarning && (
                     <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                       {saveWarning}
@@ -203,16 +209,33 @@ export function DashboardHeader({
                   )}
               </div>
             </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Open menu"
+                title="Menu"
+              >
+                <Menu className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  toggleTheme()
+                  setResolvedTheme(getResolvedTheme())
+                }}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                title={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
+                aria-label={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
+              >
+                {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setMobileMenuOpen(true)}
-            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
-            aria-label="Open menu"
-            title="Menu"
-          >
-            <Menu className="h-4 w-4" />
-          </button>
+
           <div className="hidden lg:block">
             <MenuBar
               onOpenProject={onOpenProject}
@@ -248,7 +271,7 @@ export function DashboardHeader({
               toggleTheme()
               setResolvedTheme(getResolvedTheme())
             }}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:inline-flex"
             title={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
             aria-label={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
           >
@@ -272,7 +295,7 @@ export function DashboardHeader({
               Save
             </button>
           ) : null}
-          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 lg:flex-wrap lg:overflow-visible lg:whitespace-normal lg:pb-0">
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-0.5 text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 lg:flex-wrap lg:overflow-visible lg:whitespace-normal lg:pb-0">
             {presenceUsers.map((user) => (
               <span
                 key={user.id}
