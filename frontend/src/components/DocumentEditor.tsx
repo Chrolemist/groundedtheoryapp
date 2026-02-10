@@ -51,6 +51,7 @@ export function DocumentEditor({
 }: DocumentEditorProps) {
   const didSeedRef = useRef(false)
   const didSyncRef = useRef(false)
+  const fallbackSeedTimerRef = useRef<number | null>(null)
   const debugRef = useRef({ lastLogAt: 0 })
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
@@ -127,14 +128,53 @@ export function DocumentEditor({
         })
       }
     }
-    // Presence can be flaky (especially on reconnect / Close project -> reopen).
-    // We only *enforce* leader election when presence is ready.
-    if (seedReady && !canSeedInitialContent) return
     if (!hasReceivedSync) return
     if (didSeedRef.current) return
 
     const currentText = editor.getText().trim()
     const editorIsEmpty = currentText.length === 0
+
+    const clearFallbackTimer = () => {
+      if (!fallbackSeedTimerRef.current) return
+      window.clearTimeout(fallbackSeedTimerRef.current)
+      fallbackSeedTimerRef.current = null
+    }
+
+    // If presence is ready and we are not the designated seeder, give the seeder a short
+    // window to push Yjs updates. If nothing arrives and the fragment is still empty,
+    // seed anyway so cross-device users don't get stuck with a blank document.
+    if (seedReady && !canSeedInitialContent) {
+      clearFallbackTimer()
+      if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
+        fallbackSeedTimerRef.current = window.setTimeout(() => {
+          fallbackSeedTimerRef.current = null
+          if (didSeedRef.current) return
+          if (!editor) return
+          const nowText = editor.getText().trim()
+          const stillEmpty = nowText.length === 0
+          const stillNoRemote = !hasRemoteUpdates
+          const stillEmptyFragment = ydoc.getXmlFragment(documentId).length === 0
+          if (!stillEmpty || !stillNoRemote || !stillEmptyFragment) return
+          if (debugEnabled) {
+            console.log('[DocEditor] fallback seed setContent', {
+              documentId,
+              initialHtmlLen: initialHtml.length,
+            })
+          }
+          editor.commands.setContent(initialHtml, false)
+          didSeedRef.current = true
+        }, 1200)
+
+        return () => {
+          clearFallbackTimer()
+        }
+      }
+      return () => {
+        clearFallbackTimer()
+      }
+    }
+
+    clearFallbackTimer()
 
     if (editorIsEmpty && initialHtml) {
       if (debugEnabled) {
@@ -170,6 +210,15 @@ export function DocumentEditor({
     hasRemoteUpdates,
     hasReceivedSync,
   ])
+
+  useEffect(() => {
+    return () => {
+      if (fallbackSeedTimerRef.current) {
+        window.clearTimeout(fallbackSeedTimerRef.current)
+        fallbackSeedTimerRef.current = null
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!editor) return
