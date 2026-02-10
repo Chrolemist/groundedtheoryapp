@@ -336,7 +336,7 @@ export function DocumentViewerPanel({
       const styledHtml = applyCodeStylesToHtml(html)
       return (
         <div
-          className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+          className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none dark:bg-slate-900 dark:text-slate-100"
           style={{ fontFamily: documentFontFamily, lineHeight: documentLineHeight }}
           dangerouslySetInnerHTML={{ __html: styledHtml }}
         />
@@ -344,7 +344,7 @@ export function DocumentViewerPanel({
     }
     return (
       <div
-        className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+        className="document-content relative min-h-[220px] whitespace-pre-wrap rounded-xl bg-white px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none dark:bg-slate-900 dark:text-slate-100"
         style={{ fontFamily: documentFontFamily, lineHeight: documentLineHeight }}
       >
         {text}
@@ -356,7 +356,7 @@ export function DocumentViewerPanel({
     <section className="space-y-4">
       <div className="space-y-3">
         <div>
-          <p className="text-sm font-medium text-slate-500">Document Viewer</p>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Document Viewer</p>
           {isEditingProjectName ? (
             <input
               value={projectNameDraft}
@@ -394,7 +394,7 @@ export function DocumentViewerPanel({
                   }
                 }
               }}
-              className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-1 text-xl font-semibold text-slate-900 shadow-sm"
+              className="w-full max-w-md rounded-lg border border-slate-200 bg-white px-3 py-1 text-xl font-semibold text-slate-900 shadow-sm dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
               placeholder="Project name"
               autoFocus
             />
@@ -407,8 +407,8 @@ export function DocumentViewerPanel({
                 setIsEditingProjectName(true)
               }}
               className={cn(
-                'text-left text-xl font-semibold text-slate-900 transition',
-                canRenameProject ? 'hover:text-slate-700' : 'cursor-default',
+                'text-left text-xl font-semibold text-slate-900 transition dark:text-slate-100',
+                canRenameProject ? 'hover:text-slate-700 dark:hover:text-slate-200' : 'cursor-default',
               )}
               aria-label="Rename project"
             >
@@ -424,7 +424,7 @@ export function DocumentViewerPanel({
               'rounded-full px-3 py-1 text-xs font-semibold transition',
               activeTab === 'document'
                 ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
             )}
           >
             Document
@@ -437,7 +437,7 @@ export function DocumentViewerPanel({
               'rounded-full px-3 py-1 text-xs font-semibold transition',
               activeTab === 'tree'
                 ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
             )}
           >
             Theory Map
@@ -450,7 +450,7 @@ export function DocumentViewerPanel({
               'rounded-full px-3 py-1 text-xs font-semibold transition',
               activeTab === 'overview'
                 ? 'bg-slate-900 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
             )}
           >
             Overview
@@ -459,7 +459,7 @@ export function DocumentViewerPanel({
           <button
             type="button"
             onClick={onAddDocument}
-            className="ml-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+            className="ml-auto rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700"
           >
             Create document
           </button>
@@ -485,7 +485,7 @@ export function DocumentViewerPanel({
               onDocumentViewModeChange('single')
               onActiveDocumentChange(nextValue)
             }}
-            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm"
+            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
             disabled={!hasDocuments}
           >
             {hasDocuments ? (
@@ -510,7 +510,7 @@ export function DocumentViewerPanel({
               updateDocumentTitle(event.target.value)
             }}
             className={cn(
-              'min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm',
+              'min-w-[160px] rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200',
               documentViewMode === 'all' && 'invisible pointer-events-none',
             )}
             placeholder="Document title"
@@ -524,12 +524,12 @@ export function DocumentViewerPanel({
           <div
             id="document-viewer"
             className={cn(
-              'relative rounded-2xl bg-white p-8 shadow-sm',
+              'relative rounded-2xl bg-white p-8 shadow-sm dark:bg-slate-900',
               !showCodeLabels && 'hide-code-labels',
             )}
           >
           {!hasDocuments ? (
-            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500">
+            <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
               <p>No documents yet. Create a new document to start writing.</p>
             </div>
           ) : documentViewMode === 'all' ? (
@@ -537,7 +537,7 @@ export function DocumentViewerPanel({
               {documents.map((doc, index) => (
                 <div key={doc.id} className="relative space-y-3" data-doc-id={doc.id}>
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 dark:text-slate-500">
                       {doc.title}
                     </p>
                     <div className="flex items-center gap-2">
@@ -546,10 +546,10 @@ export function DocumentViewerPanel({
                         onClick={() => onMoveDocument(doc.id, 'up')}
                         disabled={index === 0}
                         className={cn(
-                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition dark:border-slate-800',
                           index === 0
-                            ? 'cursor-not-allowed text-slate-300'
-                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                            ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
+                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200',
                         )}
                         title="Move up"
                         aria-label="Move document up"
@@ -561,10 +561,10 @@ export function DocumentViewerPanel({
                         onClick={() => onMoveDocument(doc.id, 'down')}
                         disabled={index === documents.length - 1}
                         className={cn(
-                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                          'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition dark:border-slate-800',
                           index === documents.length - 1
-                            ? 'cursor-not-allowed text-slate-300'
-                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                            ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
+                            : 'text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200',
                         )}
                         title="Move down"
                         aria-label="Move document down"
@@ -574,7 +574,7 @@ export function DocumentViewerPanel({
                       <button
                         type="button"
                         onClick={() => onRemoveDocument(doc.id, doc.title)}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500 dark:border-slate-800 dark:text-slate-400 dark:hover:border-rose-900/60 dark:hover:text-rose-300"
                         title="Delete document"
                       >
                         ×
@@ -582,7 +582,7 @@ export function DocumentViewerPanel({
                     </div>
                   </div>
                   {debugDisableEditors ? (
-                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
                       Editor disabled (debug).
                     </div>
                   ) : deferEditorMount ? (
@@ -616,7 +616,7 @@ export function DocumentViewerPanel({
                     />
                   )}
                   {index < documents.length - 1 && (
-                    <div className="border-b border-dashed border-slate-200" />
+                    <div className="border-b border-dashed border-slate-200 dark:border-slate-800" />
                   )}
                 </div>
               ))}
@@ -629,10 +629,10 @@ export function DocumentViewerPanel({
                   onClick={() => onMoveDocument(activeDocumentId, 'up')}
                   disabled={documents.findIndex((doc) => doc.id === activeDocumentId) <= 0}
                   className={cn(
-                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition dark:border-slate-800',
                     documents.findIndex((doc) => doc.id === activeDocumentId) <= 0
-                      ? 'cursor-not-allowed text-slate-300'
-                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                      ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
+                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200',
                   )}
                   title="Move up"
                   aria-label="Move document up"
@@ -649,13 +649,13 @@ export function DocumentViewerPanel({
                     })()
                   }
                   className={cn(
-                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition',
+                    'inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold transition dark:border-slate-800',
                     (() => {
                       const idx = documents.findIndex((doc) => doc.id === activeDocumentId)
                       return idx === -1 || idx >= documents.length - 1
                     })()
-                      ? 'cursor-not-allowed text-slate-300'
-                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600',
+                      ? 'cursor-not-allowed text-slate-300 dark:text-slate-700'
+                      : 'text-slate-400 hover:border-slate-300 hover:text-slate-600 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200',
                   )}
                   title="Move down"
                   aria-label="Move document down"
@@ -667,7 +667,7 @@ export function DocumentViewerPanel({
                   onClick={() =>
                     onRemoveDocument(activeDocumentId, documentTitle || 'Untitled document')
                   }
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500"
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 text-xs font-semibold text-slate-400 transition hover:border-rose-200 hover:text-rose-500 dark:border-slate-800 dark:text-slate-400 dark:hover:border-rose-900/60 dark:hover:text-rose-300"
                   title="Delete document"
                   aria-label="Delete document"
                 >
@@ -675,7 +675,7 @@ export function DocumentViewerPanel({
                 </button>
               </div>
               {debugDisableEditors ? (
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
                   Editor disabled (debug).
                 </div>
               ) : deferEditorMount ? (
@@ -719,7 +719,7 @@ export function DocumentViewerPanel({
             <button
               type="button"
               onClick={onAddDocument}
-              className="mt-6 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+              className="mt-6 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700"
             >
               Create document
             </button>

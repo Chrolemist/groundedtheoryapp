@@ -219,19 +219,19 @@ export function DocumentEditor({
   }
 
   return (
-    <div className="rounded-xl bg-white">
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2">
+    <div className="rounded-xl bg-white dark:bg-slate-900">
+      <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-800">
         <button
           type="button"
           onClick={() => runCommand('bold')}
-          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Bold
         </button>
         <button
           type="button"
           onClick={() => runCommand('italic')}
-          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+          className="rounded-md border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800"
         >
           Italic
         </button>
@@ -239,7 +239,7 @@ export function DocumentEditor({
           id="doc-font-size"
           name="doc-font-size"
           onChange={(event) => runCommand('fontSize', event.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
           defaultValue="3"
         >
           <option value="2">Small</option>
@@ -252,7 +252,7 @@ export function DocumentEditor({
           name="doc-font-family"
           value={fontFamilyValue}
           onChange={(event) => setFontFamily(event.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
         >
           <option value="__mixed__" disabled>
             Mixed
@@ -283,7 +283,7 @@ export function DocumentEditor({
           name="doc-line-height"
           value={lineHeight}
           onChange={(event) => setLineHeight(event.target.value)}
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200"
         >
           <option value="1.4">Tight</option>
           <option value="1.6">Normal</option>
@@ -293,7 +293,7 @@ export function DocumentEditor({
       </div>
       <EditorContent
         editor={editor}
-        className="document-content relative min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none"
+        className="document-content relative min-h-[220px] whitespace-pre-wrap px-3 pb-3 pt-2 text-sm leading-7 text-slate-800 outline-none dark:text-slate-100"
         style={{ fontFamily, lineHeight }}
         data-editor="tiptap"
         ref={editorRef}

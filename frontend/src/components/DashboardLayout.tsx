@@ -348,7 +348,7 @@ export function DashboardLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       <AdminLoginModal
         open={isAdminModalOpen}
         password={adminPassword}
@@ -508,20 +508,20 @@ export function DashboardLayout() {
             )}
           </>
         ) : (
-          <div className="col-span-full flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center">
+          <div className="col-span-full flex min-h-[420px] flex-col items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center dark:border-slate-800 dark:bg-slate-900">
             <p className="text-sm font-semibold uppercase tracking-wide text-slate-400">
               No project open
             </p>
-            <h2 className="mt-2 text-2xl font-semibold text-slate-900">
+            <h2 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">
               Choose a project to continue
             </h2>
-            <p className="mt-2 max-w-md text-sm text-slate-500">
+            <p className="mt-2 max-w-md text-sm text-slate-500 dark:text-slate-400">
               Open an existing project or create a new one to start coding documents.
             </p>
             <button
               type="button"
               onClick={openProjectModal}
-              className="mt-5 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
+              className="mt-5 rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-900 dark:hover:bg-white"
             >
               Open project
             </button>

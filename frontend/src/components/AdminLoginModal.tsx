@@ -35,16 +35,16 @@ export function AdminLoginModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 px-4 py-6">
-      <div className="mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-xl">
+      <div className="mx-auto flex w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Admin login</h2>
-            <p className="text-sm text-slate-500">Enter the admin password to unlock protected actions.</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Admin login</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Enter the admin password to unlock protected actions.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-300"
           >
             Close
           </button>
@@ -68,28 +68,28 @@ export function AdminLoginModal({
                 value={password}
                 onChange={(event) => onPasswordChange(event.target.value)}
                 placeholder="Admin password"
-                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
                 autoComplete="current-password"
               />
             </div>
           ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
               Login locked. Try again in {retryAfterSeconds}s.
             </div>
           )}
 
           {error ? (
-            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+            <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
               {error}
               {typeof retryAfterSeconds === 'number' && retryAfterSeconds > 0 ? (
-                <div className="mt-1 text-[11px] text-rose-600">
+                <div className="mt-1 text-[11px] text-rose-600 dark:text-rose-300">
                   Remaining: {retryAfterSeconds}s
                 </div>
               ) : null}
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
             <span>3 failed attempts triggers a timed lockout.</span>
             {!isLocked ? (
               <button

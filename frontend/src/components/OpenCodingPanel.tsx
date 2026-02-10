@@ -65,7 +65,7 @@ function CodeRow({
         event.preventDefault()
         onToggleActive()
       }}
-      className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm"
+      className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="flex flex-wrap items-center gap-3">
         <button
@@ -89,7 +89,7 @@ function CodeRow({
           name={`code-label-${code.id}`}
           value={code.label}
           onChange={(event) => updateLabel(event.target.value)}
-          className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+          className="min-w-[180px] flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
           placeholder="Code name"
         />
         <input
@@ -112,7 +112,7 @@ function CodeRow({
           <button
             type="button"
             onClick={onToggleActive}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
             title="Edit memo"
           >
             <FileText className="h-4 w-4" />
@@ -122,7 +122,7 @@ function CodeRow({
         <button
           type="button"
           onClick={() => onRemoveCode(code.id)}
-          className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50"
+          className="rounded-lg border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
           title="Remove code"
         >
           <Trash2 className="h-4 w-4" />
@@ -131,13 +131,13 @@ function CodeRow({
       {showMemos && isActive && (
         <div className="mt-3 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-slate-500">
               Code Notes
             </p>
             <button
               type="button"
               onClick={() => onAddCodeMemo(code.id, code.label)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700"
             >
               <Plus className="h-3.5 w-3.5" />
               Add Memo
@@ -177,15 +177,15 @@ export function OpenCodingPanel({
     <div id="open-coding-panel" className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Open Codes</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Open Codes</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Drag to axial categories or apply in the document.
           </p>
         </div>
         <button
           type="button"
           onClick={onAddCode}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700"
         >
           <Plus className="h-3.5 w-3.5" />
           New Code
@@ -213,7 +213,7 @@ export function OpenCodingPanel({
           />
         ))}
         {!codes.length && (
-          <p className="text-xs text-slate-400">Create your first code to start tagging text.</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500">Create your first code to start tagging text.</p>
         )}
       </div>
     </div>

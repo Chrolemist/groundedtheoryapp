@@ -87,7 +87,7 @@ export function CodingSidebar({
 
   return (
     <aside className="space-y-4">
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="flex gap-2">
           {tabConfig
             .filter((tab) => (tab.key === 'memos' ? showMemos : true))
@@ -110,7 +110,7 @@ export function CodingSidebar({
                   'flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition',
                   resolvedActiveTab === tab.key
                     ? 'bg-slate-900 text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700',
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -121,7 +121,7 @@ export function CodingSidebar({
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <AnimatePresence mode="popLayout">
           {resolvedActiveTab === 'open' ? (
             <motion.div

@@ -19,13 +19,13 @@ export function MemosPanel({ memos, ydoc, onAddGlobalMemo, onUpdateMemo, onRemov
     <div id="memos-panel" className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Memos</p>
-          <p className="text-xs text-slate-500">Integrative notes that run through the process.</p>
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Memos</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">Integrative notes that run through the process.</p>
         </div>
         <button
           type="button"
           onClick={onAddGlobalMemo}
-          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300"
+          className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-700"
         >
           <Plus className="h-3.5 w-3.5" />
           New Memo

@@ -65,16 +65,16 @@ export function ProjectPickerModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/40 px-4 py-6">
-      <div className="mx-auto flex w-full max-w-xl min-h-[420px] flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-xl">
+      <div className="mx-auto flex w-full max-w-xl min-h-[420px] flex-col overflow-hidden rounded-2xl bg-white p-6 shadow-xl dark:bg-slate-900">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Projects</h2>
-            <p className="text-sm text-slate-500">Pick a project to load or create a new one.</p>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Projects</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Pick a project to load or create a new one.</p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500"
+            className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-300"
           >
             Close
           </button>
@@ -85,7 +85,7 @@ export function ProjectPickerModal({
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="New project name"
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm"
+            className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
           />
           <button
             type="button"
@@ -101,13 +101,13 @@ export function ProjectPickerModal({
           </button>
         </div>
 
-        <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+        <div className="mt-4 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
           <span>{isLoading ? 'Loading...' : `${sortedProjects.length} projects`}</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onRefresh}
-              className="rounded-lg border border-slate-200 px-2 py-1 text-xs"
+              className="rounded-lg border border-slate-200 px-2 py-1 text-xs dark:border-slate-800"
             >
               Refresh
             </button>
@@ -124,7 +124,7 @@ export function ProjectPickerModal({
         </div>
 
         {error && (
-          <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600">
+          <div className="mt-3 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-600 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
             {error}
           </div>
         )}
@@ -137,7 +137,7 @@ export function ProjectPickerModal({
                 'flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-left text-sm transition',
                 project.id === activeProjectId
                   ? 'border-slate-900 bg-slate-900 text-white'
-                  : 'border-slate-200 hover:bg-slate-50',
+                  : 'border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800',
               )}
             >
               <button
@@ -162,7 +162,7 @@ export function ProjectPickerModal({
                   'rounded-lg border px-2 py-1 text-xs font-semibold transition',
                   project.id === activeProjectId
                     ? 'border-white/30 text-white hover:bg-white/10'
-                    : 'border-slate-200 text-slate-600 hover:bg-slate-50',
+                    : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-200 dark:hover:bg-slate-800',
                 )}
               >
                 Duplicera
@@ -175,7 +175,7 @@ export function ProjectPickerModal({
                     'rounded-lg border px-2 py-1 text-xs font-semibold transition',
                     project.id === activeProjectId
                       ? 'border-white/30 text-white hover:bg-white/10'
-                      : 'border-rose-200 text-rose-600 hover:bg-rose-50',
+                      : 'border-rose-200 text-rose-600 hover:bg-rose-50 dark:border-rose-900/50 dark:text-rose-300 dark:hover:bg-rose-950/30',
                   )}
                 >
                   Delete
@@ -184,7 +184,7 @@ export function ProjectPickerModal({
             </div>
           ))}
           {!sortedProjects.length && !isLoading && (
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400">
               No projects yet. Create your first one.
             </div>
           )}

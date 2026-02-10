@@ -39,7 +39,7 @@ export function CodeChip({
             event.stopPropagation()
             onRemove(code.id)
           }}
-          className="ml-1 rounded-full p-0.5 text-slate-500 transition hover:bg-white/70"
+          className="ml-1 rounded-full p-0.5 text-slate-500 transition hover:bg-white/70 dark:text-slate-200 dark:hover:bg-slate-900/70"
           title="Remove code"
         >
           <Trash2 className="h-3 w-3" />

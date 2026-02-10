@@ -39,23 +39,23 @@ function MemoListItem({
   })
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-3">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <input
           id={`memo-title-${memo.id}`}
           name={`memo-title-${memo.id}`}
           value={memo.title}
           onChange={(event) => updateTitle(event.target.value)}
-          className="min-w-[180px] flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700"
+          className="min-w-[180px] flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm font-semibold text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
           placeholder="Memo title"
         />
-        <span className="text-xs text-slate-400">
+        <span className="text-xs text-slate-400 dark:text-slate-500">
           {(memo.updatedAt || memo.createdAt).slice(0, 10)}
         </span>
         <button
           type="button"
           onClick={() => onRemoveMemo(memo.id)}
-          className="rounded-md border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50"
+          className="rounded-md border border-slate-200 px-2 py-2 text-slate-500 transition hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
           title="Delete memo"
         >
           <Trash2 className="h-4 w-4" />
@@ -68,7 +68,7 @@ function MemoListItem({
         onChange={(event) => updateBody(event.target.value)}
         placeholder="Skriv din analys, hypoteser och aha-upplevelser..."
         rows={4}
-        className="mt-2 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
+        className="mt-2 w-full rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-100"
       />
     </div>
   )
@@ -77,7 +77,7 @@ function MemoListItem({
 export function MemoList({ memos, ydoc, onUpdateMemo, onRemoveMemo, emptyText }: MemoListProps) {
   if (!memos.length) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400">
+      <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-xs text-slate-400 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-500">
         {emptyText ?? 'No memos yet.'}
       </div>
     )

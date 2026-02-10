@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react'
+import { Moon, Sun } from 'lucide-react'
 import { MenuBar } from './MenuBar'
 import { type PresenceUser } from './DashboardLayout.types'
 import { cn } from '../lib/cn'
+import { getResolvedTheme, toggleTheme } from '../lib/theme'
 
 type DashboardHeaderProps = {
   websocketOnline: boolean
@@ -84,6 +87,41 @@ export function DashboardHeader({
   onAdminLogin,
   onAdminLogout,
 }: DashboardHeaderProps) {
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
+    typeof window === 'undefined' ? 'light' : getResolvedTheme(),
+  )
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+
+    const update = () => setResolvedTheme(getResolvedTheme())
+    update()
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== 'gt-theme') return
+      update()
+    }
+
+    window.addEventListener('storage', handleStorage)
+
+    const media = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleMediaChange = () => update()
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', handleMediaChange)
+      return () => {
+        window.removeEventListener('storage', handleStorage)
+        media.removeEventListener('change', handleMediaChange)
+      }
+    }
+
+    media.addListener(handleMediaChange)
+    return () => {
+      window.removeEventListener('storage', handleStorage)
+      media.removeListener(handleMediaChange)
+    }
+  }, [])
+
   const formatSavedTime = (value: number) =>
     new Date(value).toLocaleTimeString('sv-SE', {
       hour: '2-digit',
@@ -123,19 +161,19 @@ export function DashboardHeader({
           : 'bg-emerald-500'
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
       <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 px-6 py-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap items-center gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white shadow-sm dark:bg-slate-100 dark:text-slate-900">
               GT
             </div>
             <div>
               <p className="text-lg font-semibold">Grounded Theory</p>
               {activeProjectName ? (
-                <p className="text-xs font-medium text-slate-500">{activeProjectName}</p>
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{activeProjectName}</p>
               ) : null}
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span
                   className={cn(
                     'h-2 w-2 rounded-full',
@@ -143,7 +181,7 @@ export function DashboardHeader({
                   )}
                 />
                 <span>{websocketOnline ? 'Online' : 'Offline'} WebSocket</span>
-                <span className="mx-1 text-slate-300">•</span>
+                <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
                   <span
                     className={cn(
                       'h-2 w-2 rounded-full',
@@ -158,7 +196,7 @@ export function DashboardHeader({
                   />
                   <span className="min-w-[120px] tabular-nums">{saveLabel}</span>
                   {saveWarning && (
-                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700">
+                    <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-700 dark:bg-amber-950/40 dark:text-amber-200">
                       {saveWarning}
                     </span>
                   )}
@@ -192,48 +230,63 @@ export function DashboardHeader({
             onAdminLogin={onAdminLogin}
             onAdminLogout={onAdminLogout}
           />
+          <button
+            type="button"
+            onClick={() => {
+              toggleTheme()
+              setResolvedTheme(getResolvedTheme())
+            }}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+            title={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
+            aria-label={resolvedTheme === 'dark' ? 'Byt till ljust läge' : 'Byt till mörkt läge'}
+          >
+            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            <span className="hidden sm:inline">
+              {resolvedTheme === 'dark' ? 'Ljust läge' : 'Mörkt läge'}
+            </span>
+          </button>
           {onManualSave ? (
             <button
               type="button"
               onClick={onManualSave}
               disabled={!canManualSave || isSaving}
               className={cn(
-                'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition',
+                'rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200',
                 !canManualSave || isSaving
                   ? 'cursor-not-allowed opacity-50'
-                  : 'hover:bg-slate-50',
+                  : 'hover:bg-slate-50 dark:hover:bg-slate-800',
               )}
             >
               Save
             </button>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
             {presenceUsers.map((user) => (
               <span
                 key={user.id}
-                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1"
+                className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-2 py-1 dark:border-slate-800 dark:bg-slate-900"
               >
                 <span
                   className="h-2 w-2 rounded-full"
                   style={{ backgroundColor: user.color }}
                 />
-                <span className="font-semibold text-slate-600">
+                <span className="font-semibold text-slate-600 dark:text-slate-200">
                   {user.name}
                   {localUser?.id === user.id ? ' (you)' : ''}
                 </span>
               </span>
             ))}
             {!presenceUsers.length && (
-              <span className="text-xs text-slate-400">No collaborators yet</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">No collaborators yet</span>
             )}
           </div>
         </div>
         {sizeLabel && sizePercent !== null && (
-          <div className="flex flex-col items-end gap-1 text-xs text-slate-600 lg:ml-auto">
-            <span className="rounded-full bg-slate-100 px-2 py-1">
+          <div className="flex flex-col items-end gap-1 text-xs text-slate-600 dark:text-slate-300 lg:ml-auto">
+            <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
               {projectSizeLabel ?? 'Lagring'}: {sizeLabel} ({sizePercent.toFixed(0)}%)
             </span>
-            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-1.5 w-40 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
               <div
                 className={`h-full rounded-full transition-[width] duration-300 ${sizeTone}`}
                 style={{ width: `${sizePercent}%` }}

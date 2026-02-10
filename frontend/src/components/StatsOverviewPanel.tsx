@@ -80,43 +80,43 @@ export function StatsOverviewPanel({
   return (
     <section
       id="analysis-overview"
-      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold text-slate-900">Analysis Overview</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Analysis Overview</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Quick stats and trends to keep track of your grounded theory progress.
           </p>
         </div>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Totals
           </p>
           <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs text-slate-500">Documents</p>
-              <p className="text-lg font-semibold text-slate-900">{totalDocuments}</p>
+            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Documents</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{totalDocuments}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs text-slate-500">Codes</p>
-              <p className="text-lg font-semibold text-slate-900">{totalCodes}</p>
+            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Codes</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{totalCodes}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs text-slate-500">Categories</p>
-              <p className="text-lg font-semibold text-slate-900">{totalCategories}</p>
+            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Categories</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{totalCategories}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 bg-white p-3">
-              <p className="text-xs text-slate-500">Memos</p>
-              <p className="text-lg font-semibold text-slate-900">{totalMemos}</p>
+            <div className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+              <p className="text-xs text-slate-500 dark:text-slate-400">Memos</p>
+              <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">{totalMemos}</p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Memos by type
           </p>
@@ -130,11 +130,11 @@ export function StatsOverviewPanel({
               const width = (item.value / max) * 100
               return (
                 <div key={item.key} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-slate-600">
+                  <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
                     <span>{item.label}</span>
-                    <span className="font-semibold text-slate-700">{item.value}</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-100">{item.value}</span>
                   </div>
-                  <div className="h-2 rounded-full bg-white">
+                  <div className="h-2 rounded-full bg-white dark:bg-slate-900">
                     <div
                       className="h-2 rounded-full bg-slate-900"
                       style={{ width: `${width}%` }}
@@ -148,7 +148,7 @@ export function StatsOverviewPanel({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Strongest categories
           </p>
@@ -158,11 +158,11 @@ export function StatsOverviewPanel({
                 const width = maxCategoryValue > 0 ? (item.value / maxCategoryValue) * 100 : 0
                 return (
                   <div key={item.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span className="font-semibold text-slate-800">{item.label}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{item.label}</span>
                       <span>{item.value} codes</span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
                         className="h-2 rounded-full bg-emerald-500"
                         style={{ width: `${width}%` }}
@@ -172,12 +172,12 @@ export function StatsOverviewPanel({
                 )
               })
             ) : (
-              <p className="text-xs text-slate-400">No categories yet.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">No categories yet.</p>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
+        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Most highlighted codes
           </p>
@@ -187,11 +187,11 @@ export function StatsOverviewPanel({
                 const width = maxHighlightValue > 0 ? (item.value / maxHighlightValue) * 100 : 0
                 return (
                   <div key={item.id} className="space-y-1">
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span className="font-semibold text-slate-800">{item.label}</span>
+                    <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">{item.label}</span>
                       <span>{item.value} highlights</span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-800">
                       <div
                         className="h-2 rounded-full bg-slate-900"
                         style={{ width: `${width}%` }}
@@ -201,7 +201,7 @@ export function StatsOverviewPanel({
                 )
               })
             ) : (
-              <p className="text-xs text-slate-400">No highlights yet.</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500">No highlights yet.</p>
             )}
           </div>
         </div>
