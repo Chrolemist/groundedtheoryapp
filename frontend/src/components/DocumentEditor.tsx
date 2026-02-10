@@ -55,9 +55,52 @@ export function DocumentEditor({
   const didSyncRef = useRef(false)
   const fallbackSeedTimerRef = useRef<number | null>(null)
   const lastAppliedHtmlRef = useRef<string>('')
+  const tabIdRef = useRef<string>('')
   const debugRef = useRef({ lastLogAt: 0 })
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const key = 'gt-tab-id'
+    const stored = window.sessionStorage.getItem(key)
+    if (stored) {
+      tabIdRef.current = stored
+      return
+    }
+    const next = crypto.randomUUID()
+    window.sessionStorage.setItem(key, next)
+    tabIdRef.current = next
+  }, [])
+
+  const tryAcquireSeedLock = () => {
+    if (typeof window === 'undefined') return true
+    const tabId = tabIdRef.current || 'unknown'
+    const lockKey = `gt-doc-seed-lock:${documentId}`
+    const now = Date.now()
+    const TTL_MS = 10_000
+    try {
+      const raw = window.localStorage.getItem(lockKey)
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw) as { tabId?: string; ts?: number }
+          const owner = typeof parsed.tabId === 'string' ? parsed.tabId : ''
+          const ts = typeof parsed.ts === 'number' ? parsed.ts : 0
+          const fresh = ts > 0 && now - ts < TTL_MS
+          if (fresh && owner && owner !== tabId) {
+            return false
+          }
+        } catch {
+          // ignore malformed lock
+        }
+      }
+      window.localStorage.setItem(lockKey, JSON.stringify({ tabId, ts: now }))
+      return true
+    } catch {
+      // If storage is blocked, fall back to allowing seeding.
+      return true
+    }
+  }
 
   const extensions = collaborationEnabled
     ? [
@@ -147,6 +190,47 @@ export function DocumentEditor({
       fallbackSeedTimerRef.current = null
     }
 
+    // While we wait for WS/presence (seedReady) we must NOT seed immediately in multiple tabs,
+    // otherwise each tab will insert the same snapshot into Yjs and the merge duplicates text.
+    // Instead, wait briefly and only seed if we can acquire a lock.
+    if (!seedReady) {
+      clearFallbackTimer()
+      if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
+        fallbackSeedTimerRef.current = window.setTimeout(() => {
+          fallbackSeedTimerRef.current = null
+          if (didSeedRef.current) return
+          if (!editor) return
+          const nowText = editor.getText().trim()
+          const stillEmpty = nowText.length === 0
+          const stillNoRemote = !hasRemoteUpdates
+          const stillEmptyFragment = ydoc.getXmlFragment(documentId).length === 0
+          if (!stillEmpty || !stillNoRemote || !stillEmptyFragment) return
+          if (!tryAcquireSeedLock()) {
+            if (debugEnabled) {
+              console.log('[DocEditor] seed-lock held (waiting for remote)', { documentId })
+            }
+            return
+          }
+          if (debugEnabled) {
+            console.log('[DocEditor] delayed seed setContent (seedReady=false)', {
+              documentId,
+              initialHtmlLen: initialHtml.length,
+            })
+          }
+          editor.commands.setContent(initialHtml, false)
+          didSeedRef.current = true
+          lastAppliedHtmlRef.current = editor.getHTML()
+        }, 1200)
+
+        return () => {
+          clearFallbackTimer()
+        }
+      }
+      return () => {
+        clearFallbackTimer()
+      }
+    }
+
     // If presence is ready and we are not the designated seeder, give the seeder a short
     // window to push Yjs updates. If nothing arrives and the fragment is still empty,
     // seed anyway so cross-device users don't get stuck with a blank document.
@@ -162,6 +246,12 @@ export function DocumentEditor({
           const stillNoRemote = !hasRemoteUpdates
           const stillEmptyFragment = ydoc.getXmlFragment(documentId).length === 0
           if (!stillEmpty || !stillNoRemote || !stillEmptyFragment) return
+          if (!tryAcquireSeedLock()) {
+            if (debugEnabled) {
+              console.log('[DocEditor] seed-lock held (skip fallback seed)', { documentId })
+            }
+            return
+          }
           if (debugEnabled) {
             console.log('[DocEditor] fallback seed setContent', {
               documentId,
@@ -186,7 +276,13 @@ export function DocumentEditor({
     // If we are the designated seeder (or presence isn't running), we can seed immediately.
     // Do not require hasReceivedSync here; in some network races yjs:sync can be delayed/missed,
     // and blocking seeding leaves the editor blank even though we have snapshot HTML.
-    if (editorIsEmpty && initialHtml && (!seedReady || canSeedInitialContent)) {
+    if (editorIsEmpty && initialHtml && canSeedInitialContent) {
+      if (!tryAcquireSeedLock()) {
+        if (debugEnabled) {
+          console.log('[DocEditor] seed-lock held (skip designated seed)', { documentId })
+        }
+        return
+      }
       if (debugEnabled) {
         console.log('[DocEditor] seeding setContent', {
           documentId,
