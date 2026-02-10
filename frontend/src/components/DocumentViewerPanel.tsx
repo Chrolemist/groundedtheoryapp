@@ -541,7 +541,6 @@ export function DocumentViewerPanel({
                       {doc.title}
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-slate-400">Document {index + 1}</span>
                       <button
                         type="button"
                         onClick={() => onMoveDocument(doc.id, 'up')}
