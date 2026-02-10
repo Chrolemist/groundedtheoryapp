@@ -618,13 +618,17 @@ export function useYjsSync({
   ])
 
   useEffect(() => {
+    // Only use BroadcastChannel in local-collaboration mode (WS disabled).
+    // When WS is enabled, updates already fan out via the server; broadcasting as well
+    // can result in the same update being applied twice in other tabs.
+    if (!disableWs) return
     if (typeof window === 'undefined' || !('BroadcastChannel' in window)) return
     if (!projectId) return
     const channel = new BroadcastChannel(`gt-yjs:${projectId}`)
     broadcastChannelRef.current = channel
     const clientId = ydoc.clientID
 
-    if (disableWs && isLocalLeaderRef.current) {
+    if (isLocalLeaderRef.current) {
       if (localLeaderSeedTimerRef.current) {
         window.clearTimeout(localLeaderSeedTimerRef.current)
       }
@@ -766,13 +770,15 @@ export function useYjsSync({
         console.warn('[Yjs] failed to send yjs:update (ws not open)', { projectId })
       }
 
-      try {
-        broadcastChannelRef.current?.postMessage({
-          type: 'yjs:update',
-          update: encoded,
-        })
-      } catch {
-        // ignore
+      if (disableWs) {
+        try {
+          broadcastChannelRef.current?.postMessage({
+            type: 'yjs:update',
+            update: encoded,
+          })
+        } catch {
+          // ignore
+        }
       }
     }
 

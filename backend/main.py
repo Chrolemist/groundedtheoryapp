@@ -245,18 +245,65 @@ class ConnectionManager:
             suffix += 1
         return f"{base} {suffix}"
 
-    def _generate_user_color(self, project_id: str) -> str:
-        palette = [
-            "#2563EB",
-            "#7C3AED",
-            "#DC2626",
-            "#16A34A",
-            "#D97706",
-            "#0EA5E9",
-            "#DB2777",
-            "#0F766E",
-        ]
-        return palette[len(self.users.get(project_id, {})) % len(palette)]
+    def _generate_user_color(self, project_id: str, seed: Optional[str] = None) -> str:
+        """Pick a high-contrast collaborator color.
+
+        - Deterministic per `seed` (prefer client_id, else user_id)
+        - Avoid duplicates within the same project when possible
+        """
+
+        def _stable_hash(value: str) -> int:
+            digest = hashlib.sha256(value.encode("utf-8", errors="ignore")).digest()
+            return int.from_bytes(digest[:8], "big", signed=False)
+
+        def _hsl_to_hex(h: float, s: float, l: float) -> str:
+            h = (h % 360.0) / 360.0
+
+            def hue_to_rgb(p: float, q: float, t: float) -> float:
+                if t < 0:
+                    t += 1
+                if t > 1:
+                    t -= 1
+                if t < 1 / 6:
+                    return p + (q - p) * 6 * t
+                if t < 1 / 2:
+                    return q
+                if t < 2 / 3:
+                    return p + (q - p) * (2 / 3 - t) * 6
+                return p
+
+            if s == 0:
+                r = g = b = l
+            else:
+                q = l * (1 + s) if l < 0.5 else l + s - l * s
+                p = 2 * l - q
+                r = hue_to_rgb(p, q, h + 1 / 3)
+                g = hue_to_rgb(p, q, h)
+                b = hue_to_rgb(p, q, h - 1 / 3)
+            return "#{:02X}{:02X}{:02X}".format(int(r * 255), int(g * 255), int(b * 255))
+
+        # 12 strongly separated hues, consistent saturation/lightness.
+        # This yields visually distinct cursor colors.
+        palette = [_hsl_to_hex(i * 30.0, 0.85, 0.45) for i in range(12)]
+
+        used_colors: set[str] = set()
+        for existing in self.users.get(project_id, {}).values():
+            if isinstance(existing, dict):
+                color = existing.get("color")
+                if isinstance(color, str) and color.startswith("#") and len(color) == 7:
+                    used_colors.add(color.upper())
+
+        seed_value = seed or project_id
+        preferred = _stable_hash(seed_value) % len(palette)
+
+        # Step through the palette with a coprime step to spread choices.
+        step = 5  # gcd(5, 12) == 1
+        for k in range(len(palette)):
+            idx = (preferred + k * step) % len(palette)
+            candidate = palette[idx]
+            if candidate.upper() not in used_colors:
+                return candidate
+        return palette[preferred]
 
     async def connect(
         self,
@@ -301,13 +348,13 @@ class ConnectionManager:
             user = {
                 "id": user_id,
                 "name": self._generate_user_name(),
-                "color": self._generate_user_color(project_id),
+                "color": self._generate_user_color(project_id, seed=client_id or user_id),
             }
         else:
             if "name" not in user or not user.get("name"):
                 user["name"] = self._generate_user_name()
             if "color" not in user or not user.get("color"):
-                user["color"] = self._generate_user_color(project_id)
+                user["color"] = self._generate_user_color(project_id, seed=client_id or user_id)
 
         project_connections.append(websocket)
         self.connection_users[websocket] = user_id

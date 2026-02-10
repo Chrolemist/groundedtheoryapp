@@ -73,6 +73,16 @@ const pickDistinctColor = (palette: string[], used: Set<string>, fallbackIndex: 
   return bestScore < 0 ? palette[fallbackIndex % palette.length] : bestColor
 }
 
+const stableHash = (value: string) => {
+  // FNV-1a 32-bit
+  let hash = 0x811c9dc5
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return hash >>> 0
+}
+
 // WebSocket-backed presence and cursor tracking.
 export function useCollaboration({ onProjectUpdate, projectId }: UseCollaborationArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
@@ -115,7 +125,20 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
     const colorKey = `${colorKeyPrefix}${tabId}`
     const storedColor = window.localStorage.getItem(colorKey)
     const name = storedName ?? 'Local'
-    const palette = ['#E11D48', '#2563EB', '#F97316', '#7C3AED', '#0EA5E9', '#F59E0B', '#10B981', '#DB2777']
+    const palette = [
+      '#E11D48',
+      '#2563EB',
+      '#F97316',
+      '#7C3AED',
+      '#0EA5E9',
+      '#F59E0B',
+      '#10B981',
+      '#DB2777',
+      '#DC2626',
+      '#16A34A',
+      '#D97706',
+      '#0F766E',
+    ]
     const usedColors = new Set<string>()
     try {
       for (let i = 0; i < localStorage.length; i += 1) {
@@ -127,8 +150,7 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
     } catch {
       // Ignore storage access issues.
     }
-    const hash = Array.from(tabId).reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    const preferredIndex = hash % palette.length
+    const preferredIndex = stableHash(`${deviceId}:${tabId}`) % palette.length
     const color = storedColor ?? pickDistinctColor(palette, usedColors, preferredIndex)
     window.sessionStorage.setItem(tabIdKey, tabId)
     window.localStorage.setItem(deviceIdKey, deviceId)
