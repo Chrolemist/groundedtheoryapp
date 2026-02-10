@@ -128,7 +128,6 @@ export function DocumentEditor({
         })
       }
     }
-    if (!hasReceivedSync) return
     if (didSeedRef.current) return
 
     const currentText = editor.getText().trim()
@@ -176,7 +175,10 @@ export function DocumentEditor({
 
     clearFallbackTimer()
 
-    if (editorIsEmpty && initialHtml) {
+    // If we are the designated seeder (or presence isn't running), we can seed immediately.
+    // Do not require hasReceivedSync here; in some network races yjs:sync can be delayed/missed,
+    // and blocking seeding leaves the editor blank even though we have snapshot HTML.
+    if (editorIsEmpty && initialHtml && (!seedReady || canSeedInitialContent)) {
       if (debugEnabled) {
         console.log('[DocEditor] seeding setContent', {
           documentId,

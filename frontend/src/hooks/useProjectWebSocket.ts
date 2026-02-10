@@ -67,6 +67,8 @@ let sharedLastHello: unknown | null = null
 let sharedLastHelloUrl: string | null = null
 let sharedLastYjsSync: unknown | null = null
 let sharedLastYjsSyncUrl: string | null = null
+let sharedSendQueue: string[] = []
+const sharedSendQueueLimit = 500
 
 const isDebugEnabled = () => {
   if (typeof window === 'undefined') return false
@@ -87,6 +89,45 @@ const clearSharedPing = () => {
   if (sharedPingTimer) {
     window.clearInterval(sharedPingTimer)
     sharedPingTimer = null
+  }
+}
+
+const clearSharedSendQueue = () => {
+  sharedSendQueue = []
+}
+
+const enqueueSharedSend = (json: string) => {
+  sharedSendQueue.push(json)
+  if (sharedSendQueue.length > sharedSendQueueLimit) {
+    // Drop oldest messages to keep memory bounded.
+    sharedSendQueue.splice(0, sharedSendQueue.length - sharedSendQueueLimit)
+  }
+  if (isDebugEnabled()) {
+    console.log('[WS] queued message', { queued: sharedSendQueue.length })
+  }
+}
+
+const flushSharedSendQueue = (socket: WebSocket) => {
+  if (!isSocketOpen(socket)) return
+  if (sharedSendQueue.length === 0) return
+  const queue = sharedSendQueue
+  sharedSendQueue = []
+  if (isDebugEnabled()) {
+    console.log('[WS] flush queued messages', { count: queue.length })
+  }
+  for (const json of queue) {
+    try {
+      if (socket.readyState !== WebSocket.OPEN) {
+        // Put the remaining messages back if we lost the connection mid-flush.
+        sharedSendQueue = [json, ...queue.slice(queue.indexOf(json) + 1), ...sharedSendQueue]
+        return
+      }
+      socket.send(json)
+    } catch {
+      // Re-queue on send failure.
+      sharedSendQueue = [json, ...queue.slice(queue.indexOf(json) + 1), ...sharedSendQueue]
+      return
+    }
   }
 }
 
@@ -147,6 +188,8 @@ const connectSharedSocket = (url: string) => {
     if (isDebugEnabled()) {
       console.log('[WS] open')
     }
+
+    flushSharedSendQueue(socket)
     
     clearSharedPing()
     sharedPingTimer = window.setInterval(() => {
@@ -278,6 +321,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
       sharedLastHelloUrl = null
       sharedLastYjsSync = null
       sharedLastYjsSyncUrl = null
+      clearSharedSendQueue()
     }
     connectSharedSocket(sharedUrl)
     // Initialize state from current socket status in case the socket is already open.
@@ -324,6 +368,7 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
         sharedLastHelloUrl = null
         sharedLastYjsSync = null
         sharedLastYjsSyncUrl = null
+        clearSharedSendQueue()
       }
     }
   }, [disableWs, projectId])
@@ -331,9 +376,20 @@ export function useProjectWebSocket(options: UseProjectWebSocketOptions = {}) {
   const sendJson = useCallback((payload: unknown) => {
     if (disableWs) return false
     if (!projectId) return false
-    if (!sharedSocket || sharedSocket.readyState !== WebSocket.OPEN) return false
     try {
-      sharedSocket.send(JSON.stringify(payload))
+      const json = JSON.stringify(payload)
+      if (sharedSocket && sharedSocket.readyState === WebSocket.OPEN) {
+        sharedSocket.send(json)
+        return true
+      }
+
+      // If we are connecting/reconnecting (or the socket isn't created yet), queue the message
+      // so it will be flushed on the next successful open. This prevents dropped Yjs updates
+      // when edits happen during the connect handshake.
+      enqueueSharedSend(json)
+      if (!sharedSocket && sharedUrl) {
+        connectSharedSocket(sharedUrl)
+      }
       return true
     } catch {
       return false
