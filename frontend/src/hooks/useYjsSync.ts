@@ -379,27 +379,19 @@ export function useYjsSync({
       const fallback = currentById.get(id)
       return {
         id,
-        label: (map?.get('label') as Y.Text | undefined)?.toString() ?? fallback?.label ?? 'Untitled',
+        label: readScalarString(map?.get('label')) || fallback?.label || 'Untitled',
         description:
-          (map?.get('description') as Y.Text | undefined)?.toString() ??
-          fallback?.description ??
-          '',
+          readScalarString(map?.get('description')) || fallback?.description || '',
         colorClass:
-          (map?.get('colorClass') as Y.Text | undefined)?.toString() ??
-          fallback?.colorClass ??
+          readScalarString(map?.get('colorClass')) ||
+          fallback?.colorClass ||
           'bg-slate-100 text-slate-700 ring-slate-200',
         colorHex:
-          (map?.get('colorHex') as Y.Text | undefined)?.toString() ??
-          fallback?.colorHex ??
-          '#E2E8F0',
+          readScalarString(map?.get('colorHex')) || fallback?.colorHex || '#E2E8F0',
         textHex:
-          (map?.get('textHex') as Y.Text | undefined)?.toString() ??
-          fallback?.textHex ??
-          '#334155',
+          readScalarString(map?.get('textHex')) || fallback?.textHex || '#334155',
         ringHex:
-          (map?.get('ringHex') as Y.Text | undefined)?.toString() ??
-          fallback?.ringHex ??
-          'rgba(148,163,184,0.4)',
+          readScalarString(map?.get('ringHex')) || fallback?.ringHex || 'rgba(148,163,184,0.4)',
       }
     })
   }, [])
@@ -451,17 +443,13 @@ export function useYjsSync({
       const codeIds = (map?.get('codeIds') as Y.Array<string> | undefined)?.toArray()
       return {
         id,
-        name: (map?.get('name') as Y.Text | undefined)?.toString() ?? fallback?.name ?? '',
+        name: readScalarString(map?.get('name')) || fallback?.name || '',
         codeIds: codeIds ?? fallback?.codeIds ?? [],
         precondition:
-          (map?.get('precondition') as Y.Text | undefined)?.toString() ??
-          fallback?.precondition ??
-          '',
-        action: (map?.get('action') as Y.Text | undefined)?.toString() ?? fallback?.action ?? '',
+          readScalarString(map?.get('precondition')) || fallback?.precondition || '',
+        action: readScalarString(map?.get('action')) || fallback?.action || '',
         consequence:
-          (map?.get('consequence') as Y.Text | undefined)?.toString() ??
-          fallback?.consequence ??
-          '',
+          readScalarString(map?.get('consequence')) || fallback?.consequence || '',
       }
     })
   }, [])
@@ -477,7 +465,7 @@ export function useYjsSync({
     return orderedIds.map((id) => {
       const map = memosMap.get(id)
       const fallback = currentById.get(id)
-      const typeValue = (map?.get('type') as Y.Text | undefined)?.toString()
+      const typeValue = readScalarString(map?.get('type'))
       const type: Memo['type'] =
         typeValue === 'code' || typeValue === 'category' || typeValue === 'global'
           ? typeValue
@@ -485,17 +473,13 @@ export function useYjsSync({
       return {
         id,
         type,
-        refId: (map?.get('refId') as Y.Text | undefined)?.toString() ?? fallback?.refId,
-        title: (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? 'Untitled memo',
-        body: (map?.get('body') as Y.Text | undefined)?.toString() ?? fallback?.body ?? '',
+        refId: readScalarString(map?.get('refId')) || fallback?.refId,
+        title: readScalarString(map?.get('title')) || fallback?.title || 'Untitled memo',
+        body: readScalarString(map?.get('body')) || fallback?.body || '',
         createdAt:
-          (map?.get('createdAt') as Y.Text | undefined)?.toString() ??
-          fallback?.createdAt ??
-          new Date().toISOString(),
+          readScalarString(map?.get('createdAt')) || fallback?.createdAt || new Date().toISOString(),
         updatedAt:
-          (map?.get('updatedAt') as Y.Text | undefined)?.toString() ??
-          fallback?.updatedAt ??
-          new Date().toISOString(),
+          readScalarString(map?.get('updatedAt')) || fallback?.updatedAt || new Date().toISOString(),
       }
     })
   }, [])

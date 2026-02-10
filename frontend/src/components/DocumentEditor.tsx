@@ -10,12 +10,19 @@ type DocumentEditorProps = {
   documentId: string
   initialHtml: string
 
-    // IMPORTANT: Only one client should ever seed snapshot HTML into the shared Yjs document.
-    // If multiple devices seed concurrently (common during reconnect), CRDT merges can duplicate
-    // the content. We therefore only seed when presence/WS is ready AND this client is the
-    // designated seeder.
+    // IMPORTANT: Only one client should ever seed snapshot HTML into the shared Yjs document,
+    // and only AFTER we have received the server's yjs:sync. If a client seeds before sync
+    // arrives (common during reconnect), the later sync will merge the same content and create
+    // duplicates.
     clearFallbackTimer()
     if (!seedReady) return
+    if (!hasReceivedSync) {
+      // If remote updates have already populated the fragment/editor, mark as seeded.
+      if (!editorIsEmpty || fragment.length > 0 || hasRemoteUpdates) {
+        didSeedRef.current = true
+      }
+      return
+    }
     if (!canSeedInitialContent) return
       }
       window.localStorage.setItem(lockKey, JSON.stringify({ tabId, ts: now }))
@@ -197,10 +204,8 @@ type DocumentEditorProps = {
 
     clearFallbackTimer()
 
-    // If we are the designated seeder, we can seed immediately.
-    // Do not require hasReceivedSync here; in some network races yjs:sync can be delayed/missed,
-    // and blocking seeding leaves the editor blank even though we have snapshot HTML.
-    if (editorIsEmpty && initialHtml) {
+    // Only seed if the shared Yjs fragment is still empty and we haven't observed remote updates.
+    if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
       if (!tryAcquireSeedLock()) {
         if (debugEnabled) {
           console.log('[DocEditor] seed-lock held (skip designated seed)', { documentId })
