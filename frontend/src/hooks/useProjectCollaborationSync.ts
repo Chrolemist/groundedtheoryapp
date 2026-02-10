@@ -69,10 +69,18 @@ export function useProjectCollaborationSync({
 }: UseProjectCollaborationSyncArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const broadcastRef = useRef<BroadcastChannel | null>(null)
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
+  const lastDebugAtRef = useRef(0)
+  const lastSkipDebugAtRef = useRef(0)
 
   const applyRemoteProject = useCallback((project: Record<string, unknown>) => {
     const incomingUpdatedAt =
       typeof project.updated_at === 'number' ? project.updated_at : 0
+    // When switching projects, `useProjectState` resets `projectUpdatedAtRef` to 0.
+    // In that scenario we *must* allow replacing local state (even with an empty payload),
+    // otherwise the UI can show stale documents from the previous project.
+    const allowReplace = projectUpdatedAtRef.current === 0
     const localEmpty =
       documents.length === 0 &&
       codes.length === 0 &&
@@ -91,20 +99,99 @@ export function useProjectCollaborationSync({
       Boolean(hydrated.coreCategoryId) ||
       Boolean(hydrated.theoryHtml)
 
-    if (!localEmpty && !incomingHasData) return
-    if (!localEmpty && incomingUpdatedAt === 0) return
+    if (!allowReplace) {
+      if (!localEmpty && !incomingHasData) {
+        if (debugEnabled) {
+          const now = Date.now()
+          if (now - lastSkipDebugAtRef.current > 800) {
+            lastSkipDebugAtRef.current = now
+            console.log('[Project Sync] skip applyRemoteProject (incoming empty)', {
+              projectId,
+              allowReplace,
+              localEmpty,
+              incomingHasData,
+              incomingUpdatedAt,
+              localUpdatedAt: projectUpdatedAtRef.current,
+            })
+          }
+        }
+        return
+      }
+      if (!localEmpty && incomingUpdatedAt === 0) {
+        if (debugEnabled) {
+          const now = Date.now()
+          if (now - lastSkipDebugAtRef.current > 800) {
+            lastSkipDebugAtRef.current = now
+            console.log('[Project Sync] skip applyRemoteProject (missing updated_at)', {
+              projectId,
+              allowReplace,
+              localEmpty,
+              incomingHasData,
+              incomingUpdatedAt,
+              localUpdatedAt: projectUpdatedAtRef.current,
+            })
+          }
+        }
+        return
+      }
+    }
 
     const shouldApply =
-      localEmpty ||
-      incomingUpdatedAt > projectUpdatedAtRef.current ||
-      projectUpdatedAtRef.current === 0
-    if (!shouldApply) return
+      allowReplace || localEmpty || incomingUpdatedAt > projectUpdatedAtRef.current
+    if (!shouldApply) {
+      if (debugEnabled) {
+        const now = Date.now()
+        if (now - lastSkipDebugAtRef.current > 800) {
+          lastSkipDebugAtRef.current = now
+          console.log('[Project Sync] skip applyRemoteProject (stale)', {
+            projectId,
+            allowReplace,
+            localEmpty,
+            incomingHasData,
+            incomingUpdatedAt,
+            localUpdatedAt: projectUpdatedAtRef.current,
+          })
+        }
+      }
+      return
+    }
 
     isApplyingRemoteRef.current = true
 
+    if (debugEnabled) {
+      const now = Date.now()
+      if (now - lastDebugAtRef.current > 500) {
+        lastDebugAtRef.current = now
+        console.log('[Project Sync] applyRemoteProject', {
+          projectId,
+          allowReplace,
+          localEmpty,
+          incomingHasData,
+          incomingUpdatedAt,
+          localUpdatedAt: projectUpdatedAtRef.current,
+          hydrated: {
+            docs: hydrated.documents.length,
+            codes: hydrated.codes.length,
+            categories: hydrated.categories.length,
+            memos: hydratedMemos.length,
+            coreCategoryId: Boolean(hydrated.coreCategoryId),
+            theoryHtml: Boolean(hydrated.theoryHtml),
+            sampleDoc: hydrated.documents[0]
+              ? {
+                  id: hydrated.documents[0].id,
+                  title: hydrated.documents[0].title,
+                  htmlLen: hydrated.documents[0].html?.length ?? 0,
+                  textLen: hydrated.documents[0].text?.length ?? 0,
+                }
+              : null,
+          },
+        })
+      }
+    }
+
     setDocuments(hydrated.documents)
-    if (hydrated.codes.length) setCodes(hydrated.codes)
-    if (hydrated.categories.length) setCategories(hydrated.categories)
+    setCodes(hydrated.codes)
+    setCategories(hydrated.categories)
     setMemos(hydratedMemos)
 
     if (typeof hydrated.coreCategoryId === 'string') {
@@ -128,6 +215,8 @@ export function useProjectCollaborationSync({
     memos.length,
     coreCategoryId,
     theoryHtml,
+    projectId,
+    debugEnabled,
     getReadableTextColor,
     isApplyingRemoteRef,
     projectUpdatedAtRef,

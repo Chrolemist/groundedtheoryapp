@@ -93,6 +93,24 @@ export function DocumentViewerPanel({
   const debugDisableEditors = false
   const hasDocuments = documents.length > 0
   const codeById = useMemo(() => new Map(codes.map((code) => [code.id, code])), [codes])
+
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+
+  const toInitialHtml = (doc: DocumentItem | undefined) => {
+    if (!doc) return ''
+    const html = (doc.html ?? '').trim()
+    if (html) return html
+    const text = doc.text ?? ''
+    if (!text.trim()) return ''
+    // TipTap expects HTML content. Convert plain text into a minimal HTML representation.
+    return `<p>${escapeHtml(text).replace(/\n/g, '<br />')}</p>`
+  }
   const [activeTab, setActiveTab] = useState<'document' | 'tree' | 'overview'>(
     'document',
   )
@@ -514,7 +532,7 @@ export function DocumentViewerPanel({
                   ) : (
                     <DocumentEditor
                       documentId={doc.id}
-                      initialHtml={doc.html ?? ''}
+                      initialHtml={toInitialHtml(doc)}
                       onUpdate={(html, text) => {
                         onDocumentInput(doc.id, { html, text })
                       }}
@@ -568,9 +586,7 @@ export function DocumentViewerPanel({
                 <DocumentEditor
                   key={activeDocumentId}
                   documentId={activeDocumentId}
-                  initialHtml={
-                    documents.find((doc) => doc.id === activeDocumentId)?.html ?? ''
-                  }
+                  initialHtml={toInitialHtml(documents.find((doc) => doc.id === activeDocumentId))}
                   onUpdate={(html, text) => {
                     onDocumentInput(activeDocumentId, { html, text })
                   }}
