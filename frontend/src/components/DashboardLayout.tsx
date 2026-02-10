@@ -116,6 +116,8 @@ export function DashboardLayout() {
     hasRemoteState,
     remoteLoadedRef,
     projectId: catalogActiveProjectId,
+    websocketOnline,
+    disableWs,
   })
 
   const project = useProjectState({

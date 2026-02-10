@@ -5,6 +5,8 @@ type UseProjectPersistenceArgs = {
   hasRemoteState: boolean
   remoteLoadedRef: MutableRefObject<boolean>
   projectId?: string | null
+  websocketOnline?: boolean
+  disableWs?: boolean
 }
 
 type UseProjectPersistenceResult = {
@@ -20,6 +22,8 @@ export function useProjectPersistence({
   hasRemoteState,
   remoteLoadedRef,
   projectId,
+  websocketOnline,
+  disableWs,
 }: UseProjectPersistenceArgs): UseProjectPersistenceResult {
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
@@ -56,6 +60,18 @@ export function useProjectPersistence({
       }
       if (!projectId) {
         if (debugEnabled) console.warn('[Project Save] skip (no projectId)')
+        return
+      }
+
+      // When WebSocket collaboration is enabled and connected, the backend persists
+      // `project:update` messages to storage. Avoid double-saving via REST.
+      if (!disableWs && websocketOnline && hasRemoteState) {
+        updateWarning(projectRaw)
+        remoteLoadedRef.current = true
+        setSaveError(null)
+        setIsSaving(false)
+        setLastSavedAt(Date.now())
+        if (debugEnabled) console.log('[Project Save] skip REST persist (WS online)')
         return
       }
       // Persistence should not depend on WebSocket presence.
@@ -133,7 +149,7 @@ export function useProjectPersistence({
           }
         })
     },
-    [apiBase, hasRemoteState, remoteLoadedRef, projectId, updateWarning],
+    [apiBase, disableWs, hasRemoteState, remoteLoadedRef, projectId, updateWarning, websocketOnline, debugEnabled],
   )
 
   return { persistProject, isSaving, lastSavedAt, saveError, saveWarning }
