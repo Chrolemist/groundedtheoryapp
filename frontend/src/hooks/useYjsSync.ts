@@ -738,7 +738,11 @@ export function useYjsSync({
     const handleUpdate = (update: Uint8Array, origin: unknown) => {
       if (origin === REMOTE_ORIGIN || origin === BROADCAST_ORIGIN) {
         setHasRemoteUpdates(true)
-        if (isEditingElement(document.activeElement)) {
+        // Only defer applying remote updates while the user is actively editing in THIS tab.
+        // In background tabs, `document.activeElement` can stay on a contentEditable editor,
+        // which previously caused remote updates to be deferred indefinitely.
+        const isActivelyEditingHere = document.hasFocus() && isEditingElement(document.activeElement)
+        if (isActivelyEditingHere) {
           pendingRefreshRef.current = true
           return
         }
