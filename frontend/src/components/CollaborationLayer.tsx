@@ -91,6 +91,11 @@ export function CollaborationLayer({
         } catch {
           // Fall back to raw cursor coords below.
         }
+      } else {
+        // If we don't have the editor instance for this document in this tab,
+        // raw x/y fallbacks are often incorrect (different layout/scroll/view mode).
+        // Prefer showing nothing rather than a misleading caret.
+        return null
       }
     }
 

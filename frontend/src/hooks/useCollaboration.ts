@@ -322,7 +322,27 @@ export function useCollaboration({ onProjectUpdate, onProjectNameUpdate, project
         if (senderId && senderId === localUserRef.current?.id) return
         const projectRaw = (data.project_raw ?? data.project) as Record<string, unknown> | undefined
         if (projectRaw) {
-          onProjectUpdate(projectRaw)
+          const incomingName =
+            typeof (projectRaw as { name?: unknown }).name === 'string'
+              ? ((projectRaw as { name: string }).name as string)
+              : ''
+          if (incomingName) {
+            onProjectNameUpdate?.(incomingName)
+          }
+
+          // Only forward to full project hydration if the payload appears to contain
+          // actual project content. This avoids applying empty snapshots when a client
+          // sends a lightweight rename update.
+          const hasContentKeys =
+            'documents' in projectRaw ||
+            'codes' in projectRaw ||
+            'categories' in projectRaw ||
+            'memos' in projectRaw ||
+            'theoryHtml' in projectRaw ||
+            'coreCategoryId' in projectRaw
+          if (hasContentKeys) {
+            onProjectUpdate(projectRaw)
+          }
         }
       }
     },

@@ -213,7 +213,18 @@ export function DashboardLayout() {
 
   const handleRenameProject = async (name: string) => {
     if (!catalog.activeProjectId) return
-    await catalog.renameProject(catalog.activeProjectId, name)
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await catalog.renameProject(catalog.activeProjectId, trimmed)
+    // Also broadcast via WS using an existing message type so other clients can update
+    // their project title even if the backend doesn't emit a dedicated project:rename event.
+    sendJson?.({
+      type: 'project:update',
+      project_raw: {
+        name: trimmed,
+        updated_at: Date.now(),
+      },
+    })
   }
 
   const handleDeleteProject = async (projectId: string) => {
