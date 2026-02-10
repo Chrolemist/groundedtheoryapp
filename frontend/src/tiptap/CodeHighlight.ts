@@ -46,6 +46,7 @@ const createRemoveButton = (
     const pos = getPos()
     const text = node.textContent || ''
     const tr = view.state.tr
+    tr.setMeta('gt-local-change', true)
     tr.replaceWith(pos, pos + node.nodeSize, view.state.schema.text(text))
     view.dispatch(tr)
   })

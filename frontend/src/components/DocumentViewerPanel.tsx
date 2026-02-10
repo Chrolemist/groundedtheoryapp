@@ -38,6 +38,7 @@ type DocumentViewerPanelProps = {
   onAddDocument: () => void
   onMoveDocument: (documentId: string, direction: 'up' | 'down') => void
   onDocumentInput: (documentId: string, patch: { html: string; text: string }) => void
+  onLocalChange?: () => void
   onEditorReady: (documentId: string, editor: Editor | null) => void
   onHighlightMouseDown: (event: MouseEvent<HTMLElement>) => void
   onHighlightMouseUp: () => void
@@ -79,6 +80,7 @@ export function DocumentViewerPanel({
   onAddDocument,
   onMoveDocument,
   onDocumentInput,
+  onLocalChange,
   onEditorReady,
   onHighlightMouseDown,
   onHighlightMouseUp,
@@ -599,6 +601,7 @@ export function DocumentViewerPanel({
                       onUpdate={(html, text) => {
                         onDocumentInput(doc.id, { html, text })
                       }}
+                      onLocalChange={onLocalChange}
                       onEditorReady={onEditorReady}
                       onMouseDown={onHighlightMouseDown}
                       onMouseUp={handleEditorMouseUp}
@@ -696,6 +699,7 @@ export function DocumentViewerPanel({
                   onUpdate={(html, text) => {
                     onDocumentInput(activeDocumentId, { html, text })
                   }}
+                  onLocalChange={onLocalChange}
                   onEditorReady={onEditorReady}
                   onMouseDown={onHighlightMouseDown}
                   onMouseUp={handleEditorMouseUp}

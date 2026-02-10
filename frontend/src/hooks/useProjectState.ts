@@ -594,6 +594,7 @@ export function useProjectState({
     isTheoryEmpty,
     getReadableTextColor,
     applyRemoteProject,
+    markLocalChange,
     updateDocument: updateDocumentWithDirty,
     getDocumentById,
     addNewDocument: addNewDocumentWithDirty,

@@ -10,6 +10,7 @@ type DocumentEditorProps = {
   documentId: string
   initialHtml: string
   onUpdate: (html: string, text: string) => void
+  onLocalChange?: () => void
   onEditorReady: (documentId: string, editor: ReturnType<typeof useEditor> | null) => void
   onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void
   onMouseUp?: (event: React.MouseEvent<HTMLDivElement>) => void
@@ -32,6 +33,7 @@ export function DocumentEditor({
   documentId,
   initialHtml,
   onUpdate,
+  onLocalChange,
   onEditorReady,
   onMouseDown,
   onMouseUp,
@@ -70,7 +72,10 @@ export function DocumentEditor({
   const editor = useEditor({
     extensions,
     content: '',
-    onUpdate: ({ editor }) => {
+    onUpdate: ({ editor, transaction }) => {
+      if (transaction?.getMeta?.('gt-local-change') === true) {
+        onLocalChange?.()
+      }
       const html = editor.getHTML()
       const text = editor.getText()
       if (debugEnabled) {

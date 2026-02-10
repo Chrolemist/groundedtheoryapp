@@ -459,6 +459,7 @@ export function DashboardLayout() {
               onDocumentLineHeightChange={project.setDocumentLineHeight}
               showCodeLabels={project.showCodeLabels}
               onDocumentInput={(documentId, patch) => project.updateDocument(documentId, patch)}
+              onLocalChange={project.markLocalChange}
               onEditorReady={project.setDocumentEditorInstance}
               onHighlightMouseDown={project.handleHighlightMouseDown}
               onHighlightMouseUp={project.handleSelection}
