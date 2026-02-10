@@ -265,6 +265,11 @@ export function DashboardLayout() {
     const currentName = localUser?.name ?? ''
     const nextName = window.prompt('Your name', currentName)?.trim()
     if (!nextName) return
+    try {
+      window.localStorage.setItem('gt-client-name', nextName)
+    } catch {
+      // ignore
+    }
     sendJson?.({ type: 'presence:rename', name: nextName })
   }
 

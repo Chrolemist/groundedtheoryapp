@@ -100,6 +100,7 @@ export function useCollaboration({ onProjectUpdate, onProjectNameUpdate, project
   const presenceKeyPrefix = 'gt-presence:'
   const colorKeyPrefix = 'gt-tab-color:'
   const colorKeyRef = useRef<string | null>(null)
+  const lastAutoRenameUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     setPresenceUsers([])
@@ -210,6 +211,33 @@ export function useCollaboration({ onProjectUpdate, onProjectNameUpdate, project
         const projectName = typeof data.name === 'string' ? data.name : null
         if (projectName) {
           onProjectNameUpdate?.(projectName)
+        }
+
+        // WS reconnects can create a new server-side user with a new random name.
+        // Keep the collaborator name stable by restoring the locally preferred name.
+        if (user && typeof window !== 'undefined') {
+          const preferred = (window.localStorage.getItem('gt-client-name') ?? '').trim()
+          if (
+            preferred &&
+            preferred !== user.name &&
+            lastAutoRenameUserIdRef.current !== user.id
+          ) {
+            lastAutoRenameUserIdRef.current = user.id
+            const nextUser = { ...user, name: preferred }
+            setLocalUser(nextUser)
+            localUserRef.current = nextUser
+            setPresenceUsers((current) => {
+              if (!current.length) return [nextUser]
+              let found = false
+              const next = current.map((u) => {
+                if (u.id !== user.id) return u
+                found = true
+                return { ...u, name: preferred }
+              })
+              return found ? next : [nextUser, ...next]
+            })
+            sendJson?.({ type: 'presence:rename', name: preferred })
+          }
         }
         setHasRemoteState(true)
         return
