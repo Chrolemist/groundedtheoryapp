@@ -89,6 +89,7 @@ export function DashboardLayout() {
   } = useCollaboration({
     projectId: isolationMode ? null : catalogActiveProjectId,
     onProjectUpdate: (project) => projectUpdateRef.current(project),
+    onProjectNameUpdate: (name) => catalog.applyRemoteProjectName(name),
   })
 
   const seedReady = useMemo(() => {

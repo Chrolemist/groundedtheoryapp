@@ -4,6 +4,7 @@ import { useProjectWebSocket } from './useProjectWebSocket.ts'
 
 type UseCollaborationArgs = {
   onProjectUpdate: (project: Record<string, unknown>) => void
+  onProjectNameUpdate?: (name: string) => void
   projectId?: string | null
 }
 
@@ -84,7 +85,7 @@ const stableHash = (value: string) => {
 }
 
 // WebSocket-backed presence and cursor tracking.
-export function useCollaboration({ onProjectUpdate, projectId }: UseCollaborationArgs) {
+export function useCollaboration({ onProjectUpdate, onProjectNameUpdate, projectId }: UseCollaborationArgs) {
   const disableWs = import.meta.env.VITE_DISABLE_WS === 'true'
   const debugEnabled =
     typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
@@ -205,7 +206,20 @@ export function useCollaboration({ onProjectUpdate, projectId }: UseCollaboratio
         if (projectRaw) {
           onProjectUpdate(projectRaw)
         }
+
+        const projectName = typeof data.name === 'string' ? data.name : null
+        if (projectName) {
+          onProjectNameUpdate?.(projectName)
+        }
         setHasRemoteState(true)
+        return
+      }
+
+      if (type === 'project:rename') {
+        const name = typeof data.name === 'string' ? data.name : ''
+        if (name) {
+          onProjectNameUpdate?.(name)
+        }
         return
       }
 

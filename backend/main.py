@@ -1293,6 +1293,18 @@ async def rename_project(project_id: str, payload: Dict = Body(...)) -> Dict[str
             },
             merge=True,
         )
+        # Live update connected clients so project title stays in sync.
+        try:
+            await manager.broadcast(
+                project_id,
+                {
+                    "type": "project:rename",
+                    "name": name,
+                },
+            )
+        except Exception:
+            # Renaming should still succeed even if WS broadcast fails.
+            pass
         return {"status": "ok", "name": name}
     except Exception as exc:
         logger.warning(f"Failed to rename project: {exc}")

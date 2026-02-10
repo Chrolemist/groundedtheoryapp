@@ -30,6 +30,7 @@ type UseProjectCatalogResult = {
   createProject: (name?: string) => Promise<void>
   duplicateProject: (projectId: string, name?: string) => Promise<void>
   renameProject: (projectId: string, name: string) => Promise<void>
+  applyRemoteProjectName: (name: string) => void
   deleteProject: (projectId: string) => Promise<boolean>
   closeProject: () => void
   purgeProjects: () => Promise<number>
@@ -228,6 +229,22 @@ export function useProjectCatalog({
     }
   }, [activeProjectId, apiBase, onActiveProjectChange])
 
+  const applyRemoteProjectName = useCallback(
+    (name: string) => {
+      const trimmed = name.trim()
+      if (!trimmed) return
+      if (!activeProjectId) return
+      setActiveProjectName((current) => (current === trimmed ? current : trimmed))
+      setProjects((current) =>
+        current.map((project) =>
+          project.id === activeProjectId ? { ...project, name: trimmed } : project,
+        ),
+      )
+      onActiveProjectChange?.(activeProjectId, trimmed)
+    },
+    [activeProjectId, onActiveProjectChange],
+  )
+
   const deleteProject = useCallback(async (projectId: string) => {
     if (!apiBase) return false
     if (!adminToken) {
@@ -325,6 +342,7 @@ export function useProjectCatalog({
     createProject,
     duplicateProject,
     renameProject,
+    applyRemoteProjectName,
     deleteProject,
     closeProject,
     purgeProjects,

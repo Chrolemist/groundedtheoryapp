@@ -540,7 +540,7 @@ export function useProjectCollaborationSync({
       const rect = getCaretRect(selection)
       const docId = docContainer.getAttribute('data-doc-id') ?? undefined
       const editor = docId ? documentEditorInstancesRef.current.get(docId) : undefined
-      const docPos = editor?.state?.selection?.to
+      let docPos: number | undefined = editor?.state?.selection?.to
       let selectionFrom = editor?.state?.selection?.from
       let selectionTo = editor?.state?.selection?.to
       if (
@@ -553,6 +553,22 @@ export function useProjectCollaborationSync({
           if (mappedFrom !== mappedTo) {
             selectionFrom = Math.min(mappedFrom, mappedTo)
             selectionTo = Math.max(mappedFrom, mappedTo)
+          }
+        } catch {
+          // Ignore DOM mapping failures.
+        }
+      }
+
+      if (editor) {
+        // Prefer mapping from the actual DOM selection.
+        // On mobile Safari/Chrome the ProseMirror state selection can lag behind taps,
+        // which makes remote cursors drift. Using posAtDOM reflects the real caret.
+        try {
+          const mappedCaret = selection.isCollapsed
+            ? editor.view.posAtDOM(range.startContainer, range.startOffset)
+            : editor.view.posAtDOM(range.endContainer, range.endOffset)
+          if (typeof mappedCaret === 'number' && Number.isFinite(mappedCaret)) {
+            docPos = mappedCaret
           }
         } catch {
           // Ignore DOM mapping failures.
