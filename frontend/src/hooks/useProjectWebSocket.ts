@@ -41,8 +41,10 @@ const getWebSocketUrl = (projectId?: string | null) => {
     return apiUrl.toString()
   }
 
-  const host = window.location.port === '5173' ? 'localhost:8000' : window.location.host
-  return `${protocol}://${host}/ws${query}`
+  // Default: connect to the same origin as the frontend.
+  // In dev, Vite can proxy `/ws` to the backend (see `vite.config.ts`).
+  // This also avoids requiring remote devices to have direct access to backend port 8000.
+  return `${protocol}://${window.location.host}/ws${query}`
 }
 
 type UseProjectWebSocketOptions = {
