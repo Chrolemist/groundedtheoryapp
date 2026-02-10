@@ -44,6 +44,10 @@ type DashboardHeaderProps = {
   isAdmin: boolean
   onAdminLogin: () => void
   onAdminLogout: () => void
+
+  showMobileWorkspaceTabs?: boolean
+  mobileWorkspaceTab?: 'document' | 'coding'
+  onMobileWorkspaceTabChange?: (tab: 'document' | 'coding') => void
 }
 
 // Top navigation with app actions and collaborator presence.
@@ -86,6 +90,10 @@ export function DashboardHeader({
   isAdmin,
   onAdminLogin,
   onAdminLogout,
+
+  showMobileWorkspaceTabs,
+  mobileWorkspaceTab,
+  onMobileWorkspaceTabChange,
 }: DashboardHeaderProps) {
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
     typeof window === 'undefined' ? 'light' : getResolvedTheme(),
@@ -180,7 +188,7 @@ export function DashboardHeader({
                     {activeProjectName}
                   </p>
                 ) : null}
-                <div className="mt-1 flex items-center gap-2 overflow-x-auto whitespace-nowrap text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 lg:flex-wrap lg:overflow-visible lg:whitespace-normal">
+                <div className="mt-1 hidden items-center gap-2 overflow-x-auto whitespace-nowrap text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 sm:flex lg:flex-wrap lg:overflow-visible lg:whitespace-normal">
                 <span
                   className={cn(
                     'h-2 w-2 rounded-full',
@@ -188,7 +196,8 @@ export function DashboardHeader({
                   )}
                 />
                 <span>{websocketOnline ? 'Online' : 'Offline'}</span>
-                <span className="mx-1 text-slate-300 dark:text-slate-700">•</span>
+                <span className="mx-1 hidden text-slate-300 dark:text-slate-700 sm:inline">•</span>
+                <span className="hidden items-center gap-2 sm:inline-flex">
                   <span
                     className={cn(
                       'h-2 w-2 rounded-full',
@@ -207,6 +216,7 @@ export function DashboardHeader({
                       {saveWarning}
                     </span>
                   )}
+                </span>
               </div>
             </div>
             </div>
@@ -315,9 +325,38 @@ export function DashboardHeader({
               <span className="text-xs text-slate-400 dark:text-slate-500">No collaborators yet</span>
             )}
           </div>
+
+          {showMobileWorkspaceTabs && mobileWorkspaceTab && onMobileWorkspaceTabChange ? (
+            <div className="lg:hidden">
+              <div className="inline-flex w-full rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <button
+                  type="button"
+                  onClick={() => onMobileWorkspaceTabChange('document')}
+                  className={
+                    mobileWorkspaceTab === 'document'
+                      ? 'flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }
+                >
+                  Dokument
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onMobileWorkspaceTabChange('coding')}
+                  className={
+                    mobileWorkspaceTab === 'coding'
+                      ? 'flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900'
+                      : 'flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                  }
+                >
+                  Kodning
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
         {sizeLabel && sizePercent !== null && (
-          <div className="flex flex-col items-end gap-1 text-xs text-slate-600 dark:text-slate-300 lg:ml-auto">
+          <div className="hidden flex-col items-end gap-1 text-xs text-slate-600 dark:text-slate-300 lg:ml-auto lg:flex">
             <span className="rounded-full bg-slate-100 px-2 py-1 dark:bg-slate-900">
               {projectSizeLabel ?? 'Lagring'}: {sizeLabel} ({sizePercent.toFixed(0)}%)
             </span>
