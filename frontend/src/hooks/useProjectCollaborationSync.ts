@@ -116,6 +116,14 @@ export function useProjectCollaborationSync({
       !coreCategoryId &&
       !theoryHtml
 
+    const localUpdatedAt = projectUpdatedAtRef.current
+    // If localUpdatedAt is far ahead of incoming, it's likely from clock skew or stale localStorage.
+    // In that case, allow applying the remote snapshot to recover live sync.
+    const isLikelyClockSkew =
+      incomingUpdatedAt > 0 &&
+      localUpdatedAt > 0 &&
+      localUpdatedAt - incomingUpdatedAt > 30_000
+
     // If we have local unsaved changes, don't apply remote snapshots on top.
     // This prevents transient races from overwriting recent local edits.
     if (!allowReplace && !localEmpty && hasLocalProjectUpdateRef.current) {
@@ -203,7 +211,10 @@ export function useProjectCollaborationSync({
     }
 
     const shouldApply =
-      allowReplace || localEmpty || incomingUpdatedAt > projectUpdatedAtRef.current
+      allowReplace ||
+      localEmpty ||
+      isLikelyClockSkew ||
+      incomingUpdatedAt > projectUpdatedAtRef.current
     if (!shouldApply) {
       if (debugEnabled) {
         const now = Date.now()
@@ -216,6 +227,7 @@ export function useProjectCollaborationSync({
             incomingHasData,
             incomingUpdatedAt,
             localUpdatedAt: projectUpdatedAtRef.current,
+            isLikelyClockSkew,
           })
         }
       }
