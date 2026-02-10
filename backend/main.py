@@ -23,6 +23,21 @@ from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+
+def monotonic_updated_at_ms(previous: int) -> int:
+    """Generate a monotonic ms timestamp based on server time.
+
+    We use this as the canonical updated_at for project_raw to avoid client clock skew
+    breaking live sync ("stale" rejects).
+    """
+    now_ms = int(time.time() * 1000)
+    try:
+        prev_ms = int(previous) if previous else 0
+    except Exception:
+        prev_ms = 0
+    # Ensure strictly increasing when multiple updates happen quickly.
+    return max(now_ms, prev_ms + 1)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -763,6 +778,14 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     project_state = get_in_memory_project(project_id)
     project_raw = get_in_memory_project_raw(project_id)
 
+    # Ensure in-memory project_raw carries a canonical monotonic updated_at.
+    if isinstance(project_raw, dict):
+        prev_updated_at = project_raw.get("updated_at")
+        prev_ms = prev_updated_at if isinstance(prev_updated_at, int) else 0
+        next_ms = max(int(time.time() * 1000), prev_ms)
+        if next_ms and prev_ms != next_ms:
+            project_raw["updated_at"] = next_ms
+
     await websocket.send_json(
         {
             "type": "hello",
@@ -894,6 +917,15 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
                             }
                         )
                         continue
+                # Canonicalize updated_at using server time to avoid client clock skew.
+                current_raw = get_in_memory_project_raw(project_id)
+                current_updated_at = (
+                    current_raw.get("updated_at")
+                    if isinstance(current_raw, dict)
+                    else 0
+                )
+                previous_ms = current_updated_at if isinstance(current_updated_at, int) else 0
+                project_raw["updated_at"] = monotonic_updated_at_ms(previous_ms)
                 set_in_memory_project(project_id, project_raw)
                 saved_ok = save_project_to_firestore(project_raw, project_id=storage_id)
                 if not saved_ok:
@@ -1245,6 +1277,11 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
         if not isinstance(project_raw, dict):
             return {"status": "invalid"}
 
+        # Canonicalize updated_at using server time to avoid client clock skew.
+        prev_updated_at = project_raw.get("updated_at")
+        prev_ms = prev_updated_at if isinstance(prev_updated_at, int) else 0
+        project_raw["updated_at"] = monotonic_updated_at_ms(prev_ms)
+
         try:
             doc_list = project_raw.get("documents", [])
             docs_count = len(doc_list) if isinstance(doc_list, list) else 0
@@ -1344,7 +1381,7 @@ async def set_project_state_for_project(project_id: str, payload: Dict = Body(..
             doc_ref = get_project_doc_ref(project_id)
             if doc_ref:
                 doc_ref.set({"name": project_name}, merge=True)
-        return {"status": "ok"}
+        return {"status": "ok", "updated_at": project_raw.get("updated_at")}
     except Exception:
         logger.exception("Failed to save project state")
         return {"status": "error"}
@@ -1356,6 +1393,10 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
         project_raw = payload.get("project_raw") or payload.get("project") or payload
         if not isinstance(project_raw, dict):
             return {"status": "invalid"}
+
+        prev_updated_at = project_raw.get("updated_at")
+        prev_ms = prev_updated_at if isinstance(prev_updated_at, int) else 0
+        project_raw["updated_at"] = monotonic_updated_at_ms(prev_ms)
 
         limit_error = validate_project_limits(project_raw)
         if limit_error:
@@ -1383,7 +1424,7 @@ async def set_project_state(payload: Dict = Body(...)) -> Dict[str, str]:
                 "project_raw": get_in_memory_project_raw(project_id),
             },
         )
-        return {"status": "ok"}
+        return {"status": "ok", "updated_at": project_raw.get("updated_at")}
     except Exception as exc:
         logger.exception("Failed to save project state")
         return {"status": "error"}

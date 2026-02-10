@@ -153,12 +153,14 @@ export function useProjectAutosave({
     }
     lastSyncedDataRef.current = dataPayload
     hasLocalProjectUpdateRef.current = false
-    const nextUpdatedAt = Date.now()
-    projectUpdatedAtRef.current = nextUpdatedAt
 
+    // Keep outgoing updated_at for legacy clients, but do NOT use it as the local
+    // version/source-of-truth. The backend canonicalizes `updated_at` using server time
+    // to avoid clock skew across collaborators.
+    const outgoingUpdatedAt = Date.now()
     const projectRaw = {
       ...dataSnapshot,
-      updated_at: nextUpdatedAt,
+      updated_at: outgoingUpdatedAt,
     }
 
     if (enableProjectSync && hasRemoteState && sendJson) {

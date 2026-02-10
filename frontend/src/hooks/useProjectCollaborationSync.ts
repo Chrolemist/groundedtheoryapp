@@ -116,6 +116,23 @@ export function useProjectCollaborationSync({
       !coreCategoryId &&
       !theoryHtml
 
+    // If we have local unsaved changes, don't apply remote snapshots on top.
+    // This prevents transient races from overwriting recent local edits.
+    if (!allowReplace && !localEmpty && hasLocalProjectUpdateRef.current) {
+      if (debugEnabled) {
+        const now = Date.now()
+        if (now - lastSkipDebugAtRef.current > 800) {
+          lastSkipDebugAtRef.current = now
+          console.log('[Project Sync] skip applyRemoteProject (local dirty)', {
+            projectId,
+            incomingUpdatedAt,
+            localUpdatedAt: projectUpdatedAtRef.current,
+          })
+        }
+      }
+      return
+    }
+
     const hydrated = hydrateRemoteProject(project, getReadableTextColor)
     const hydratedMemos = hydrated.memos ?? []
 

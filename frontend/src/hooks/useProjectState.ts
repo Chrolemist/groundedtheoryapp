@@ -416,7 +416,10 @@ export function useProjectState({
   useEffect(() => {
     if (disableLocalStoragePersist) return
     if (projectUpdatedAtRef.current === 0 && storedHasData) {
-      projectUpdatedAtRef.current = Date.now()
+      // Do not use Date.now() here; it can be ahead of the backend's canonical timestamps
+      // and cause incoming collaboration updates to be treated as stale.
+      // We only need a non-zero sentinel to avoid "allowReplace" behavior.
+      projectUpdatedAtRef.current = 1
     }
     saveStoredProjectState(storageKey, {
       codes,
