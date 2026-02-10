@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Moon, Sun } from 'lucide-react'
+import { Menu, Moon, Sun, X } from 'lucide-react'
 import { MenuBar } from './MenuBar'
 import { type PresenceUser } from './DashboardLayout.types'
 import { cn } from '../lib/cn'
@@ -90,6 +90,7 @@ export function DashboardHeader({
   const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>(() =>
     typeof window === 'undefined' ? 'light' : getResolvedTheme(),
   )
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
@@ -203,33 +204,44 @@ export function DashboardHeader({
               </div>
             </div>
           </div>
-          <MenuBar
-            onOpenProject={onOpenProject}
-            onNewProject={onNewProject}
-            onCloseProject={onCloseProject}
-            canCloseProject={canCloseProject}
-            onExportExcel={onExportExcel}
-            onExportWord={onExportWord}
-            onAddDocument={onAddDocument}
-            onDeleteDocument={onDeleteDocument}
-            canDeleteDocument={canDeleteDocument}
-            deleteDocumentLabel={deleteDocumentLabel}
-            onRenameUser={onRenameUser}
-            onUndo={onUndo}
-            onRedo={onRedo}
-            onCut={onCut}
-            onCopy={onCopy}
-            onPaste={onPaste}
-            onSelectAll={onSelectAll}
-            onToggleCodeLabels={onToggleCodeLabels}
-            showCodeLabels={showCodeLabels}
-            onToggleMemos={onToggleMemos}
-            showMemos={showMemos}
-            onTour={onTour}
-            isAdmin={isAdmin}
-            onAdminLogin={onAdminLogin}
-            onAdminLogout={onAdminLogout}
-          />
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
+            aria-label="Open menu"
+            title="Menu"
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+          <div className="hidden lg:block">
+            <MenuBar
+              onOpenProject={onOpenProject}
+              onNewProject={onNewProject}
+              onCloseProject={onCloseProject}
+              canCloseProject={canCloseProject}
+              onExportExcel={onExportExcel}
+              onExportWord={onExportWord}
+              onAddDocument={onAddDocument}
+              onDeleteDocument={onDeleteDocument}
+              canDeleteDocument={canDeleteDocument}
+              deleteDocumentLabel={deleteDocumentLabel}
+              onRenameUser={onRenameUser}
+              onUndo={onUndo}
+              onRedo={onRedo}
+              onCut={onCut}
+              onCopy={onCopy}
+              onPaste={onPaste}
+              onSelectAll={onSelectAll}
+              onToggleCodeLabels={onToggleCodeLabels}
+              showCodeLabels={showCodeLabels}
+              onToggleMemos={onToggleMemos}
+              showMemos={showMemos}
+              onTour={onTour}
+              isAdmin={isAdmin}
+              onAdminLogin={onAdminLogin}
+              onAdminLogout={onAdminLogout}
+            />
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -260,7 +272,7 @@ export function DashboardHeader({
               Save
             </button>
           ) : null}
-          <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap pb-1 text-xs text-slate-500 [-webkit-overflow-scrolling:touch] dark:text-slate-400 lg:flex-wrap lg:overflow-visible lg:whitespace-normal lg:pb-0">
             {presenceUsers.map((user) => (
               <span
                 key={user.id}
@@ -295,6 +307,115 @@ export function DashboardHeader({
           </div>
         )}
       </div>
+
+      {mobileMenuOpen ? (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 h-full w-full bg-slate-950/40"
+            aria-label="Close menu"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          <div className="absolute left-0 top-0 h-full w-[min(92vw,380px)] border-r border-slate-200 bg-white p-4 shadow-xl dark:border-slate-800 dark:bg-slate-950">
+            <div className="mb-4 flex items-center justify-between">
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">Menu</p>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="Close menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <MenuBar
+              variant="drawer"
+              onOpenProject={() => {
+                setMobileMenuOpen(false)
+                onOpenProject()
+              }}
+              onNewProject={() => {
+                setMobileMenuOpen(false)
+                onNewProject()
+              }}
+              onCloseProject={() => {
+                setMobileMenuOpen(false)
+                onCloseProject()
+              }}
+              canCloseProject={canCloseProject}
+              onExportExcel={() => {
+                setMobileMenuOpen(false)
+                onExportExcel()
+              }}
+              onExportWord={() => {
+                setMobileMenuOpen(false)
+                onExportWord()
+              }}
+              onAddDocument={() => {
+                setMobileMenuOpen(false)
+                onAddDocument()
+              }}
+              onDeleteDocument={() => {
+                setMobileMenuOpen(false)
+                onDeleteDocument()
+              }}
+              canDeleteDocument={canDeleteDocument}
+              deleteDocumentLabel={deleteDocumentLabel}
+              onRenameUser={() => {
+                setMobileMenuOpen(false)
+                onRenameUser()
+              }}
+              onUndo={() => {
+                setMobileMenuOpen(false)
+                onUndo()
+              }}
+              onRedo={() => {
+                setMobileMenuOpen(false)
+                onRedo()
+              }}
+              onCut={() => {
+                setMobileMenuOpen(false)
+                onCut()
+              }}
+              onCopy={() => {
+                setMobileMenuOpen(false)
+                onCopy()
+              }}
+              onPaste={() => {
+                setMobileMenuOpen(false)
+                onPaste()
+              }}
+              onSelectAll={() => {
+                setMobileMenuOpen(false)
+                onSelectAll()
+              }}
+              onToggleCodeLabels={() => {
+                setMobileMenuOpen(false)
+                onToggleCodeLabels()
+              }}
+              showCodeLabels={showCodeLabels}
+              onToggleMemos={() => {
+                setMobileMenuOpen(false)
+                onToggleMemos()
+              }}
+              showMemos={showMemos}
+              onTour={() => {
+                setMobileMenuOpen(false)
+                onTour()
+              }}
+              isAdmin={isAdmin}
+              onAdminLogin={() => {
+                setMobileMenuOpen(false)
+                onAdminLogin()
+              }}
+              onAdminLogout={() => {
+                setMobileMenuOpen(false)
+                onAdminLogout()
+              }}
+            />
+          </div>
+        </div>
+      ) : null}
     </header>
   )
 }

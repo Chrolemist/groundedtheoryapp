@@ -51,13 +51,19 @@ const getTabId = () => {
 }
 
 const toBase64 = (bytes: Uint8Array) => {
-  let binary = ''
-  const chunkSize = 0x8000
+  // iOS Safari can throw when spreading large typed arrays into fromCharCode.
+  // Use a safe incremental conversion instead.
+  const parts: string[] = []
+  const chunkSize = 2048
   for (let i = 0; i < bytes.length; i += chunkSize) {
-    const chunk = bytes.subarray(i, i + chunkSize)
-    binary += String.fromCharCode(...chunk)
+    const slice = bytes.subarray(i, i + chunkSize)
+    let chunk = ''
+    for (let j = 0; j < slice.length; j += 1) {
+      chunk += String.fromCharCode(slice[j])
+    }
+    parts.push(chunk)
   }
-  return btoa(binary)
+  return btoa(parts.join(''))
 }
 
 const fromBase64 = (value: string) => {
@@ -714,11 +720,31 @@ export function useYjsSync({
         refreshFromYjs()
         return
       }
-      sendJson?.({ type: 'yjs:update', update: toBase64(update) })
-      broadcastChannelRef.current?.postMessage({
-        type: 'yjs:update',
-        update: toBase64(update),
-      })
+
+      let encoded: string | null = null
+      try {
+        encoded = toBase64(update)
+      } catch (error) {
+        if (debugEnabled) {
+          console.warn('[Yjs] failed to encode update', { projectId, error })
+        }
+      }
+
+      if (!encoded) return
+
+      const sent = sendJson?.({ type: 'yjs:update', update: encoded })
+      if (debugEnabled && sent === false) {
+        console.warn('[Yjs] failed to send yjs:update (ws not open)', { projectId })
+      }
+
+      try {
+        broadcastChannelRef.current?.postMessage({
+          type: 'yjs:update',
+          update: encoded,
+        })
+      } catch {
+        // ignore
+      }
     }
 
     ydoc.on('update', handleUpdate)

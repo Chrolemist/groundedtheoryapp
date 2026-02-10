@@ -50,6 +50,9 @@ export function DashboardLayout() {
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null)
   const [adminRetryAfterSeconds, setAdminRetryAfterSeconds] = useState<number | null>(null)
   const [isAdminLoggingIn, setIsAdminLoggingIn] = useState(false)
+  const [mobileWorkspaceTab, setMobileWorkspaceTab] = useState<'document' | 'coding'>(
+    'document',
+  )
 
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
@@ -418,6 +421,36 @@ export function DashboardLayout() {
       <main className="mx-auto grid w-full max-w-[1400px] grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[3fr_2fr]">
         {catalogActiveProjectId ? (
           <>
+            {isolationMode || hideSidebarMode ? null : (
+              <div className="lg:hidden">
+                <div className="inline-flex w-full rounded-xl border border-slate-200 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                  <button
+                    type="button"
+                    onClick={() => setMobileWorkspaceTab('document')}
+                    className={
+                      mobileWorkspaceTab === 'document'
+                        ? 'flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900'
+                        : 'flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                    }
+                  >
+                    Dokument
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileWorkspaceTab('coding')}
+                    className={
+                      mobileWorkspaceTab === 'coding'
+                        ? 'flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white dark:bg-slate-100 dark:text-slate-900'
+                        : 'flex-1 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                    }
+                  >
+                    Kodning
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className={mobileWorkspaceTab === 'document' ? 'block' : 'hidden lg:block'}>
             <DocumentViewerPanel
               documents={project.documents}
               codes={project.codes}
@@ -472,39 +505,42 @@ export function DashboardLayout() {
               isolationMode={isolationMode}
               plainEditorMode={plainEditorMode}
             />
+            </div>
 
             {isolationMode || hideSidebarMode ? null : (
-              <CodingSidebar
-                codes={project.codes}
-                categories={project.categories}
-                ungroupedCodes={project.ungroupedCodes}
-                coreCategoryId={project.coreCategoryId}
-                coreCategoryDraft={project.coreCategoryDraft}
-                memos={project.memos}
-                isTheoryEmpty={project.isTheoryEmpty}
-                showMemos={project.showMemos}
-                ydoc={project.ydoc}
-              onAddCode={project.addNewCode}
-              onApplyCode={project.applyCodeToSelection}
-              onUpdateCode={project.updateCode}
-              onRemoveCode={project.removeCode}
-              getReadableTextColor={project.getReadableTextColor}
-              onAddCategory={project.handleAddCategory}
-              onUpdateCategory={project.updateCategory}
-              onRemoveCategory={project.removeCategory}
-              onRemoveCodeFromCategory={project.removeCodeFromCategory}
-              onCoreCategoryDraftChange={project.setCoreCategoryDraft}
-              onCreateCoreCategory={project.handleCreateCoreCategory}
-              onAddCodeMemo={project.handleAddCodeMemo}
-              onAddCategoryMemo={project.handleAddCategoryMemo}
-              onAddGlobalMemo={project.handleAddGlobalMemo}
-              onUpdateMemo={project.updateMemo}
-              onRemoveMemo={project.removeMemo}
-              onApplyEditorCommand={project.applyEditorCommand}
-              onTheoryInput={project.setTheoryHtml}
-              onTheoryEditorRef={project.setTheoryEditorRef}
-              onMoveCode={project.moveCodeToCategory}
-              />
+              <div className={mobileWorkspaceTab === 'coding' ? 'block' : 'hidden lg:block'}>
+                <CodingSidebar
+                  codes={project.codes}
+                  categories={project.categories}
+                  ungroupedCodes={project.ungroupedCodes}
+                  coreCategoryId={project.coreCategoryId}
+                  coreCategoryDraft={project.coreCategoryDraft}
+                  memos={project.memos}
+                  isTheoryEmpty={project.isTheoryEmpty}
+                  showMemos={project.showMemos}
+                  ydoc={project.ydoc}
+                  onAddCode={project.addNewCode}
+                  onApplyCode={project.applyCodeToSelection}
+                  onUpdateCode={project.updateCode}
+                  onRemoveCode={project.removeCode}
+                  getReadableTextColor={project.getReadableTextColor}
+                  onAddCategory={project.handleAddCategory}
+                  onUpdateCategory={project.updateCategory}
+                  onRemoveCategory={project.removeCategory}
+                  onRemoveCodeFromCategory={project.removeCodeFromCategory}
+                  onCoreCategoryDraftChange={project.setCoreCategoryDraft}
+                  onCreateCoreCategory={project.handleCreateCoreCategory}
+                  onAddCodeMemo={project.handleAddCodeMemo}
+                  onAddCategoryMemo={project.handleAddCategoryMemo}
+                  onAddGlobalMemo={project.handleAddGlobalMemo}
+                  onUpdateMemo={project.updateMemo}
+                  onRemoveMemo={project.removeMemo}
+                  onApplyEditorCommand={project.applyEditorCommand}
+                  onTheoryInput={project.setTheoryHtml}
+                  onTheoryEditorRef={project.setTheoryEditorRef}
+                  onMoveCode={project.moveCodeToCategory}
+                />
+              </div>
             )}
           </>
         ) : (
