@@ -31,10 +31,11 @@ type UseYjsSyncArgs = {
   isApplyingRemoteRef: MutableRefObject<boolean>
 }
 
-type DocumentMapValue = Y.Text
-type CodeMapValue = Y.Text
-type CategoryMapValue = Y.Text | Y.Array<string>
-type MemoMapValue = Y.Text
+type ScalarValue = string | Y.Text
+type DocumentMapValue = ScalarValue
+type CodeMapValue = ScalarValue
+type CategoryMapValue = ScalarValue | Y.Array<string>
+type MemoMapValue = ScalarValue
 
 const LOCAL_ORIGIN = 'local-yjs'
 const REMOTE_ORIGIN = 'remote-yjs'
@@ -117,6 +118,17 @@ const hasMeaningfulContent = (html: string, text: string) => {
   const trimmedHtml = (html ?? '').trim()
   if (!trimmedHtml) return false
   return !isEffectivelyEmptyHtml(trimmedHtml)
+}
+
+const readScalarString = (value: unknown) => {
+  if (!value) return ''
+  if (value instanceof Y.Text) return value.toString()
+  // Strings (and most primitives) safely stringify.
+  try {
+    return String(value)
+  } catch {
+    return ''
+  }
 }
 
 export function useYjsSync({
@@ -404,9 +416,9 @@ export function useYjsSync({
       return orderedIds.map((id) => {
         const map = documentsMap.get(id)
         const fallback = currentById.get(id)
-        const title = (map?.get('title') as Y.Text | undefined)?.toString() ?? fallback?.title ?? ''
-        const mapHtml = (map?.get('html') as Y.Text | undefined)?.toString() ?? ''
-        const mapText = (map?.get('text') as Y.Text | undefined)?.toString() ?? ''
+        const title = readScalarString(map?.get('title')) || fallback?.title || ''
+        const mapHtml = readScalarString(map?.get('html'))
+        const mapText = readScalarString(map?.get('text'))
         const fallbackHtml = fallback?.html ?? ''
         const fallbackText = fallback?.text ?? ''
         const mapHas = hasMeaningfulContent(mapHtml, mapText)
@@ -841,18 +853,13 @@ export function useYjsSync({
         }
       }
 
-      const ensureText = (map: Y.Map<Y.Text>, key: string, value: string) => {
-        const text = map.get(key)
-        if (!text) {
-          const next = new Y.Text()
-          next.insert(0, value)
-          map.set(key, next)
-          return
-        }
-        if (text.toString() !== value) {
-          text.delete(0, text.length)
-          text.insert(0, value)
-        }
+      const ensureScalar = (map: Y.Map<unknown>, key: string, value: string) => {
+        const current = map.get(key)
+        const currentValue = current instanceof Y.Text ? current.toString() : typeof current === 'string' ? current : current ? String(current) : ''
+        if (currentValue === value) return
+        // Use primitive strings for scalar fields so concurrent full-field rewrites don't merge
+        // into duplicated content (a known issue with Y.Text delete+insert patterns).
+        map.set(key, value)
       }
 
       const ensureCategoryText = (map: Y.Map<CategoryMapValue>, key: string, value: string) => {
@@ -900,9 +907,9 @@ export function useYjsSync({
           map = new Y.Map<DocumentMapValue>()
           documentsMap.set(doc.id, map)
         }
-        ensureText(map as Y.Map<Y.Text>, 'title', doc.title)
-        ensureText(map as Y.Map<Y.Text>, 'html', doc.html ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'text', doc.text ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'title', doc.title)
+        ensureScalar(map as unknown as Y.Map<unknown>, 'html', doc.html ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'text', doc.text ?? '')
       })
       Array.from(documentsMap.keys()).forEach((id) => {
         if (documentIds.includes(id)) return
@@ -917,12 +924,12 @@ export function useYjsSync({
           map = new Y.Map<CodeMapValue>()
           codesMap.set(code.id, map)
         }
-        ensureText(map as Y.Map<Y.Text>, 'label', code.label)
-        ensureText(map as Y.Map<Y.Text>, 'description', code.description ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'colorClass', code.colorClass ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'colorHex', code.colorHex ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'textHex', code.textHex ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'ringHex', code.ringHex ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'label', code.label)
+        ensureScalar(map as unknown as Y.Map<unknown>, 'description', code.description ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'colorClass', code.colorClass ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'colorHex', code.colorHex ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'textHex', code.textHex ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'ringHex', code.ringHex ?? '')
       })
       Array.from(codesMap.keys()).forEach((id) => {
         if (codeIds.includes(id)) return
@@ -937,10 +944,11 @@ export function useYjsSync({
           map = new Y.Map<CategoryMapValue>()
           categoriesMap.set(category.id, map)
         }
-        ensureCategoryText(map, 'name', category.name)
-        ensureCategoryText(map, 'precondition', category.precondition)
-        ensureCategoryText(map, 'action', category.action)
-        ensureCategoryText(map, 'consequence', category.consequence)
+        // Category text fields can also be safely stored as strings to avoid merge duplication.
+        ensureScalar(map as unknown as Y.Map<unknown>, 'name', category.name)
+        ensureScalar(map as unknown as Y.Map<unknown>, 'precondition', category.precondition)
+        ensureScalar(map as unknown as Y.Map<unknown>, 'action', category.action)
+        ensureScalar(map as unknown as Y.Map<unknown>, 'consequence', category.consequence)
         ensureArray(map, 'codeIds', category.codeIds)
       })
       Array.from(categoriesMap.keys()).forEach((id) => {
@@ -956,12 +964,12 @@ export function useYjsSync({
           map = new Y.Map<MemoMapValue>()
           memosMap.set(memo.id, map)
         }
-        ensureText(map as Y.Map<Y.Text>, 'type', memo.type ?? 'global')
-        ensureText(map as Y.Map<Y.Text>, 'refId', memo.refId ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'title', memo.title ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'body', memo.body ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'createdAt', memo.createdAt ?? '')
-        ensureText(map as Y.Map<Y.Text>, 'updatedAt', memo.updatedAt ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'type', memo.type ?? 'global')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'refId', memo.refId ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'title', memo.title ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'body', memo.body ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'createdAt', memo.createdAt ?? '')
+        ensureScalar(map as unknown as Y.Map<unknown>, 'updatedAt', memo.updatedAt ?? '')
       })
       Array.from(memosMap.keys()).forEach((id) => {
         if (memoIds.includes(id)) return

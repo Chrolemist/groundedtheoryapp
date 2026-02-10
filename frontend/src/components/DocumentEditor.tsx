@@ -9,90 +9,14 @@ import type * as Y from 'yjs'
 type DocumentEditorProps = {
   documentId: string
   initialHtml: string
-  onUpdate: (html: string, text: string) => void
-  onLocalChange?: () => void
-  onEditorReady: (documentId: string, editor: ReturnType<typeof useEditor> | null) => void
-  onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void
-  onMouseUp?: (event: React.MouseEvent<HTMLDivElement>) => void
-  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
-  editorRef: (node: HTMLDivElement | null) => void
-  ydoc: Y.Doc
-  fontFamily: string
-  fontFamilyValue: string
-  lineHeight: string
-  setFontFamily: (value: string) => void
-  setLineHeight: (value: string) => void
-  collaborationEnabled?: boolean
-  canSeedInitialContent: boolean
-  seedReady: boolean
-  hasRemoteUpdates: boolean
-  hasReceivedSync: boolean
-}
 
-export function DocumentEditor({
-  documentId,
-  initialHtml,
-  onUpdate,
-  onLocalChange,
-  onEditorReady,
-  onMouseDown,
-  onMouseUp,
-  onClick,
-  editorRef,
-  ydoc,
-  fontFamily,
-  fontFamilyValue,
-  lineHeight,
-  setFontFamily,
-  setLineHeight,
-  collaborationEnabled = true,
-  canSeedInitialContent,
-  seedReady,
-  hasRemoteUpdates,
-  hasReceivedSync,
-}: DocumentEditorProps) {
-  const didSeedRef = useRef(false)
-  const didSyncRef = useRef(false)
-  const fallbackSeedTimerRef = useRef<number | null>(null)
-  const lastAppliedHtmlRef = useRef<string>('')
-  const tabIdRef = useRef<string>('')
-  const debugRef = useRef({ lastLogAt: 0 })
-  const debugEnabled =
-    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    const key = 'gt-tab-id'
-    const stored = window.sessionStorage.getItem(key)
-    if (stored) {
-      tabIdRef.current = stored
-      return
-    }
-    const next = crypto.randomUUID()
-    window.sessionStorage.setItem(key, next)
-    tabIdRef.current = next
-  }, [])
-
-  const tryAcquireSeedLock = () => {
-    if (typeof window === 'undefined') return true
-    const tabId = tabIdRef.current || 'unknown'
-    const lockKey = `gt-doc-seed-lock:${documentId}`
-    const now = Date.now()
-    const TTL_MS = 10_000
-    try {
-      const raw = window.localStorage.getItem(lockKey)
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as { tabId?: string; ts?: number }
-          const owner = typeof parsed.tabId === 'string' ? parsed.tabId : ''
-          const ts = typeof parsed.ts === 'number' ? parsed.ts : 0
-          const fresh = ts > 0 && now - ts < TTL_MS
-          if (fresh && owner && owner !== tabId) {
-            return false
-          }
-        } catch {
-          // ignore malformed lock
-        }
+    // IMPORTANT: Only one client should ever seed snapshot HTML into the shared Yjs document.
+    // If multiple devices seed concurrently (common during reconnect), CRDT merges can duplicate
+    // the content. We therefore only seed when presence/WS is ready AND this client is the
+    // designated seeder.
+    clearFallbackTimer()
+    if (!seedReady) return
+    if (!canSeedInitialContent) return
       }
       window.localStorage.setItem(lockKey, JSON.stringify({ tabId, ts: now }))
       return true
@@ -273,10 +197,10 @@ export function DocumentEditor({
 
     clearFallbackTimer()
 
-    // If we are the designated seeder (or presence isn't running), we can seed immediately.
+    // If we are the designated seeder, we can seed immediately.
     // Do not require hasReceivedSync here; in some network races yjs:sync can be delayed/missed,
     // and blocking seeding leaves the editor blank even though we have snapshot HTML.
-    if (editorIsEmpty && initialHtml && canSeedInitialContent) {
+    if (editorIsEmpty && initialHtml) {
       if (!tryAcquireSeedLock()) {
         if (debugEnabled) {
           console.log('[DocEditor] seed-lock held (skip designated seed)', { documentId })

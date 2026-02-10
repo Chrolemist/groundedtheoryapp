@@ -208,9 +208,18 @@ export function useCollaboration({ onProjectUpdate, onProjectNameUpdate, project
           onProjectUpdate(projectRaw)
         }
 
-        const projectName = typeof data.name === 'string' ? data.name : null
-        if (projectName) {
-          onProjectNameUpdate?.(projectName)
+        const projectNameFromHello =
+          (typeof (data as { name?: unknown }).name === 'string'
+            ? ((data as { name: string }).name as string)
+            : null) ||
+          (typeof (data as { project?: { name?: unknown } }).project?.name === 'string'
+            ? ((data as { project: { name: string } }).project.name as string)
+            : null) ||
+          (typeof (projectRaw as { name?: unknown } | undefined)?.name === 'string'
+            ? ((projectRaw as { name: string }).name as string)
+            : null)
+        if (projectNameFromHello) {
+          onProjectNameUpdate?.(projectNameFromHello)
         }
 
         // WS reconnects can create a new server-side user with a new random name.
