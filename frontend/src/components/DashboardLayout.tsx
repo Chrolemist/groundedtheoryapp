@@ -54,6 +54,10 @@ export function DashboardLayout() {
     'document',
   )
 
+  const projectRenamePersistTimerRef = useRef<number | null>(null)
+  const lastBroadcastProjectNameRef = useRef('')
+  const lastRequestedProjectNameRef = useRef('')
+
   const apiBase = useMemo(() => {
     if (typeof window === 'undefined') return ''
     const configured = (import.meta.env.VITE_API_BASE as string | undefined) ?? ''
@@ -135,6 +139,15 @@ export function DashboardLayout() {
   }, [project.applyRemoteProject])
 
   useEffect(() => {
+    return () => {
+      if (projectRenamePersistTimerRef.current) {
+        window.clearTimeout(projectRenamePersistTimerRef.current)
+        projectRenamePersistTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
     if (!catalogActiveProjectId) {
       void refreshCatalogStorage()
     }
@@ -211,20 +224,40 @@ export function DashboardLayout() {
     }
   }
 
-  const handleRenameProject = async (name: string) => {
+  const handleRenameProject = (name: string) => {
     if (!catalog.activeProjectId) return
     const trimmed = name.trim()
     if (!trimmed) return
-    await catalog.renameProject(catalog.activeProjectId, trimmed)
-    // Also broadcast via WS using an existing message type so other clients can update
-    // their project title even if the backend doesn't emit a dedicated project:rename event.
-    sendJson?.({
-      type: 'project:update',
-      project_raw: {
-        name: trimmed,
-        updated_at: Date.now(),
-      },
-    })
+
+    // Update local UI immediately.
+    catalog.applyRemoteProjectName(trimmed)
+
+    // Broadcast the rename so other collaborators see it live.
+    if (trimmed !== lastBroadcastProjectNameRef.current) {
+      lastBroadcastProjectNameRef.current = trimmed
+      sendJson?.({
+        type: 'project:update',
+        project_raw: {
+          name: trimmed,
+          updated_at: Date.now(),
+        },
+      })
+    }
+
+    // Persist to backend, but debounce to avoid sending a PATCH for every keystroke.
+    lastRequestedProjectNameRef.current = trimmed
+    if (projectRenamePersistTimerRef.current) {
+      window.clearTimeout(projectRenamePersistTimerRef.current)
+      projectRenamePersistTimerRef.current = null
+    }
+    const projectId = catalog.activeProjectId
+    projectRenamePersistTimerRef.current = window.setTimeout(() => {
+      if (!projectId) return
+      if (catalog.activeProjectId !== projectId) return
+      const finalName = lastRequestedProjectNameRef.current
+      if (!finalName) return
+      void catalog.renameProject(projectId, finalName)
+    }, 800)
   }
 
   const handleDeleteProject = async (projectId: string) => {

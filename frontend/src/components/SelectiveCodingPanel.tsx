@@ -133,7 +133,7 @@ export function SelectiveCodingPanel({
                 className="min-h-[140px] px-3 py-3 text-sm text-slate-700 outline-none dark:text-slate-100"
                 contentEditable
                 suppressContentEditableWarning
-                onInput={(event) => onTheoryInput((event.target as HTMLDivElement).innerHTML)}
+                onInput={(event) => onTheoryInput((event.currentTarget as HTMLDivElement).innerHTML)}
               />
             </div>
           </div>

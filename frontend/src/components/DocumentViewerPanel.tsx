@@ -146,6 +146,9 @@ export function DocumentViewerPanel({
   })
   const [isEditingProjectName, setIsEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState(projectName)
+  const projectNameDraftTimerRef = useRef<number | null>(null)
+  const lastSentProjectNameDraftRef = useRef<string>('')
+  const projectNameEditStartRef = useRef<string>(projectName)
   const canRenameProject = Boolean(onProjectNameChange)
   const displayProjectName = projectName.trim() || 'Untitled project'
   const [deferEditorMount, setDeferEditorMount] = useState(false)
@@ -160,6 +163,11 @@ export function DocumentViewerPanel({
       if (deferTimerRef.current) {
         window.clearTimeout(deferTimerRef.current)
         deferTimerRef.current = null
+      }
+
+      if (projectNameDraftTimerRef.current) {
+        window.clearTimeout(projectNameDraftTimerRef.current)
+        projectNameDraftTimerRef.current = null
       }
     }
   }, [])
@@ -362,36 +370,82 @@ export function DocumentViewerPanel({
           {isEditingProjectName ? (
             <input
               value={projectNameDraft}
-              onChange={(event) => setProjectNameDraft(event.target.value)}
+              onChange={(event) => {
+                const nextValue = event.target.value
+                setProjectNameDraft(nextValue)
+
+                if (!onProjectNameChange) return
+                if (projectNameDraftTimerRef.current) {
+                  window.clearTimeout(projectNameDraftTimerRef.current)
+                  projectNameDraftTimerRef.current = null
+                }
+
+                projectNameDraftTimerRef.current = window.setTimeout(() => {
+                  const trimmed = nextValue.trim()
+                  if (!trimmed) return
+                  if (trimmed === lastSentProjectNameDraftRef.current) return
+                  lastSentProjectNameDraftRef.current = trimmed
+                  if (trimmed !== projectName.trim()) {
+                    onProjectNameChange(trimmed)
+                  }
+                }, 250)
+              }}
               onBlur={() => {
                 const trimmed = projectNameDraft.trim()
                 setIsEditingProjectName(false)
+
+                if (projectNameDraftTimerRef.current) {
+                  window.clearTimeout(projectNameDraftTimerRef.current)
+                  projectNameDraftTimerRef.current = null
+                }
+
                 if (!onProjectNameChange) return
                 if (!trimmed) {
                   setProjectNameDraft(projectName)
                   return
                 }
                 if (trimmed !== projectName.trim()) {
+                  lastSentProjectNameDraftRef.current = trimmed
                   onProjectNameChange(trimmed)
                 }
               }}
               onKeyDown={(event) => {
                 if (event.key === 'Escape') {
                   event.preventDefault()
-                  setProjectNameDraft(projectName)
+                  if (projectNameDraftTimerRef.current) {
+                    window.clearTimeout(projectNameDraftTimerRef.current)
+                    projectNameDraftTimerRef.current = null
+                  }
+                  const restore = projectNameEditStartRef.current
+                  setProjectNameDraft(restore)
                   setIsEditingProjectName(false)
+
+                  if (!onProjectNameChange) return
+                  const trimmedRestore = restore.trim()
+                  if (!trimmedRestore) return
+                  lastSentProjectNameDraftRef.current = trimmedRestore
+                  if (trimmedRestore !== projectName.trim()) {
+                    onProjectNameChange(trimmedRestore)
+                  }
                   return
                 }
                 if (event.key === 'Enter') {
                   event.preventDefault()
                   const trimmed = projectNameDraft.trim()
                   setIsEditingProjectName(false)
+
+                  if (projectNameDraftTimerRef.current) {
+                    window.clearTimeout(projectNameDraftTimerRef.current)
+                    projectNameDraftTimerRef.current = null
+                  }
+
                   if (!onProjectNameChange) return
                   if (!trimmed) {
                     setProjectNameDraft(projectName)
                     return
                   }
                   if (trimmed !== projectName.trim()) {
+                    lastSentProjectNameDraftRef.current = trimmed
                     onProjectNameChange(trimmed)
                   }
                 }
@@ -405,6 +459,7 @@ export function DocumentViewerPanel({
               type="button"
               onClick={() => {
                 if (!canRenameProject) return
+                projectNameEditStartRef.current = projectName
                 setProjectNameDraft(projectName)
                 setIsEditingProjectName(true)
               }}
