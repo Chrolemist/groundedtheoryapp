@@ -228,21 +228,24 @@ export function useYjsSync({
       }
       if (data.type === 'yjs:sync') {
         const updates = Array.isArray(data.updates) ? data.updates : []
-        setHasReceivedSync(true)
-        if (updates.length > 0) setHasRemoteUpdates(true)
         updates.forEach((update) => {
           if (typeof update !== 'string') return
           const decoded = fromBase64(update)
           Y.applyUpdate(ydoc, decoded, REMOTE_ORIGIN)
         })
+        // IMPORTANT: Mark sync as received only AFTER applying updates.
+        // Otherwise downstream consumers can observe hasReceivedSync=true while the
+        // shared Yjs fragments are still empty, leading to duplicate seeding.
+        setHasReceivedSync(true)
+        if (updates.length > 0) setHasRemoteUpdates(true)
         return
       }
       if (data.type !== 'yjs:update') return
       const update = typeof data.update === 'string' ? data.update : null
       if (!update) return
-      setHasRemoteUpdates(true)
       const decoded = fromBase64(update)
       Y.applyUpdate(ydoc, decoded, REMOTE_ORIGIN)
+      setHasRemoteUpdates(true)
     },
   })
 
@@ -647,6 +650,11 @@ export function useYjsSync({
       const data = event.data as { type?: string; update?: string; from?: number } | undefined
       if (!data || typeof data.type !== 'string') return
       if (data.type === 'yjs:update' && typeof data.update === 'string') {
+        if (debugEnabled) {
+          console.log('[Yjs][local] recv update', { projectId, from: data.from })
+        }
+        const decoded = fromBase64(data.update)
+        Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         setHasRemoteUpdates(true)
         if (disableWs) {
           setHasReceivedSync(true)
@@ -658,16 +666,9 @@ export function useYjsSync({
             }
           }
         }
-        if (debugEnabled) {
-          console.log('[Yjs][local] recv update', { projectId, from: data.from })
-        }
-        const decoded = fromBase64(data.update)
-        Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
         return
       }
       if (data.type === 'yjs:sync' && typeof data.update === 'string') {
-        setHasReceivedSync(true)
-        setHasRemoteUpdates(true)
         if (localLeaderSeedTimerRef.current) {
           window.clearTimeout(localLeaderSeedTimerRef.current)
           localLeaderSeedTimerRef.current = null
@@ -680,6 +681,9 @@ export function useYjsSync({
         }
         const decoded = fromBase64(data.update)
         Y.applyUpdate(ydoc, decoded, BROADCAST_ORIGIN)
+        // Mark sync only after applying update to avoid seeding races.
+        setHasReceivedSync(true)
+        setHasRemoteUpdates(true)
         return
       }
       if (data.type === 'yjs:hello' && typeof data.from === 'number' && data.from !== clientId) {
