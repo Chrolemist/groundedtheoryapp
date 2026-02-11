@@ -1,3 +1,4 @@
+import { useCallback, useRef } from 'react'
 import { type Category } from '../types'
 
 type SelectiveCodingPanelProps = {
@@ -23,6 +24,20 @@ export function SelectiveCodingPanel({
   onTheoryInput,
   theoryEditorRef,
 }: SelectiveCodingPanelProps) {
+  const isComposingRef = useRef(false)
+  const lastSentHtmlRef = useRef<string>('')
+
+  const emitHtml = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (!element) return
+      const html = element.innerHTML
+      if (html === lastSentHtmlRef.current) return
+      lastSentHtmlRef.current = html
+      onTheoryInput(html)
+    },
+    [onTheoryInput],
+  )
+
   return (
     <div className="space-y-4">
       <div>
@@ -133,7 +148,28 @@ export function SelectiveCodingPanel({
                 className="min-h-[140px] px-3 py-3 text-sm text-slate-700 outline-none dark:text-slate-100"
                 contentEditable
                 suppressContentEditableWarning
-                onInput={(event) => onTheoryInput((event.currentTarget as HTMLDivElement).innerHTML)}
+                onCompositionStart={() => {
+                  isComposingRef.current = true
+                }}
+                onCompositionEnd={(event) => {
+                  isComposingRef.current = false
+                  emitHtml(event.currentTarget as HTMLDivElement)
+                }}
+                onInput={(event) => {
+                  if (isComposingRef.current) return
+                  emitHtml(event.currentTarget as HTMLDivElement)
+                }}
+                onPaste={(event) => {
+                  const element = event.currentTarget as HTMLDivElement
+                  queueMicrotask(() => {
+                    if (isComposingRef.current) return
+                    emitHtml(element)
+                  })
+                }}
+                onBlur={(event) => {
+                  if (isComposingRef.current) return
+                  emitHtml(event.currentTarget as HTMLDivElement)
+                }}
               />
             </div>
           </div>
