@@ -850,20 +850,6 @@ export function useYjsSync({
         map.set(key, value)
       }
 
-      const ensureCategoryText = (map: Y.Map<CategoryMapValue>, key: string, value: string) => {
-        const text = map.get(key) as Y.Text | undefined
-        if (!text) {
-          const next = new Y.Text()
-          next.insert(0, value)
-          map.set(key, next)
-          return
-        }
-        if (text.toString() !== value) {
-          text.delete(0, text.length)
-          text.insert(0, value)
-        }
-      }
-
       const ensureArray = (map: Y.Map<CategoryMapValue>, key: string, value: string[]) => {
         const array = map.get(key) as Y.Array<string> | undefined
         if (!array) {
