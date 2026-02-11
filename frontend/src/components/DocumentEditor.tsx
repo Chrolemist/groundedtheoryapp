@@ -1,49 +1,123 @@
-import { useEffect, useRef } from 'react'
-import { EditorContent, useEditor } from '@tiptap/react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
 import Underline from '@tiptap/extension-underline'
 import { CodeHighlight } from '../tiptap/CodeHighlight'
+import type { Doc as YDoc } from 'yjs'
 import type * as Y from 'yjs'
 
 type DocumentEditorProps = {
   documentId: string
   initialHtml: string
+  ydoc: YDoc
+  collaborationEnabled: boolean
+  canSeedInitialContent: boolean
+  seedReady: boolean
+  hasRemoteUpdates: boolean
+  hasReceivedSync: boolean
+  fontFamily: string
+  fontFamilyValue: string
+  lineHeight: string
+  setFontFamily: (value: string) => void
+  setLineHeight: (value: string) => void
+  onUpdate: (html: string, text: string) => void
+  onLocalChange?: () => void
+  onEditorReady: (documentId: string, editor: Editor | null) => void
+  onMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void
+  onMouseUp?: (event: React.MouseEvent<HTMLDivElement>) => void
+  onClick?: (event: React.MouseEvent<HTMLDivElement>) => void
+  editorRef?: (node: HTMLDivElement | null) => void
+}
 
-    // IMPORTANT: Only one client should ever seed snapshot HTML into the shared Yjs document,
-    // and only AFTER we have received the server's yjs:sync. If a client seeds before sync
-    // arrives (common during reconnect), the later sync will merge the same content and create
-    // duplicates.
-    clearFallbackTimer()
-    if (!seedReady) return
-    if (!hasReceivedSync) {
-      // If remote updates have already populated the fragment/editor, mark as seeded.
-      if (!editorIsEmpty || fragment.length > 0 || hasRemoteUpdates) {
-        didSeedRef.current = true
-      }
-      return
-    }
-    if (!canSeedInitialContent) return
+const getTabId = () => {
+  if (typeof window === 'undefined') return 'server'
+  const key = 'gt-tab-id'
+  const stored = window.sessionStorage.getItem(key)
+  if (stored) return stored
+  const next = crypto.randomUUID()
+  window.sessionStorage.setItem(key, next)
+  return next
+}
+
+export function DocumentEditor({
+  documentId,
+  initialHtml,
+  ydoc,
+  collaborationEnabled,
+  canSeedInitialContent,
+  seedReady,
+  hasRemoteUpdates,
+  hasReceivedSync,
+  fontFamily,
+  fontFamilyValue,
+  lineHeight,
+  setFontFamily,
+  setLineHeight,
+  onUpdate,
+  onLocalChange,
+  onEditorReady,
+  onMouseDown,
+  onMouseUp,
+  onClick,
+  editorRef,
+}: DocumentEditorProps) {
+  const debugEnabled =
+    typeof window !== 'undefined' && window.localStorage.getItem('gt-debug') === 'true'
+
+  const didSeedRef = useRef(false)
+  const didSyncRef = useRef(false)
+  const fallbackSeedTimerRef = useRef<number | null>(null)
+  const lastAppliedHtmlRef = useRef<string>('')
+  const debugRef = useRef({ lastLogAt: 0 })
+
+  const clearFallbackTimer = () => {
+    if (!fallbackSeedTimerRef.current) return
+    window.clearTimeout(fallbackSeedTimerRef.current)
+    fallbackSeedTimerRef.current = null
+  }
+
+  const tryAcquireSeedLock = () => {
+    if (typeof window === 'undefined') return true
+    const tabId = getTabId()
+    const lockKey = `gt-doc-seed-lock:${documentId}`
+    const now = Date.now()
+    const STALE_AFTER_MS = 4000
+    try {
+      const raw = window.localStorage.getItem(lockKey)
+      if (raw) {
+        const parsed = JSON.parse(raw) as { tabId?: string; ts?: number }
+        if (
+          parsed &&
+          typeof parsed.tabId === 'string' &&
+          typeof parsed.ts === 'number' &&
+          now - parsed.ts < STALE_AFTER_MS &&
+          parsed.tabId !== tabId
+        ) {
+          return false
+        }
       }
       window.localStorage.setItem(lockKey, JSON.stringify({ tabId, ts: now }))
       return true
     } catch {
-      // If storage is blocked, fall back to allowing seeding.
       return true
     }
   }
 
-  const extensions = collaborationEnabled
-    ? [
-        StarterKit.configure({ history: false }),
-        Underline,
-        CodeHighlight,
-        Collaboration.configure({
-          document: ydoc,
-          field: documentId,
-        }),
-      ]
-    : [StarterKit, Underline, CodeHighlight]
+  const extensions = useMemo(() => {
+    return collaborationEnabled
+      ? [
+          StarterKit.configure({ history: false }),
+          Underline,
+          CodeHighlight,
+          Collaboration.configure({
+            document: ydoc as unknown as Y.Doc,
+            field: documentId,
+          }),
+        ]
+      : [StarterKit, Underline, CodeHighlight]
+  }, [collaborationEnabled, documentId, ydoc])
+
   const editor = useEditor({
     extensions,
     content: '',
@@ -77,7 +151,16 @@ type DocumentEditorProps = {
   }, [documentId, editor, onEditorReady])
 
   useEffect(() => {
+    return () => {
+      clearFallbackTimer()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
     if (!editor) return
+
+    // Plain mode: seed from snapshot HTML immediately.
     if (!collaborationEnabled) {
       if (didSeedRef.current) return
       if (!initialHtml) return
@@ -93,7 +176,8 @@ type DocumentEditorProps = {
       return
     }
 
-    const fragment = ydoc.getXmlFragment(documentId)
+    const fragment = (ydoc as unknown as Y.Doc).getXmlFragment(documentId)
+
     if (debugEnabled) {
       const now = Date.now()
       if (now - debugRef.current.lastLogAt > 800) {
@@ -110,130 +194,75 @@ type DocumentEditorProps = {
         })
       }
     }
+
     if (didSeedRef.current) return
 
     const currentText = editor.getText().trim()
     const editorIsEmpty = currentText.length === 0
 
-    const clearFallbackTimer = () => {
-      if (!fallbackSeedTimerRef.current) return
-      window.clearTimeout(fallbackSeedTimerRef.current)
-      fallbackSeedTimerRef.current = null
-    }
-
-    // While we wait for WS/presence (seedReady) we must NOT seed immediately in multiple tabs,
-    // otherwise each tab will insert the same snapshot into Yjs and the merge duplicates text.
-    // Instead, wait briefly and only seed if we can acquire a lock.
-    if (!seedReady) {
+    // IMPORTANT: Never seed snapshot HTML into Yjs until AFTER we have received yjs:sync.
+    // Otherwise the later sync merges the same content and duplicates everything.
+    if (!hasReceivedSync) {
       clearFallbackTimer()
-      if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
-        fallbackSeedTimerRef.current = window.setTimeout(() => {
-          fallbackSeedTimerRef.current = null
-          if (didSeedRef.current) return
-          if (!editor) return
-          const nowText = editor.getText().trim()
-          const stillEmpty = nowText.length === 0
-          const stillNoRemote = !hasRemoteUpdates
-          const stillEmptyFragment = ydoc.getXmlFragment(documentId).length === 0
-          if (!stillEmpty || !stillNoRemote || !stillEmptyFragment) return
-          if (!tryAcquireSeedLock()) {
-            if (debugEnabled) {
-              console.log('[DocEditor] seed-lock held (waiting for remote)', { documentId })
-            }
-            return
-          }
-          if (debugEnabled) {
-            console.log('[DocEditor] delayed seed setContent (seedReady=false)', {
-              documentId,
-              initialHtmlLen: initialHtml.length,
-            })
-          }
-          editor.commands.setContent(initialHtml, false)
-          didSeedRef.current = true
-          lastAppliedHtmlRef.current = editor.getHTML()
-        }, 1200)
-
-        return () => {
-          clearFallbackTimer()
-        }
+      if (!editorIsEmpty || fragment.length > 0 || hasRemoteUpdates) {
+        didSeedRef.current = true
       }
-      return () => {
-        clearFallbackTimer()
-      }
+      return
     }
 
-    // If presence is ready and we are not the designated seeder, give the seeder a short
-    // window to push Yjs updates. If nothing arrives and the fragment is still empty,
-    // seed anyway so cross-device users don't get stuck with a blank document.
-    if (seedReady && !canSeedInitialContent) {
-      clearFallbackTimer()
-      if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
-        fallbackSeedTimerRef.current = window.setTimeout(() => {
-          fallbackSeedTimerRef.current = null
-          if (didSeedRef.current) return
-          if (!editor) return
-          const nowText = editor.getText().trim()
-          const stillEmpty = nowText.length === 0
-          const stillNoRemote = !hasRemoteUpdates
-          const stillEmptyFragment = ydoc.getXmlFragment(documentId).length === 0
-          if (!stillEmpty || !stillNoRemote || !stillEmptyFragment) return
-          if (!tryAcquireSeedLock()) {
-            if (debugEnabled) {
-              console.log('[DocEditor] seed-lock held (skip fallback seed)', { documentId })
-            }
-            return
-          }
-          if (debugEnabled) {
-            console.log('[DocEditor] fallback seed setContent', {
-              documentId,
-              initialHtmlLen: initialHtml.length,
-            })
-          }
-          editor.commands.setContent(initialHtml, false)
-          didSeedRef.current = true
-        }, 1200)
+    // After sync: seed ONLY if the shared fragment is still empty and no remote updates arrived.
+    const shouldSeed = editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates
 
-        return () => {
-          clearFallbackTimer()
-        }
-      }
-      return () => {
-        clearFallbackTimer()
-      }
-    }
-
-    clearFallbackTimer()
-
-    // Only seed if the shared Yjs fragment is still empty and we haven't observed remote updates.
-    if (editorIsEmpty && initialHtml && fragment.length === 0 && !hasRemoteUpdates) {
+    if (shouldSeed) {
+      // If presence isn't ready yet, multiple tabs might still try to seed.
+      // Use a short-lived lock to ensure only one actually writes.
       if (!tryAcquireSeedLock()) {
         if (debugEnabled) {
-          console.log('[DocEditor] seed-lock held (skip designated seed)', { documentId })
+          console.log('[DocEditor] seed-lock held (skip seed)', { documentId })
         }
         return
       }
+
       if (debugEnabled) {
         console.log('[DocEditor] seeding setContent', {
           documentId,
           initialHtmlLen: initialHtml.length,
         })
       }
+
       editor.commands.setContent(initialHtml, false)
       didSeedRef.current = true
       lastAppliedHtmlRef.current = editor.getHTML()
+      return
     }
 
-    if (!editorIsEmpty) {
-      // Editor already has content (from Yjs). Mark as seeded.
+    // If editor already has content (from sync/Yjs), mark as seeded.
+    if (!editorIsEmpty || fragment.length > 0) {
       didSeedRef.current = true
-    } else if (fragment.length > 0) {
-      if (debugEnabled && !didSeedRef.current) {
-        console.log('[DocEditor] seed-skip fragment-not-empty', {
-          documentId,
-          fragmentLen: fragment.length,
-        })
-      }
-      didSeedRef.current = true
+      return
+    }
+
+    // Safety: if we are not the designated seeder, give it a short window.
+    // If nothing arrives and we're still empty after sync, seed anyway.
+    if (seedReady && !canSeedInitialContent && initialHtml && !fallbackSeedTimerRef.current) {
+      fallbackSeedTimerRef.current = window.setTimeout(() => {
+        fallbackSeedTimerRef.current = null
+        if (didSeedRef.current) return
+        if (!editor) return
+        const nowText = editor.getText().trim()
+        const stillEmpty = nowText.length === 0
+        const stillEmptyFragment = (ydoc as unknown as Y.Doc).getXmlFragment(documentId).length === 0
+        if (!stillEmpty || hasRemoteUpdates || !stillEmptyFragment) return
+        if (!tryAcquireSeedLock()) return
+        if (debugEnabled) {
+          console.log('[DocEditor] fallback seed setContent', {
+            documentId,
+            initialHtmlLen: initialHtml.length,
+          })
+        }
+        editor.commands.setContent(initialHtml, false)
+        didSeedRef.current = true
+      }, 1200)
     }
   }, [
     editor,
@@ -245,6 +274,7 @@ type DocumentEditorProps = {
     seedReady,
     hasRemoteUpdates,
     hasReceivedSync,
+    debugEnabled,
   ])
 
   useEffect(() => {
@@ -252,9 +282,6 @@ type DocumentEditorProps = {
     if (collaborationEnabled) return
     if (!didSeedRef.current) return
 
-    // In plain editor mode (no Yjs Collaboration extension), remote collaborators
-    // update `initialHtml` via project snapshots. Keep the editor in sync when the
-    // user isn't actively editing.
     const hasFocus = editor.view?.hasFocus?.() ?? false
     if (hasFocus) return
 
@@ -274,15 +301,6 @@ type DocumentEditorProps = {
     editor.commands.setContent(next, false)
     lastAppliedHtmlRef.current = editor.getHTML()
   }, [collaborationEnabled, debugEnabled, documentId, editor, initialHtml])
-
-  useEffect(() => {
-    return () => {
-      if (fallbackSeedTimerRef.current) {
-        window.clearTimeout(fallbackSeedTimerRef.current)
-        fallbackSeedTimerRef.current = null
-      }
-    }
-  }, [])
 
   useEffect(() => {
     if (!editor) return
