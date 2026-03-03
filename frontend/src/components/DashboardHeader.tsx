@@ -44,6 +44,9 @@ type DashboardHeaderProps = {
   isAdmin: boolean
   onAdminLogin: () => void
   onAdminLogout: () => void
+  authUserName?: string
+  onLogout?: () => void
+  onManageUsers?: () => void
 
   showMobileWorkspaceTabs?: boolean
   mobileWorkspaceTab?: 'document' | 'coding'
@@ -90,6 +93,10 @@ export function DashboardHeader({
   isAdmin,
   onAdminLogin,
   onAdminLogout,
+
+  authUserName,
+  onLogout,
+  onManageUsers,
 
   showMobileWorkspaceTabs,
   mobileWorkspaceTab,
@@ -273,6 +280,9 @@ export function DashboardHeader({
               isAdmin={isAdmin}
               onAdminLogin={onAdminLogin}
               onAdminLogout={onAdminLogout}
+              authUserName={authUserName}
+              onLogout={onLogout}
+              onManageUsers={onManageUsers}
             />
           </div>
           <button
@@ -474,6 +484,15 @@ export function DashboardHeader({
                 setMobileMenuOpen(false)
                 onAdminLogout()
               }}
+              authUserName={authUserName}
+              onLogout={onLogout ? () => {
+                setMobileMenuOpen(false)
+                onLogout()
+              } : undefined}
+              onManageUsers={onManageUsers ? () => {
+                setMobileMenuOpen(false)
+                onManageUsers()
+              } : undefined}
             />
           </div>
         </div>

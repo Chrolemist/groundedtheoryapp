@@ -10,7 +10,16 @@ export default defineConfig({
         target: 'ws://127.0.0.1:8000',
         ws: true,
       },
+      '/auth': {
+        target: 'http://127.0.0.1:8000',
+      },
+      '/admin': {
+        target: 'http://127.0.0.1:8000',
+      },
       '/project': {
+        target: 'http://127.0.0.1:8000',
+      },
+      '/projects': {
         target: 'http://127.0.0.1:8000',
       },
       '/export': {

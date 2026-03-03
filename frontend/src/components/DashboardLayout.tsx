@@ -7,14 +7,22 @@ import { CollaborationLayer } from './CollaborationLayer'
 import { CodingSidebar } from './CodingSidebar'
 import { ProjectPickerModal } from './ProjectPickerModal'
 import { AdminLoginModal } from './AdminLoginModal'
+import { AdminUsersPanel } from './AdminUsersPanel'
 import { useCollaboration } from '../hooks/useCollaboration'
 import { loadStoredProjectState } from '../lib/projectStorage'
 import { useProjectState } from '../hooks/useProjectState'
 import { useProjectIO } from '../hooks/useProjectIO'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useProjectCatalog } from '../hooks/useProjectCatalog'
+import type { AuthUser } from '../lib/authApi'
 
-export function DashboardLayout() {
+type DashboardLayoutProps = {
+  authUser: AuthUser | null
+  authToken: string | null
+  onLogout: () => void
+}
+
+export function DashboardLayout({ authUser, authToken, onLogout }: DashboardLayoutProps) {
   const storageKey = 'grounded-theory-app-state'
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
@@ -43,9 +51,10 @@ export function DashboardLayout() {
   const activeProjectIdRef = useRef<string | null>(null)
   const tour = useOnboardingTour()
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(authUser?.role === 'admin')
   const [adminToken, setAdminToken] = useState<string | null>(null)
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false)
+  const [isAdminUsersOpen, setIsAdminUsersOpen] = useState(false)
   const [adminPassword, setAdminPassword] = useState('')
   const [adminLoginError, setAdminLoginError] = useState<string | null>(null)
   const [adminRetryAfterSeconds, setAdminRetryAfterSeconds] = useState<number | null>(null)
@@ -414,6 +423,13 @@ export function DashboardLayout() {
         onSubmit={submitAdminLogin}
         onClose={() => setIsAdminModalOpen(false)}
       />
+      {((isAdmin && adminToken) || (authUser?.role === 'admin' && authToken)) && (
+        <AdminUsersPanel
+          open={isAdminUsersOpen}
+          token={authToken ?? adminToken ?? ''}
+          onClose={() => setIsAdminUsersOpen(false)}
+        />
+      )}
       <ProjectPickerModal
         open={isProjectModalOpen}
         projects={catalog.projects}
@@ -467,6 +483,9 @@ export function DashboardLayout() {
         isAdmin={isAdmin}
         onAdminLogin={handleAdminLogin}
         onAdminLogout={handleAdminLogout}
+        authUserName={authUser?.name || authUser?.email || undefined}
+        onLogout={onLogout}
+        onManageUsers={(isAdmin && adminToken) || (authUser?.role === 'admin' && authToken) ? () => setIsAdminUsersOpen(true) : undefined}
 
         showMobileWorkspaceTabs={Boolean(catalogActiveProjectId) && !(isolationMode || hideSidebarMode)}
         mobileWorkspaceTab={mobileWorkspaceTab}

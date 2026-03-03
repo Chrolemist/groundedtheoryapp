@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from backend.auth import router as auth_router
 
 
 def monotonic_updated_at_ms(previous: int) -> int:
@@ -411,6 +412,7 @@ class ConnectionManager:
 
 
 app = FastAPI()
+app.include_router(auth_router)
 manager = ConnectionManager()
 
 DEFAULT_PROJECT_ID = "default"

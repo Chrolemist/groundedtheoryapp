@@ -34,6 +34,9 @@ type MenuBarProps = {
   isAdmin: boolean
   onAdminLogin: () => void
   onAdminLogout: () => void
+  authUserName?: string
+  onLogout?: () => void
+  onManageUsers?: () => void
 }
 
 type MenuItemProps = {
@@ -93,6 +96,9 @@ export function MenuBar({
   isAdmin,
   onAdminLogin,
   onAdminLogout,
+  authUserName,
+  onLogout,
+  onManageUsers,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
   const [drawerMenu, setDrawerMenu] = useState<MenuKey>('file')
@@ -220,6 +226,18 @@ export function MenuBar({
                   }
                 }}
               />
+              {isAdmin && onManageUsers && (
+                <MenuItem label="Manage users" onClick={onManageUsers} />
+              )}
+              <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+              {authUserName && (
+                <div className="px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">
+                  Signed in as {authUserName}
+                </div>
+              )}
+              {onLogout && (
+                <MenuItem label="Sign out" onClick={onLogout} destructive />
+              )}
             </>
           )}
         </div>
@@ -468,6 +486,31 @@ export function MenuBar({
                 closeMenu()
               }}
             />
+            {isAdmin && onManageUsers && (
+              <MenuItem
+                label="Manage users"
+                onClick={() => {
+                  onManageUsers()
+                  closeMenu()
+                }}
+              />
+            )}
+            <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+            {authUserName && (
+              <div className="px-3 py-1.5 text-xs text-slate-400 dark:text-slate-500">
+                Signed in as {authUserName}
+              </div>
+            )}
+            {onLogout && (
+              <MenuItem
+                label="Sign out"
+                onClick={() => {
+                  onLogout()
+                  closeMenu()
+                }}
+                destructive
+              />
+            )}
           </div>
         ) : null}
       </div>
