@@ -37,6 +37,7 @@ type MenuBarProps = {
   authUserName?: string
   onLogout?: () => void
   onManageUsers?: () => void
+  onCopyInviteLink?: () => void
 }
 
 type MenuItemProps = {
@@ -99,6 +100,7 @@ export function MenuBar({
   authUserName,
   onLogout,
   onManageUsers,
+  onCopyInviteLink,
 }: MenuBarProps) {
   const [openMenu, setOpenMenu] = useState<MenuKey | null>(null)
   const [drawerMenu, setDrawerMenu] = useState<MenuKey>('file')
@@ -184,6 +186,12 @@ export function MenuBar({
               <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
               <MenuItem label="Export as Excel" onClick={onExportExcel} />
               <MenuItem label="Export as Word" onClick={onExportWord} />
+              {onCopyInviteLink && (
+                <>
+                  <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+                  <MenuItem label="Copy invite link" onClick={onCopyInviteLink} />
+                </>
+              )}
             </>
           ) : drawerMenu === 'edit' ? (
             <>
@@ -327,6 +335,18 @@ export function MenuBar({
                 closeMenu()
               }}
             />
+            {onCopyInviteLink && (
+              <>
+                <div className="my-2 border-t border-slate-100 dark:border-slate-800" />
+                <MenuItem
+                  label="Copy invite link"
+                  onClick={() => {
+                    onCopyInviteLink()
+                    closeMenu()
+                  }}
+                />
+              </>
+            )}
           </div>
         ) : null}
       </div>

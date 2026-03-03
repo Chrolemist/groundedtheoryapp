@@ -2,7 +2,7 @@ export type AuthUser = {
   id: string
   email: string
   name: string
-  role: 'user' | 'admin'
+  role: 'user' | 'admin' | 'guest'
 }
 
 export type AuthState = {
@@ -169,6 +169,41 @@ export async function apiAdminDeleteUser(
   if (!res.ok) {
     const d = await res.json().catch(() => ({}))
     return { ok: false, detail: d.detail ?? 'Failed to delete user' }
+  }
+  return res.json()
+}
+
+// ─── Invite links ────────────────────────────────────────────
+export async function apiCreateInvite(
+  token: string,
+  projectId: string,
+): Promise<{ ok: boolean; url?: string; token?: string; detail?: string }> {
+  const res = await authFetchWithToken(`/projects/${projectId}/invite`, token, {
+    method: 'POST',
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    return { ok: false, detail: d.detail ?? 'Failed to create invite' }
+  }
+  return res.json()
+}
+
+export async function apiRedeemInvite(
+  inviteToken: string,
+): Promise<{
+  ok: boolean
+  token?: string
+  project_id?: string
+  user?: AuthUser
+  detail?: string
+}> {
+  const res = await authFetch('/auth/invite', {
+    method: 'POST',
+    body: JSON.stringify({ token: inviteToken }),
+  })
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}))
+    return { ok: false, detail: d.detail ?? 'Invalid or expired invite' }
   }
   return res.json()
 }

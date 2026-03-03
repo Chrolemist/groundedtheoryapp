@@ -47,6 +47,7 @@ type DashboardHeaderProps = {
   authUserName?: string
   onLogout?: () => void
   onManageUsers?: () => void
+  onCopyInviteLink?: () => void
 
   showMobileWorkspaceTabs?: boolean
   mobileWorkspaceTab?: 'document' | 'coding'
@@ -97,6 +98,7 @@ export function DashboardHeader({
   authUserName,
   onLogout,
   onManageUsers,
+  onCopyInviteLink,
 
   showMobileWorkspaceTabs,
   mobileWorkspaceTab,
@@ -283,6 +285,7 @@ export function DashboardHeader({
               authUserName={authUserName}
               onLogout={onLogout}
               onManageUsers={onManageUsers}
+              onCopyInviteLink={onCopyInviteLink}
             />
           </div>
           <button
@@ -492,6 +495,10 @@ export function DashboardHeader({
               onManageUsers={onManageUsers ? () => {
                 setMobileMenuOpen(false)
                 onManageUsers()
+              } : undefined}
+              onCopyInviteLink={onCopyInviteLink ? () => {
+                setMobileMenuOpen(false)
+                onCopyInviteLink()
               } : undefined}
             />
           </div>

@@ -72,6 +72,15 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 
+class InvitePayload(BaseModel):
+    project_id: str
+    expires_hours: int = 72  # default 3 days
+
+
+class RedeemInvitePayload(BaseModel):
+    token: str
+
+
 class UserOut(BaseModel):
     id: str
     email: str
@@ -153,6 +162,16 @@ def _create_reset_token(user_id: str) -> str:
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
+def _create_invite_token(project_id: str, inviter_id: str, expires_hours: int = 72) -> str:
+    payload = {
+        "project_id": project_id,
+        "inviter": inviter_id,
+        "purpose": "project_invite",
+        "exp": datetime.now(timezone.utc) + timedelta(hours=expires_hours),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 def decode_token(token: str) -> Optional[Dict]:
     try:
         return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
@@ -172,7 +191,19 @@ def get_current_user(request: Request) -> Dict:
     payload = decode_token(token)
     if not payload or "sub" not in payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = _get_user_by_id(payload["sub"])
+
+    # Guest tokens (from invite links) don't have a Firestore user record
+    sub = payload["sub"]
+    if isinstance(sub, str) and sub.startswith("guest-"):
+        return {
+            "id": sub,
+            "email": "",
+            "name": "Guest",
+            "role": "guest",
+            "project_id": payload.get("project_id"),
+        }
+
+    user = _get_user_by_id(sub)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
     return user
@@ -442,5 +473,57 @@ async def admin_create_user(payload: RegisterPayload, admin: Dict = Depends(requ
             "email": email,
             "name": user_doc["name"],
             "role": "user",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Routes – project invite links (no login required to redeem)
+# ---------------------------------------------------------------------------
+
+INVITE_EXPIRE_HOURS = int(os.getenv("INVITE_EXPIRE_HOURS", "72"))
+
+
+@router.post("/projects/{project_id}/invite")
+async def create_invite(project_id: str, user: Dict = Depends(get_current_user)):
+    """Generate a shareable invite link for a project (authenticated)."""
+    token = _create_invite_token(project_id, user["id"], INVITE_EXPIRE_HOURS)
+    url = f"{FRONTEND_URL}?invite_token={token}"
+    return {"ok": True, "token": token, "url": url, "expires_hours": INVITE_EXPIRE_HOURS}
+
+
+@router.post("/auth/invite")
+async def redeem_invite(payload: RedeemInvitePayload):
+    """Validate an invite token and return a guest session token + project id."""
+    data = decode_token(payload.token)
+    if not data or data.get("purpose") != "project_invite":
+        raise HTTPException(status_code=400, detail="Invalid or expired invite link")
+
+    project_id = data.get("project_id")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="Invite token missing project reference")
+
+    # Create a temporary guest identity (no Firestore user record needed)
+    guest_id = f"guest-{uuid4()}"
+    guest_token = jwt.encode(
+        {
+            "sub": guest_id,
+            "role": "guest",
+            "project_id": project_id,
+            "exp": datetime.now(timezone.utc) + timedelta(hours=INVITE_EXPIRE_HOURS),
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+
+    return {
+        "ok": True,
+        "token": guest_token,
+        "project_id": project_id,
+        "user": {
+            "id": guest_id,
+            "email": "",
+            "name": "Guest",
+            "role": "guest",
         },
     }

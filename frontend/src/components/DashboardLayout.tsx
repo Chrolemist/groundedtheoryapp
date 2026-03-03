@@ -14,15 +14,16 @@ import { useProjectState } from '../hooks/useProjectState'
 import { useProjectIO } from '../hooks/useProjectIO'
 import { useProjectPersistence } from '../hooks/useProjectPersistence'
 import { useProjectCatalog } from '../hooks/useProjectCatalog'
-import type { AuthUser } from '../lib/authApi'
+import { apiCreateInvite, type AuthUser } from '../lib/authApi'
 
 type DashboardLayoutProps = {
   authUser: AuthUser | null
   authToken: string | null
   onLogout: () => void
+  inviteProjectId?: string | null
 }
 
-export function DashboardLayout({ authUser, authToken, onLogout }: DashboardLayoutProps) {
+export function DashboardLayout({ authUser, authToken, onLogout, inviteProjectId }: DashboardLayoutProps) {
   const storageKey = 'grounded-theory-app-state'
   const disableLocalStorage = true
   const storedState = disableLocalStorage ? null : loadStoredProjectState(storageKey)
@@ -205,6 +206,30 @@ export function DashboardLayout({ authUser, authToken, onLogout }: DashboardLayo
   const handleSelectProject = async (projectId: string) => {
     await catalog.loadProject(projectId)
     setIsProjectModalOpen(false)
+  }
+
+  // Auto-open project when entering via invite link
+  const inviteLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!inviteProjectId || inviteLoadedRef.current) return
+    inviteLoadedRef.current = true
+    void catalog.loadProject(inviteProjectId)
+  }, [inviteProjectId, catalog])
+
+  const handleCopyInviteLink = async () => {
+    const projectId = catalog.activeProjectId
+    if (!projectId || !authToken) return
+    const res = await apiCreateInvite(authToken, projectId)
+    if (res.ok && res.url) {
+      try {
+        await navigator.clipboard.writeText(res.url)
+        window.alert('Invite link copied to clipboard!')
+      } catch {
+        window.prompt('Copy this invite link:', res.url)
+      }
+    } else {
+      window.alert(res.detail ?? 'Failed to create invite link')
+    }
   }
 
   const handleDuplicateProject = async (projectId: string) => {
@@ -486,6 +511,7 @@ export function DashboardLayout({ authUser, authToken, onLogout }: DashboardLayo
         authUserName={authUser?.name || authUser?.email || undefined}
         onLogout={onLogout}
         onManageUsers={(isAdmin && adminToken) || (authUser?.role === 'admin' && authToken) ? () => setIsAdminUsersOpen(true) : undefined}
+        onCopyInviteLink={catalogActiveProjectId && authToken && authUser?.role !== 'guest' ? handleCopyInviteLink : undefined}
 
         showMobileWorkspaceTabs={Boolean(catalogActiveProjectId) && !(isolationMode || hideSidebarMode)}
         mobileWorkspaceTab={mobileWorkspaceTab}

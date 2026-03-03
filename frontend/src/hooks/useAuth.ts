@@ -4,6 +4,7 @@ import {
   apiGetMe,
   apiLogin,
   apiRegister,
+  apiRedeemInvite,
   clearAuthStorage,
   loadAuthFromStorage,
   saveAuthToStorage,
@@ -13,6 +14,7 @@ export function useAuth() {
   const [user, setUser] = useState<AuthUser | null>(null)
   const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [inviteProjectId, setInviteProjectId] = useState<string | null>(null)
 
   // Restore session on mount
   useEffect(() => {
@@ -69,8 +71,24 @@ export function useAuth() {
   const logout = useCallback(() => {
     setUser(null)
     setToken(null)
+    setInviteProjectId(null)
     clearAuthStorage()
   }, [])
+
+  const redeemInvite = useCallback(
+    async (inviteToken: string) => {
+      const res = await apiRedeemInvite(inviteToken)
+      if (res.ok && res.token && res.user && res.project_id) {
+        setUser(res.user)
+        setToken(res.token)
+        setInviteProjectId(res.project_id)
+        // Don't persist guest sessions to localStorage
+        return { ok: true as const, projectId: res.project_id }
+      }
+      return { ok: false as const, detail: res.detail ?? 'Invalid invite link' }
+    },
+    [],
+  )
 
   return {
     user,
@@ -78,8 +96,11 @@ export function useAuth() {
     loading,
     isAuthenticated: Boolean(user && token),
     isAdmin: user?.role === 'admin',
+    isGuest: user?.role === 'guest',
+    inviteProjectId,
     login,
     register,
     logout,
+    redeemInvite,
   }
 }
