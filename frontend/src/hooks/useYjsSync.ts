@@ -83,6 +83,9 @@ const isEditingElement = (element: Element | null) => {
   if (element.closest('.document-content')) return true
   if (element.closest('.ProseMirror')) return true
   if (element.closest('#theory-narrative')) return true
+  // Recognise regular inputs / textareas so remote updates are deferred while
+  // the user is typing in code-label fields, category names, memo titles, etc.
+  if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') return true
   return false
 }
 
@@ -380,9 +383,10 @@ export function useYjsSync({
     return orderedIds.map((id) => {
       const map = codesMap.get(id)
       const fallback = currentById.get(id)
+      const yjsLabel = readScalarString(map?.get('label'))
       return {
         id,
-        label: readScalarString(map?.get('label')) || fallback?.label || 'Untitled',
+        label: yjsLabel !== '' ? yjsLabel : (fallback?.label || 'Untitled'),
         description:
           readScalarString(map?.get('description')) || fallback?.description || '',
         colorClass:
