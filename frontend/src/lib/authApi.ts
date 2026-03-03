@@ -188,6 +188,16 @@ export async function apiCreateInvite(
   return res.json()
 }
 
+export async function apiGuestLogin(): Promise<Record<string, unknown>> {
+  try {
+    const base = getApiBase()
+    const res = await fetch(`${base}/auth/guest`, { method: 'POST' })
+    return (await res.json()) as Record<string, unknown>
+  } catch {
+    return { ok: false, detail: 'Network error' }
+  }
+}
+
 export async function apiRedeemInvite(
   inviteToken: string,
 ): Promise<{

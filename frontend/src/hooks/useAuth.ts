@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { AuthUser } from '../lib/authApi'
 import {
   apiGetMe,
+  apiGuestLogin,
   apiLogin,
   apiRegister,
   apiRedeemInvite,
@@ -75,6 +76,19 @@ export function useAuth() {
     clearAuthStorage()
   }, [])
 
+  const loginAsGuest = useCallback(async () => {
+    const res = await apiGuestLogin()
+    if (res.ok && res.token && res.user) {
+      const u = res.user as AuthUser
+      const t = res.token as string
+      setUser(u)
+      setToken(t)
+      // Don't persist guest sessions to localStorage
+      return { ok: true as const }
+    }
+    return { ok: false as const, detail: (res.detail as string) ?? 'Guest login failed' }
+  }, [])
+
   const redeemInvite = useCallback(
     async (inviteToken: string) => {
       const res = await apiRedeemInvite(inviteToken)
@@ -99,6 +113,7 @@ export function useAuth() {
     isGuest: user?.role === 'guest',
     inviteProjectId,
     login,
+    loginAsGuest,
     register,
     logout,
     redeemInvite,

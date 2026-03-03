@@ -492,6 +492,31 @@ async def create_invite(project_id: str, user: Dict = Depends(get_current_user))
     return {"ok": True, "token": token, "url": url, "expires_hours": INVITE_EXPIRE_HOURS}
 
 
+@router.post("/auth/guest")
+async def guest_login():
+    """Create a temporary guest session (no account needed). For testing."""
+    guest_id = f"guest-{uuid4()}"
+    guest_token = jwt.encode(
+        {
+            "sub": guest_id,
+            "role": "guest",
+            "exp": datetime.now(timezone.utc) + timedelta(hours=24),
+        },
+        JWT_SECRET,
+        algorithm=JWT_ALGORITHM,
+    )
+    return {
+        "ok": True,
+        "token": guest_token,
+        "user": {
+            "id": guest_id,
+            "email": "",
+            "name": "Guest",
+            "role": "guest",
+        },
+    }
+
+
 @router.post("/auth/invite")
 async def redeem_invite(payload: RedeemInvitePayload):
     """Validate an invite token and return a guest session token + project id."""

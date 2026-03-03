@@ -57,6 +57,7 @@ function App() {
         resetToken={resetToken}
         onLogin={auth.login}
         onRegister={auth.register}
+        onGuestLogin={auth.loginAsGuest}
         inviteError={inviteError}
       />
     )

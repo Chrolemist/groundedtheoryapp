@@ -10,9 +10,10 @@ type AuthPageProps = {
   inviteError?: string | null
   onLogin: (email: string, password: string) => Promise<{ ok: boolean; detail?: string }>
   onRegister: (email: string, password: string, name: string) => Promise<{ ok: boolean; detail?: string }>
+  onGuestLogin?: () => Promise<{ ok: boolean; detail?: string }>
 }
 
-export function AuthPage({ initialView = 'login', resetToken, inviteError, onLogin, onRegister }: AuthPageProps) {
+export function AuthPage({ initialView = 'login', resetToken, inviteError, onLogin, onRegister, onGuestLogin }: AuthPageProps) {
   const [view, setView] = useState<AuthView>(resetToken ? 'reset' : initialView)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -159,6 +160,30 @@ export function AuthPage({ initialView = 'login', resetToken, inviteError, onLog
               {error && <ErrorBanner message={error} />}
 
               <SubmitButton label="Sign in" loading={submitting} />
+
+              {onGuestLogin && (
+                <>
+                  <div className="relative flex items-center py-1">
+                    <div className="flex-grow border-t border-slate-200 dark:border-slate-700" />
+                    <span className="mx-3 flex-shrink text-xs text-slate-400 dark:text-slate-500">or</span>
+                    <div className="flex-grow border-t border-slate-200 dark:border-slate-700" />
+                  </div>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={async () => {
+                      setError(null)
+                      setSubmitting(true)
+                      const res = await onGuestLogin()
+                      setSubmitting(false)
+                      if (!res.ok) setError(res.detail ?? 'Guest login failed')
+                    }}
+                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                  >
+                    Continue as guest
+                  </button>
+                </>
+              )}
 
               <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
                 <button
